@@ -9,11 +9,17 @@ from scipy import ndimage
 import time
 import logging
 from matplotlib import cm
+import matplotlib.colors as mcolors
 from .colors import polar_to_rgb, compress_range
 
 logger = logging.getLogger(__name__)
 
 # Get the colormap
+
+#colormap = cm.get_cmap("bwr")   ###<<< doesn't work as the Spectral_r' colormap is a LinearSegmentedColormap instead of the expected ListedColormap
+#mycmap = mcolors.LinearSegmentedColormap('my_colormap', colormap._segmentdata, 256)
+#color_list = [mycmap(i) for i in range(mycmap.N)]
+
 colormap = cm.get_cmap("viridis")  # cm.get_cmap("CMRmap")
 colormap._init()
 lut = np.array(colormap.colors)*255 # Convert matplotlib colormap from 0-1 to 0-255 for Qt

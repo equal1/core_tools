@@ -1,4 +1,5 @@
-import time
+import time, sys
+from pathlib import Path
 import numpy as np
 from qcodes import MultiParameter
 
@@ -112,8 +113,6 @@ def construct_2D_scan_fast(gate1, swing1, n_pt1, gate2, swing2, n_pt2, t_step, b
     if dig_vmax is not None:
         print(f'Parameter dig_vmax is deprecated.')
 
-    print( f'(construct_2D_scan_fast)')
-
     # set up sweep voltages (get the right order, to compenstate for the biasT).
     vp1 = swing1/2
     vp2 = swing2/2
@@ -128,6 +127,7 @@ def construct_2D_scan_fast(gate1, swing1, n_pt1, gate2, swing2, n_pt2, t_step, b
     else:
         voltages2 = voltages2_sp
 
+
     # Note: setpoints are in qcodes order
     return dummy_digitzer_scan_parameter(digitizer, None, pulse_lib, t_step,
                                          (n_pt2, n_pt1), (gate2, gate1),
@@ -140,7 +140,7 @@ class dummy_digitzer_scan_parameter(MultiParameter):
     generator for the parameter f
     """
     def __init__(self, digitizer, my_seq, pulse_lib, t_measure, shape, names, setpoint, biasT_corr, sample_rate,
-                 data_mode = 0, channels = [1,2,3]):
+                 data_mode = 0, channels = [1]):
         """
         args:
             digitizer (SD_DIG) : digizer driver:
@@ -157,6 +157,14 @@ class dummy_digitzer_scan_parameter(MultiParameter):
         """
         channel_names = [f'ch{ch}' for ch in channels]
         units = ['mV'] * len(channels)
+
+
+        sys.path.append(str(Path('~/work/eq1x-scripts/opx-scripts').expanduser()))
+        #import alice.Reflecto.opx_vm_functions.OPX_VM_Functions
+        from alice.Reflecto.opx_vm_functions import OPX_VM_Functions
+        self.opx = OPX_VM_Functions()
+        self.opx.opx_startup_2D()
+
         super().__init__(
                 name=digitizer.name,
                 names=channel_names,
@@ -182,6 +190,9 @@ class dummy_digitzer_scan_parameter(MultiParameter):
         self.channel_names = channel_names
         self.offset = 0.0
 
+       
+
+    ###########################################################################################################
     def get_raw(self):
 
         data = []
@@ -190,10 +201,13 @@ class dummy_digitzer_scan_parameter(MultiParameter):
             data.append(np.zeros(self.shape))
             data_out.append(np.zeros(self.shape))
 
+#        data_out = self.opx.get_raw()
+
         # get the data
         for i in range(len(data_out)):
             n = len(data[i].flat)
             data[i].flat = np.linspace(0, 50, n) + np.random.random(n)*10 + i*20
+            #data[i] = data_out[i]
         self.offset = (self.offset + 0.2) % 10
         # make sure that data is put in the right order.
         for i in range(len(data)):
@@ -204,8 +218,14 @@ class dummy_digitzer_scan_parameter(MultiParameter):
             else:
                 data_out[i] = data[i]
 
-        print(f'virtual get_raw() {len(data_out)=} {type(data_out)=} {len(data_out[0].shape)=}  {len(data_out[0][0])=} {data_out[0][0][34]=}')
+        #data_out = self.opx.get_raw()
+
         time.sleep(0.05)
+
+        #print(f'opx get_raw() {len(data_out)=} {type(data_out)=} {len(data_out[0].shape)=}  {len(data_out[0][0])=} {data_out[0][0][34]=}')
+
+        data_out = self.opx.opx_run_2d(data_out)
+
 
         return tuple(data_out)
 
@@ -216,7 +236,8 @@ class dummy_digitzer_scan_parameter(MultiParameter):
         pass
 
     def close(self):
-        pass
+        self.opx.opx_close()
+
 
     def __del__(self):
         pass

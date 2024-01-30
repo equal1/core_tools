@@ -3,10 +3,22 @@ from core_tools.sweeps.scans import Scan, sweep, Function, Break
 import qcodes as qc
 from qcodes import ManualParameter
 from qcodes.parameters.specialized_parameters import ElapsedTimeParameter
+import os
+from pathlib import Path
 
-ct.configure('./setup_config/ct_config_measurement.yaml')
 
-ct.launch_databrowser()
+#Path("~/work/eq1x-scripts/experiments/databases").expanduser()
+curdir = str(Path.cwd().expanduser())
+print(f'{curdir=}')
+
+yfile = str(Path('./setup_config/ct_config_measurement.yaml').absolute().resolve())
+
+#yfile = str(Path('./setup_config/ct_config_measurement.yaml').expanduser())
+print(f'{yfile=}', os.path.exists(yfile))
+
+#ct.configure('./setup_config/ct_config_measurement_minimal.yaml')
+
+#ct.launch_databrowser()
 
 station = qc.Station()
 

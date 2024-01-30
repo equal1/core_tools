@@ -158,6 +158,17 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
                               'QRM must be added to pulse_lib with  `add_digitizer`.')
             self.construct_1D_scan_fast = scan_generator_Qblox.construct_1D_scan_fast
             self.construct_2D_scan_fast = scan_generator_Qblox.construct_2D_scan_fast
+        elif scan_type == "OPX_prev":
+            from core_tools.GUI.keysight_videomaps.data_getter import scan_generator_OPX_prev
+            self.construct_1D_scan_fast = scan_generator_OPX_prev.construct_1D_scan_fast
+            self.construct_2D_scan_fast = scan_generator_OPX_prev.construct_2D_scan_fast
+            #self.construct_1D_scan_fast = scan_generator_Virtual.construct_1D_scan_fast
+            #self.construct_2D_scan_fast = scan_generator_Virtual.construct_2D_scan_fast
+        elif scan_type == "OPX":
+            from core_tools.GUI.keysight_videomaps.data_getter import scan_generator_OPX
+            self.construct_1D_scan_fast = scan_generator_OPX.construct_1D_scan_fast
+            self.construct_2D_scan_fast = scan_generator_OPX.construct_2D_scan_fast
+
         else:
             raise ValueError("Unsupported argument for scan type.")
 
@@ -636,7 +647,8 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
             self._stop_2D()
 
     def _start_2D(self):
-        try:
+        try:   # errors will only appear in the log file (which I can't easiliy find)
+        # if 1:   # during debug its easier to see any errors in the debugger
             logger.info('Starting 2D')
             if self.current_plot._2D is None:
                 logger.info('Creating 2D scan')
@@ -679,6 +691,7 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
             self.current_plot._2D.start()
         except Exception as e:
             logger.error(repr(e), exc_info=True)
+            raise
         finally:
             self.start_2D.setText("Stop")
             self.start_2D.setEnabled(True)

@@ -6,7 +6,7 @@ from qcodes.data.data_set import DataSet
 
 from core_tools.GUI.keysight_videomaps.liveplotting import liveplotting, set_data_saver
 from core_tools.GUI.keysight_videomaps.data_saver.qcodes import QCodesDataSaver
-from core_tools.GUI.keysight_videomaps.data_getter.scan_generator_Virtual import fake_digitizer
+from core_tools.GUI.keysight_videomaps.data_getter.scan_generator_OPX import fake_digitizer
 from core_tools.GUI.qt_util import qt_init
 
 from pulse_lib.base_pulse import pulselib
@@ -98,8 +98,9 @@ for i,slot in enumerate(awg_slots):
     awgs.append(awg)
     station.add_component(awg)
 
-dig = fake_digitizer("fake_digitizer")
+dig = fake_digitizer("fake_digitizer")  # creates a Multiparamter containing parameters chan_1, chan_2 of shape tuple([(20,20)]*2)
 station.add_component(dig)
+
 
 # use AWG2 for real and AWG3 for virtual gates. (It's all fake)
 gates = DummyGates('gates',
@@ -125,7 +126,8 @@ settings = {
             },
         },
     }
-plotting = liveplotting(pulse, dig, "Virtual", settings, iq_mode='I+Q') #, gates=gates)
+#plotting = liveplotting(pulse, dig, "Tektronix", settings, iq_mode='I+Q') #, gates=gates)
+plotting = liveplotting(pulse, dig, "OPX", settings, iq_mode='I+Q') #, gates=gates)
 
 # ALL SETTIMGS:
 #settings = {
@@ -154,6 +156,9 @@ plotting = liveplotting(pulse, dig, "Virtual", settings, iq_mode='I+Q') #, gates
 #        'max_V_swing': 250,
 #        }
 #    }
+
+
+
 
 plotting._2D_gate2_name.setCurrentIndex(1)
 plotting._2D_t_meas.setValue(1)

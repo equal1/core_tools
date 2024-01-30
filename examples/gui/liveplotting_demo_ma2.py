@@ -125,7 +125,8 @@ settings = {
             },
         },
     }
-plotting = liveplotting(pulse, dig, "Virtual", settings, iq_mode='I+Q') #, gates=gates)
+#plotting = liveplotting(pulse, dig, "Tektronix", settings, iq_mode='I+Q') #, gates=gates)
+plotting = liveplotting(pulse, dig, "OPX", settings, iq_mode='I+Q') #, gates=gates)
 
 # ALL SETTIMGS:
 #settings = {
@@ -154,6 +155,9 @@ plotting = liveplotting(pulse, dig, "Virtual", settings, iq_mode='I+Q') #, gates
 #        'max_V_swing': 250,
 #        }
 #    }
+
+
+
 
 plotting._2D_gate2_name.setCurrentIndex(1)
 plotting._2D_t_meas.setValue(1)
