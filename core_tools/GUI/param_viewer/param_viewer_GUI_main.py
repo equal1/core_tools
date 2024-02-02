@@ -31,6 +31,7 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
         self.max_diff = max_diff
         self.keysight_rf = keysight_rf
         self.locked = locked
+        self.real_gates_qt_voltage_input = dict()
 
         if gates_object:
             self.gates_object = gates_object
@@ -197,7 +198,8 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
         voltage_input.setMinimumSize(QtCore.QSize(100, 0))
 
         if not virtual:
-            voltage_input.setRange(-4000.0, 4000.0)
+            #voltage_input.setRange(-4000.0, 4000.0)
+            voltage_input.setRange(-10000.0, 10000.0)
         else:
             # QDoubleSpinBox needs a limit. Set it high for virtual voltage
             voltage_input.setRange(-9999.99, 9999.99)
@@ -215,18 +217,37 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
         else:
             self.virtual_gates.append(param_data_obj(parameter,  voltage_input, 1))
 
+        # Need to save away the handle to the voltage_input QDoubleSpinBox 
+        # so that we can update the different gates from the self.dependant_gate_map
+        self.real_gates_qt_voltage_input[name] = voltage_input
+
     @qt_log_exception
-    def _set_gate(self, gate, value, voltage_input):
+    def _set_gate(self, gate, value, voltage_input, alt_value=None):
         if self.locked:
             logger.warning('Not changing voltage, ParameterViewer is locked!')
             # Note value will be restored by _update_parameters
             return
 
-        delta = abs(value() - gate())
+        # The original function takes arg 'value' in the form of a Qt type which
+        # makes it a little awkward to reuse this function when running the 
+        # update_dependant_gates function, therefore the alt_val was added 
+        # so that a simple numeric value can be used instead  (ma)
+        if alt_value:
+            val = alt_value
+        else:
+            val = value()
+
+        delta = abs(val - gate())
+
+        #print( f'(_set_gate) {value=} {val=}  {type(value)=}')
         if self.max_diff is not None and delta > self.max_diff:
-            logger.warning(f'Not setting {gate} to {value():.1f}mV. '
+            logger.warning(f'Not setting {gate} to {val:.1f}mV. '
                            f'Difference {delta:.0f} mV > {self.max_diff:.0f} mV')
             return
+
+        # If the alt_value was used we must update the gui input
+        if alt_value:
+            voltage_input.setValue(val)
 
         try:
             last_value = gate.get()
@@ -234,9 +255,50 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
             current_text = voltage_input.textFromValue(last_value)
             if new_text != current_text:
                 logger.info(f'GUI value changed: set gate {gate.name} {current_text} -> {new_text}')
-                gate.set(value())
+                gate.set(val)
+                # Look for any dependant gates to change (ma)
+                # if there are then change each one of them according to the gate_dependancy_map
+                self.update_dependant_gates(gate, val)
         except Exception as ex:
-            logger.error(f'Failed to set gate {gate} to {value()}: {ex}')
+            logger.error(f'Failed to set gate {gate} to {val}: {ex}')
+            raise
+
+    @qt_log_exception
+    def update_dependant_gates(self, gate, value):
+        '''
+        Function that looks at self.gate_object.dependant_gate_map which defines a list of
+        gates which are dependant on each other. Then will change the value of each dependant
+        gate based on the map (ma)
+        # TODO Peters LikedParameter could be used to do this
+        '''
+        if hasattr(self.gates_object, 'dependant_gate_map'):
+            dpgmap = self.gates_object.dependant_gate_map
+            if gate.name in dpgmap:
+                # Found one or more gates that are dependant on this gate
+                # now update those gates based on the dependant_gate_map
+                # which looks like this:
+                # gates.dependant_gate_map = {
+                # #    gate              mult    gate1     mult1   ofs    gate2
+                # #     V                  V      V         V       V       V
+                #     'Vds'         :  [[+0.5,  'Vcm',    +1.0 ,   0.0,   'HG07b'],  # changing Vds will update HG07b
+                #                       [-0.5,  'Vcm',     1.0 ,   0.0,   'HG12b']], # changing Vds will update HG12b
+                # where the following operation is performed
+                # gate2 =  gate*mult + gate1*mult1 + ofs 
+                # HG07b =   Vds*0.5  +   Vcm*1.0   + ofs
+                #print( f'(update_dependant_gates) {gate.name=} {value=} {dpgmap[gate.name]=}  ')
+                for dep in dpgmap[gate.name]:
+                    mult   = dep[0]
+                    gate1  = dep[1]
+                    mult1  = dep[2]
+                    ofs    = dep[3]
+                    gate2  = dep[4]
+                    #print( '(update_dependant_gates)' , gate1, mult, ofs, gate2 )
+                    gate1_current_voltage = self.gates_object[gate1]()
+                    qt_voltage_input = self.real_gates_qt_voltage_input[gate2]
+                    gate2_new_voltage =  (value * mult) + (gate1_current_voltage * mult1) + ofs
+                    gate2_obj = self.gates_object[gate2]
+                    print( f'(update_dependant_gates) {gate.name=}={value} {gate1=}={gate1_current_voltage} {mult=} {ofs=} {gate2=}={gate2_new_voltage}' )
+                    self._set_gate(  gate2_obj, None, qt_voltage_input, alt_value=gate2_new_voltage )
 
     @qt_log_exception
     def _set_set(self, setting, value, division):
