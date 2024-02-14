@@ -38,6 +38,8 @@ class virtual_gates_mgr():
 
         virtual_gate_matrix = load_virtual_gate(name, gates, virtual_gates, matrix,
                                                 normalization=normalization)
+        #virtual_gate_matrix = 'virtual_gate_matrix not defined .. no database available'
+        
         setattr(self, name, virtual_gate_matrix)
         return virtual_gate_matrix
 
@@ -93,10 +95,10 @@ class awg2dac_ratios_mgr():
 
         self._ratios[gate] = value
 
-        conn = SQL_database_manager().conn_local
-        ratios_db = AWG_2_dac_ratio_queries.get_AWG_2_dac_ratios(conn, 'general')
-        ratios_db[gate] = value
-        AWG_2_dac_ratio_queries.set_AWG_2_dac_ratios(conn, 'general', ratios_db)
+        # conn = SQL_database_manager().conn_local
+        # ratios_db = AWG_2_dac_ratio_queries.get_AWG_2_dac_ratios(conn, 'general')
+        # ratios_db[gate] = value
+        # AWG_2_dac_ratio_queries.set_AWG_2_dac_ratios(conn, 'general', ratios_db)
 
     def __len__(self):
         return len(self._ratios.keys())

@@ -87,11 +87,17 @@ def create_pulse_lib(awgs):
         pulse.add_awg(awg)
 
         # define channels
-        for ch in range(1,5):
-            pulse.define_channel(f'{awg.name}_{ch}', awg.name, ch)
+        #chs = ['HG13b', 'HG11b', 'HG09b', 'Vds', 'Vcm'] #['Vgs13', 'Vgs11', 'Vgs09', 'vVds', 'vVcm']
+        #chs = [] #['Vgs13', 'Vgs11', 'Vgs09', 'vVds', 'vVcm']
+        chs =  ["HG13b", "HG11b", "HG09b", "HG07b", "HG12b"]
+        for ch in chs:
+            pulse.define_channel(ch, awg.name, ch)
 
     pulse.finish_init()
     return pulse
+
+
+
 
 
 station = qcodes.Station()
@@ -107,6 +113,10 @@ from qualang_tools.external_frameworks.qcodes.opx_driver import OPX
 # opx = OPX(config, name="OPX_alice", host="opx-sc-001", port='11253', close_other_machines=True)
 # #Add the OPX instrument to the QCoDeS station
 # station.add_component(opx)
+
+
+
+
 
 qdac2_addr = 'qdac-sc-001'
 qdac2 = QDAC2.QDac2('QDAC', visalib='@py', address=f'TCPIP::{qdac2_addr}::5025::SOCKET')
@@ -188,39 +198,62 @@ hw = Hardware("hardware")
 
 hw.dac_gate_map = {
     'Varactor_ctl': (0,10),  
-    'Vcm'         : (0,20),
-    'Vds'         : (0,21),
-    'Vgs09'       : (0,22),
-    'Vgs11'       : (0,23),
-    'Vgs13'       : (0,24),
-    'HG09b'       : (0,12),
-    'HG11b'       : (0,11),
+    # 'Vcm'         : (0,20),
+    # 'Vds'         : (0,21),
+    # 'Vgs09'       : (0,22),
+    # 'Vgs11'       : (0,23),
+    # 'Vgs13'       : (0,24),
     'HG13b'       : (0,13),
+    'HG11b'       : (0,11),
+    'HG09b'       : (0,12),
     'HG07b'       : (0,14),
     'HG12b'       : (0,15),
 }
+
+# The signals Vcm, Vds, Vgs09, Vgs11, Vgs13, are really 'virtual'
+# signals. But they have been implemented here as real signals. 
+# These signals  are mapped to unused dac channels on the QDAC2. 
+# This means that along with the other signals they retain their 
+# last voltage values when the software terminates, and when a 
+# new session is started the signals do not need to be initialized.
+
+# Currently the virtual gate mapping functions require that an
+# SQL database is operational such that the virtual gate values 
+# are remembered from one session to the next. We don't have SQL
+# running so mapping all signals to real hardware channels
+
+# But they are mapped to real channels on the QDAC2 
 
 
 
 # mV limits
 hw.boundaries = {name: (-10000, +10000) for name in hw.dac_gate_map}
 
-# v_gate_names = ["SD1P", "P1", "P2", "B1"]
-#v_gate_names = ["HG09b", "HG11b", "HG13b", "Vcm", 'Vds']
-# assert all(name in hw.dac_gate_map for name in v_gate_names)
+v_gate_names = ["Vgs13", "Vgs11", "Vgs09", "Vds", "Vcm"]
+gate_names = ["HG13b", "HG11b", "HG09b", "HG07b", "HG12b"]
+#assert all(name in hw.dac_gate_map for name in v_gate_names)  # not sure this is needed or why it was required (ma)
 # P1, P2 = M * (P1, P2)
-##this matrix should be taken directly from the program
-# AWG_VirtGateMatrix = [
-#     [1.0, -0.058, -0.023],
-#     [0, 1.0, -0.144],
-#     [0, -0.41, 1],
-#     # [1.0, -0.144],
-#     # [-0.41, 1.0],
-# ]
-# hw.virtual_gates.add(
-#     "v_gates",
-#     gates=v_gate_names,
-# )
+
+# In the case of the Alpha3 Vcm and Vds offset voltages the 
+# Matrix to go from virtual voltages to real voltages is simple
+# but we need to use the inverse matrix for the pulse_lib functions
+# (note pulse.add_virtual_matrix( real2virtual=False) does not seem to work)
+v2r_VirtGateMatrix = [
+    # Vgs13    Vgs11    Vgs09    Vds     Vcm
+    [  1,        0,       0,      0,      1  ],   # HG13b
+    [  0,        1,       0,      0,      1  ],   # HG11b
+    [  0,        0,       1,      0,      1  ],   # HG09b
+    [  0,        0,       0,    +0.5,     1  ],   # HG07b
+    [  0,        0,       0,    -0.5,     1  ],   # HG12b
+] 
+r2v_VirtGateMatrix = np.linalg.inv(v2r_VirtGateMatrix)
+
+hw.virtual_gates.add(
+    "v_gates",
+    gates=gate_names,
+    virtual_gates=v_gate_names,
+    matrix = r2v_VirtGateMatrix,
+)
 #gates = Gates("gates", hardware=hw, dac_sources=[d5a_1, d5a_2, d5a_3], dc_gain={})
 gates = Gates("gates", hardware=hw, dac_sources=[qdac2,fdac1], dc_gain={})
 
@@ -263,12 +296,11 @@ set_data_saver(QCodesDataSaver())
 
 #station = qcodes.Station()
 
-awg_slots = [2,3]
-awgs = []
-for i,slot in enumerate(awg_slots):
-    awg = DummyAwg(f'AWG{slot}')
-    awgs.append(awg)
-    station.add_component(awg)
+# Create a dummy OPXQDAC AWG for performing the OPX sweeps
+awg = DummyAwg(f'SWPQDAC')
+awgs = [awg]
+station.add_component(awg)
+
 
 dig = fake_digitizer("fake_digitizer")  # creates a Multiparamter containing parameters chan_1, chan_2 of shape tuple([(20,20)]*2)
 station.add_component(dig)
@@ -282,19 +314,40 @@ station.add_component(gates)
 
 pulse = create_pulse_lib(awgs)
 
+pulse.add_virtual_matrix(
+    name="AWG_VirtGateMatrix",
+    #real_gate_names= ["Vgs13", "Vgs11", "Vgs09", "vVds", "vVcm"],  
+    #virtual_gate_names=["HG13b", "HG11b", "HG09b", "Vds", "Vcm"],
+    real_gate_names=    ["HG13b", "HG11b", "HG09b", "HG07b", "HG12b"],
+    virtual_gate_names= ["Vgs13", "Vgs11", "Vgs09", "Vds", "Vcm"],  
+    #as a temporary solution we define the matrix manually, ideally we should take the input from the one defined in the GUI
+    #should be smthg like VirtGateMatrixGUI()
+    matrix=r2v_VirtGateMatrix,
+    real2virtual=False,  # If True v_real = M^-1 @ v_virtual else v_real = M @ v_virtual ## not sure this is doing anything the way i'm using it!
+    filter_undefined=False,
+    keep_squared=True,
+)
+
 settings = {
     'gen':{
         '2D_colorbar':True,
         '2D_cross':True,
-        'max_V_swing': 250,
+        'max_V_swing': 500,
         },
     '1D':{
         'offsets':{'AWG3_1': 10.0},
         },
     '2D':{
+
+        "gate1_name": "Vgs13",
+        "V1_swing": 100.0,  # mV
+        "gate2_name": "Vgs11",
+        "V2_swing": 330.0,  # mV
+
+
         'offsets':{
-            'AWG2_1': 12.0,
-            'AWG2_2': 1.0,
+            'Vgs13': 500,
+            'Vgs11': 800,
             },
         },
     }
@@ -303,7 +356,7 @@ settings = {
 # we cause the liveplotting function to exit and defer the running
 # the app.exec() mainloop. This allows the running of the ParamViewerGui
 app = PyQt5.QtWidgets.QApplication([])
-plotting = liveplotting(pulse, dig, "OPX", settings, iq_mode='I+Q') #, gates=gates)
+plotting = liveplotting(pulse, dig, "OPX", settings, iq_mode='I+Q', gates=gates)
 param_viewer = ParamViewerGUI(gates_object=gates, max_diff=10000)
 app.exec()
 

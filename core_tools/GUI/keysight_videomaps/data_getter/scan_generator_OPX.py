@@ -162,8 +162,11 @@ class dummy_digitzer_scan_parameter(MultiParameter):
         sys.path.append(str(Path('~/work/eq1x-scripts/opx-scripts').expanduser()))
         #import alice.Reflecto.opx_vm_functions.OPX_VM_Functions
         from alice.Reflecto.opx_vm_functions import OPX_VM_Functions
-        self.opx = OPX_VM_Functions()
+        self.opx = OPX_VM_Functions(pulse_lib)
         self.opx.opx_startup_2D()
+
+        
+
 
         super().__init__(
                 name=digitizer.name,

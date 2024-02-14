@@ -8,35 +8,39 @@ from .virtual_gate_matrix import VirtualGateMatrix
 
 
 def load_virtual_gate(name, real_gates, virtual_gates=None, matrix=None, normalization=False):
-    conn = SQL_database_manager().conn_local
-    virtual_gate_queries.generate_table(conn)
+    # Removing all sql database access (ma)
+    # conn = SQL_database_manager().conn_local
+    # virtual_gate_queries.generate_table(conn)
 
     if virtual_gates is None:
         virtual_gates = ['v'+gate_name for gate_name in real_gates]
+#        virtual_gates = [gate_name for gate_name in real_gates]  # getting rid of 'v' prefix in the hope it makes it more usefull for A3 Vgs13 -> Vgs13 (instead of Vgs13 -> vVgs13) (ma)
 
     if matrix is None:
         matrix = np.eye(len(real_gates))
     else:
         matrix = np.asarray(matrix)
 
-    if virtual_gate_queries.check_var_in_table_exist(conn, name):
-        real_gate_db, virtual_gate_db, matrix_db = virtual_gate_queries.get_virtual_gate_matrix(conn, name)
+    # Removing all sql database access (ma)
+    # if virtual_gate_queries.check_var_in_table_exist(conn, name):
+    #     real_gate_db, virtual_gate_db, matrix_db = virtual_gate_queries.get_virtual_gate_matrix(conn, name)
 
-        # indices of rows/columns that exist in stored matrix.
-        n = len(real_gates)
-        indices = [None]*n
-        for i,gate_name in enumerate(real_gates):
-            if gate_name in real_gate_db:
-                indices[i] = real_gate_db.index(gate_name)
+    #     # indices of rows/columns that exist in stored matrix.
+    #     n = len(real_gates)
+    #     indices = [None]*n
+    #     for i,gate_name in enumerate(real_gates):
+    #         if gate_name in real_gate_db:
+    #             indices[i] = real_gate_db.index(gate_name)
 
-        for i in range(n):
-            for j in range(n):
-                if indices[i] is not None and indices[j] is not None:
-                    matrix[i,j] = matrix_db[indices[i], indices[j]]
+    #     for i in range(n):
+    #         for j in range(n):
+    #             if indices[i] is not None and indices[j] is not None:
+    #                 matrix[i,j] = matrix_db[indices[i], indices[j]]
 
     data = VirtualGateMatrixData(name, real_gates, virtual_gates, matrix)
     data.saver = save_virtual_gate
-    data.save()
+    # Removing all sql database access (ma)
+    #data.save()
 
     return VirtualGateMatrix(data, normalization=normalization)
 

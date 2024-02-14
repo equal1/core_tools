@@ -258,7 +258,7 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
                 gate.set(val)
                 # Look for any dependant gates to change (ma)
                 # if there are then change each one of them according to the gate_dependancy_map
-                self.update_dependant_gates(gate, val)
+                #self.update_dependant_gates(gate, val)
         except Exception as ex:
             logger.error(f'Failed to set gate {gate} to {val}: {ex}')
             raise
