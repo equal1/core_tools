@@ -5,6 +5,7 @@ from PyQt5 import QtCore, QtWidgets
 import qcodes as qc
 from dataclasses import dataclass
 from ..qt_util import qt_log_exception
+import numpy as np
 
 import logging
 
@@ -358,7 +359,8 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
                         if current_text != new_text:
                             logger.info(f'Update GUI {param.param_parameter.name} {current_text} -> {new_text}')
                             gui_input.setValue(new_value)
-                            if gui_input.text() != new_text:
+                            # if gui_input.text() != new_text:
+                            if not np.isclose( float(gui_input.text()), float(new_text)): # compare the actual values here (not the text string)
                                 print(f'WARNING: {param.param_parameter.name} corrected from '
                                       f'{new_text} to {gui_input.text()}')
                 elif isinstance(param.gui_input_param, QtWidgets.QCheckBox):

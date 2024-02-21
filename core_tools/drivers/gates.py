@@ -100,6 +100,10 @@ class gates(qc.Instrument):
             dac_voltage = voltage
             logger.info(f'set {gate_name} {voltage:.1f} mV')
         self.dac_sources[dac_location[0]].set(f'dac{int(dac_location[1])}', dac_voltage)
+        # If there is a second channel dac_location[2] then write the same value to it
+        # note: the _get_voltage function only reads from dac_location[1])
+        if len(dac_location) >= 3:
+            self.dac_sources[dac_location[0]].set(f'dac{int(dac_location[2])}', dac_voltage)
 
     def _get_voltage(self, gate_name):
         '''

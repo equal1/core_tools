@@ -158,15 +158,12 @@ class dummy_digitzer_scan_parameter(MultiParameter):
         channel_names = [f'ch{ch}' for ch in channels]
         units = ['mV'] * len(channels)
 
+        #sys.path.append(str(Path('~/work/eq1x-scripts/opx-scripts').expanduser()))
+        #from alice.Reflecto.opx_vm_functions import OPX_VM_Functions
+        # self.opx = OPX_VM_Functions(pulse_lib)
+        # self.opx.opx_startup_2D()
 
-        sys.path.append(str(Path('~/work/eq1x-scripts/opx-scripts').expanduser()))
-        #import alice.Reflecto.opx_vm_functions.OPX_VM_Functions
-        from alice.Reflecto.opx_vm_functions import OPX_VM_Functions
-        self.opx = OPX_VM_Functions(pulse_lib)
-        self.opx.opx_startup_2D()
-
-        
-
+        pulse_lib.opx.opx_update_sweep(names,setpoint)
 
         super().__init__(
                 name=digitizer.name,
@@ -194,43 +191,12 @@ class dummy_digitzer_scan_parameter(MultiParameter):
         self.offset = 0.0
 
        
-
     ###########################################################################################################
     def get_raw(self):
-
-        data = []
-        data_out = []
-        for i in self.channels:
-            data.append(np.zeros(self.shape))
-            data_out.append(np.zeros(self.shape))
-
-#        data_out = self.opx.get_raw()
-
-        # get the data
-        for i in range(len(data_out)):
-            n = len(data[i].flat)
-            data[i].flat = np.linspace(0, 50, n) + np.random.random(n)*10 + i*20
-            #data[i] = data_out[i]
-        self.offset = (self.offset + 0.2) % 10
-        # make sure that data is put in the right order.
-        for i in range(len(data)):
-            data[i] = data[i].reshape(self.shape)
-            if self.biasT_corr:
-                data_out[i][:len(data[i][::2])] = data[i][::2]
-                data_out[i][len(data[i][::2]):] = data[i][1::2][::-1]
-            else:
-                data_out[i] = data[i]
-
-        #data_out = self.opx.get_raw()
-
-        time.sleep(0.05)
-
+        data_out = self.pulse_lib.opx.opx_run_2d()
         #print(f'opx get_raw() {len(data_out)=} {type(data_out)=} {len(data_out[0].shape)=}  {len(data_out[0][0])=} {data_out[0][0][34]=}')
-
-        data_out = self.opx.opx_run_2d(data_out)
-
-
         return tuple(data_out)
+    ###########################################################################################################
 
     def stop(self):
         pass
@@ -240,7 +206,6 @@ class dummy_digitzer_scan_parameter(MultiParameter):
 
     def close(self):
         self.opx.opx_close()
-
 
     def __del__(self):
         pass
