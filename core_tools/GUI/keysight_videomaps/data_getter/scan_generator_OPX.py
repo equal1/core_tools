@@ -163,19 +163,7 @@ class dummy_digitzer_scan_parameter(MultiParameter):
         # self.opx = OPX_VM_Functions(pulse_lib)
         # self.opx.opx_startup_2D()
 
-        pulse_lib.opx.opx_update_sweep(names,setpoint)
 
-        super().__init__(
-                name=digitizer.name,
-                names=channel_names,
-                shapes=tuple([shape]*len(channels)),
-                labels=channel_names,
-                units=units,
-                setpoints=tuple([setpoint]*len(channels)),
-                setpoint_names=tuple([names]*len(channels)),
-                setpoint_labels=tuple([names]*len(channels)),
-                setpoint_units=tuple([tuple(["mV"]*len(names))]*len(channels)),
-                docstring='scan parameter for digitizer')
 
         self.dig = digitizer
         self.my_seq = my_seq
@@ -189,6 +177,21 @@ class dummy_digitzer_scan_parameter(MultiParameter):
         self.shape = shape
         self.channel_names = channel_names
         self.offset = 0.0
+
+        super().__init__(
+                name=digitizer.name,
+                names=channel_names,
+                shapes=tuple([shape]*len(channels)),
+                labels=channel_names,
+                units=units,
+                setpoints=tuple([setpoint]*len(channels)),
+                setpoint_names=tuple([names]*len(channels)),
+                setpoint_labels=tuple([names]*len(channels)),
+                setpoint_units=tuple([tuple(["mV"]*len(names))]*len(channels)),
+                docstring='scan parameter for digitizer')
+
+        pulse_lib.opx.opx_update_sweep(names, setpoint, t_measure, sample_rate)
+
 
        
     ###########################################################################################################
