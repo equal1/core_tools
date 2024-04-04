@@ -111,7 +111,10 @@ class gates(qc.Instrument):
         Args:
             gate_name (str) : name of the gate to set
         '''
+
         dac_location = self.hardware.dac_gate_map[gate_name]
+        if dac_location[0] == 2:  # dac location 2 is for opx instrument, we can't read it, its for pulsing only
+            return 0.0
         voltage = getattr(self.dac_sources[dac_location[0]], f'dac{int(dac_location[1])}').cache()
         if gate_name in self.dc_gain:
             return voltage * self.dc_gain[gate_name]
