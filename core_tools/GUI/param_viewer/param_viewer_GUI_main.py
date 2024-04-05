@@ -6,11 +6,17 @@ import qcodes as qc
 from dataclasses import dataclass
 from ..qt_util import qt_log_exception
 import numpy as np
-
+import os
+import json
+from pathlib import Path
 import logging
+from eq1x.util.utils import find_opx_element
 
 logger = logging.getLogger(__name__)
 
+
+SETTINGS_FILE = os.path.join(str(Path.home()), '.liveplotting_settings.cfg')
+print(f'{SETTINGS_FILE=}')
 
 @dataclass
 class param_data_obj:
@@ -33,6 +39,9 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
         self.keysight_rf = keysight_rf
         self.locked = locked
         self.real_gates_qt_voltage_input = dict()
+        self.SETTINGS_DICT = dict()
+
+        self.load_settings_file()
 
         if gates_object:
             self.gates_object = gates_object
@@ -67,15 +76,29 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
             except Exception as e:
                 logger.error(f'Failed to add keysight RF {e}')
 
+        # Look for the opx, we curently cannot set the opx channels directly
+        # therefore we must exclude all opx channels from being initialized
+        try:
+            opx_instr = self.station.get_component('opx_instr')
+        except:
+            opx_instr = None
+
         # add real gates
         for gate_name in self.gates_object.hardware.dac_gate_map.keys():
             param = getattr(self.gates_object, gate_name)
             self._add_gate(param, False)
+            if gate_name in self.SETTINGS_DICT:
+                if not find_opx_element( opx_instr, gate_name):
+                    param.set( self.SETTINGS_DICT[gate_name])
 
         # add virtual gates
         for gate_name in self.gates_object.v_gates:
             param = getattr(self.gates_object, gate_name)
             self._add_gate(param, True)
+            if gate_name in self.SETTINGS_DICT:
+                if not find_opx_element( opx_instr, gate_name):
+                    param.set( self.SETTINGS_DICT[gate_name])
+
 
         self.step_size.clear()
         items = [100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1]
@@ -97,6 +120,7 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
 
     @qt_log_exception
     def closeEvent(self, event):
+        self.save_settings_file()
         self.timer.stop()
 
     @qt_log_exception
@@ -260,9 +284,11 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
                 # Look for any dependant gates to change (ma)
                 # if there are then change each one of them according to the gate_dependancy_map
                 #self.update_dependant_gates(gate, val)
+            self.update_settings_value(gate.name, val)
         except Exception as ex:
             logger.error(f'Failed to set gate {gate} to {val}: {ex}')
             raise
+
 
     @qt_log_exception
     def update_dependant_gates(self, gate, value):
@@ -347,6 +373,7 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
         else:
             return
 
+        updated_value = False
         for param in params:
             try:
                 # do not update when a user clicks on it.
@@ -363,7 +390,56 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
                             if not np.isclose( float(gui_input.text()), float(new_text)): # compare the actual values here (not the text string)
                                 print(f'WARNING: {param.param_parameter.name} corrected from '
                                       f'{new_text} to {gui_input.text()}')
+                        # Save the value in the settings dict
+                        # and if the value changed we will save the settings file
+                        if self.update_settings_value( param.param_parameter.name, new_value):
+                            updated_value = True
                 elif isinstance(param.gui_input_param, QtWidgets.QCheckBox):
                     param.gui_input_param.setChecked(param.param_parameter())
             except Exception:
                 logger.error(f'Error updating {param}', exc_info=True)
+
+        if updated_value:
+            self.save_settings_file()
+
+
+    ##############################################################
+    def load_settings_file(self):
+
+        if os.access(SETTINGS_FILE, os.R_OK):
+
+            # print( '---------------------------------------------------' )
+            print( '...loading param_viewer settings from file:', SETTINGS_FILE )
+            # print( '---------------------------------------------------' )
+            try:
+                with open(SETTINGS_FILE, 'r') as f:
+                    self.SETTINGS_DICT = json.load(f)
+            except:
+                print(f'***ERROR*** while trying to read settings file {SETTINGS_FILE}, voltages may not be correctly setup as expected')
+
+        else:
+            print(f'***warning*** could not read param_viewer settings file {SETTINGS_FILE}, voltages may not be correctly setup as expected')
+
+    ##############################################################
+    def update_settings_value(self, param_name, param_value):
+
+        if param_name not in self.SETTINGS_DICT or self.SETTINGS_DICT[param_name] != param_value :
+            changed = True
+        else:
+            changed = False
+
+        self.SETTINGS_DICT[param_name] = param_value
+
+        return changed
+    
+
+
+    ##############################################################
+    def save_settings_file(self):
+
+        print(f'... saving param_viewer settings file {SETTINGS_FILE}')
+
+        with open(SETTINGS_FILE, 'w') as f:
+            json.dump(self.SETTINGS_DICT,f,  indent=4)
+
+
