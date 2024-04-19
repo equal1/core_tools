@@ -122,6 +122,15 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
     def closeEvent(self, event):
         self.save_settings_file()
         self.timer.stop()
+        station = qc.Station.default
+
+        # stut down the sweeps that are playing
+        opx = station.get_component('opx_instr')
+        if opx.job:
+            opx.job.halt()
+        qdac2 = station.get_component('opx_instr')
+        qdac2.abort()  
+
 
     @qt_log_exception
     def update_step(self, value: float):
@@ -284,7 +293,8 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
                 # Look for any dependant gates to change (ma)
                 # if there are then change each one of them according to the gate_dependancy_map
                 #self.update_dependant_gates(gate, val)
-            self.update_settings_value(gate.name, val)
+            if self.update_settings_value(gate.name, val):
+                self.save_settings_file()
         except Exception as ex:
             logger.error(f'Failed to set gate {gate} to {val}: {ex}')
             raise
@@ -425,10 +435,12 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
 
         if param_name not in self.SETTINGS_DICT or self.SETTINGS_DICT[param_name] != param_value :
             changed = True
+            #print(f'(update_settings_value) UPDATED  {param_name}, {param_value}')
         else:
             changed = False
 
         self.SETTINGS_DICT[param_name] = param_value
+
 
         return changed
     
@@ -437,7 +449,7 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
     ##############################################################
     def save_settings_file(self):
 
-        print(f'... saving param_viewer settings file {SETTINGS_FILE}')
+        #print(f'... saving param_viewer settings file {SETTINGS_FILE}')
 
         with open(SETTINGS_FILE, 'w') as f:
             json.dump(self.SETTINGS_DICT,f,  indent=4)
