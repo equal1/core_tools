@@ -69,6 +69,11 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
                 for RFpar in self.gates_object.hardware.RF_params:
                     param = getattr(inst, RFpar)
                     self._add_RFset(param)
+                    if RFpar in self.SETTINGS_DICT:
+                        val = self.SETTINGS_DICT[RFpar]
+                        if 'freq' in RFpar.lower():
+                            val = val * 1e6
+                        param.set(val)
         if self.keysight_rf is not None:
             try:
                 for ks_param in self.keysight_rf.all_params:
@@ -340,9 +345,10 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
     @qt_log_exception
     def _set_set(self, setting, value, division):
         logger.info(f'setting {setting} to {value():.1f} times {division:.1f}')
+        print(f'(_set_set) {setting=} {value()=} {division=}')
         setting.set(value()*division)
-        self.gates_object.hardware.RF_settings[setting.full_name] = value()*division
-        self.gates_object.hardware.sync_data()
+        #self.gates_object.hardware.RF_settings[setting.full_name] = value()*division
+        #self.gates_object.hardware.sync_data()
 
     @qt_log_exception
     def _set_bool(self, setting, value):
