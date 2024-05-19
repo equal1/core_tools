@@ -177,7 +177,7 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
 
         if 'freq' in parameter.name:
             division = 1e6
-            step_size = 0.1
+            step_size = 0.01
             unit = f'M{unit}'
 
         _translate = QtCore.QCoreApplication.translate
@@ -201,6 +201,7 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
             set_input.valueChanged.connect(lambda: self._set_set(parameter, set_input.value, division))
             set_input.setKeyboardTracking(False)
             set_input.setSingleStep(step_size)
+            set_input.setDecimals(3)
 
         layout.addWidget(set_input, i, 1, 1, 1)
 
