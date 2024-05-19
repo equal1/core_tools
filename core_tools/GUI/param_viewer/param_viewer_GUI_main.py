@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import __main__ as main_package
 from typing import Optional
 from core_tools.GUI.param_viewer.param_viewer_GUI_window import Ui_MainWindow
 from PyQt5 import QtCore, QtWidgets
@@ -14,8 +15,13 @@ from eq1x.util.utils import find_opx_element
 
 logger = logging.getLogger(__name__)
 
+try:
+    SCRIPT = main_package.__file__
+    SCRIPTNAME = os.path.splitext(os.path.basename(SCRIPT))[0]
+except Exception:
+    SCRIPTNAME = 'liveplotting'
 
-SETTINGS_FILE = os.path.join(str(Path.home()), '.liveplotting_settings.cfg')
+SETTINGS_FILE = os.path.join(str(Path.home()), f'.{SCRIPTNAME}_settings.cfg')
 print(f'{SETTINGS_FILE=}')
 
 @dataclass

@@ -67,7 +67,7 @@ def construct_1D_scan_fast(gate, swing, n_pt, t_step, biasT_corr, pulse_lib, dig
         voltages = voltages_sp
 
     return dummy_digitzer_scan_parameter(digitizer, None, pulse_lib, t_step, (n_pt, ), (gate, ),
-                                         ( tuple(voltages_sp), ), biasT_corr, 500e6)
+                                          ( tuple(voltages_sp), ), tuple(voltages), biasT_corr, 500e6)
 
 
 def construct_2D_scan_fast(gate1, swing1, n_pt1, gate2, swing2, n_pt2, t_step, biasT_corr, pulse_lib,
@@ -126,21 +126,19 @@ def construct_2D_scan_fast(gate1, swing1, n_pt1, gate2, swing2, n_pt2, t_step, b
         voltages2[1::2] = voltages2_sp[m:][::-1]
     else:
         voltages2 = voltages2_sp
-
-
     # Note: setpoints are in qcodes order
     return dummy_digitzer_scan_parameter(digitizer, None, pulse_lib, t_step,
                                          (n_pt2, n_pt1), (gate2, gate1),
-                                         (tuple(voltages2_sp), (tuple(voltages1),)*n_pt2),
-                                         biasT_corr, 500e6)
+                                         (tuple(voltages2_sp), (tuple(voltages1),)*n_pt2), (tuple(voltages2)),
+                                         biasT_corr, 500e6, )
 
 
 class dummy_digitzer_scan_parameter(MultiParameter):
     """
     generator for the parameter f
     """
-    def __init__(self, digitizer, my_seq, pulse_lib, t_measure, shape, names, setpoint, biasT_corr, sample_rate,
-                 data_mode = 0, channels = [1]):
+    def __init__(self, digitizer, my_seq, pulse_lib, t_measure, shape, names, setpoint, voltages2,
+                 biasT_corr, sample_rate, data_mode = 0, channels = [1] ):
         """
         args:
             digitizer (SD_DIG) : digizer driver:
@@ -154,6 +152,7 @@ class dummy_digitzer_scan_parameter(MultiParameter):
             sample_rate (float): sample rate of the digitizer card that should be used.
             data mode (int): data mode of the digizer
             channels (list<int>): channels to measure
+            voltages2: list of voltages for the y axis (outer loop) that may be alternating values if biasT_corr is enabled
         """
         channel_names = [f'ch{ch}' for ch in channels]
         units = ['mV'] * len(channels)
@@ -177,6 +176,7 @@ class dummy_digitzer_scan_parameter(MultiParameter):
         self.shape = shape
         self.channel_names = channel_names
         self.offset = 0.0
+        self.voltages2 = voltages2
 
         super().__init__(
                 name=digitizer.name,
@@ -190,14 +190,13 @@ class dummy_digitzer_scan_parameter(MultiParameter):
                 setpoint_units=tuple([tuple(["mV"]*len(names))]*len(channels)),
                 docstring='scan parameter for digitizer')
 
-        pulse_lib.opx.opx_update_sweep(names, setpoint, t_measure, sample_rate)
+        pulse_lib.opx.opx_update_sweep(names, setpoint, t_measure, sample_rate, biasT_corr, voltages2)
 
 
        
     ###########################################################################################################
     def get_raw(self):
         data_out = self.pulse_lib.opx.opx_run_2d()
-        #print(f'opx get_raw() {len(data_out)=} {type(data_out)=} {len(data_out[0].shape)=}  {len(data_out[0][0])=} {data_out[0][0][34]=}')
         return tuple(data_out)
     ###########################################################################################################
 

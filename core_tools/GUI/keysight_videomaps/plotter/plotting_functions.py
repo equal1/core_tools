@@ -11,6 +11,8 @@ import logging
 from matplotlib import cm
 import matplotlib.colors as mcolors
 from .colors import polar_to_rgb, compress_range
+import matplotlib as mpl
+from matplotlib.colors import  ListedColormap
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +22,10 @@ logger = logging.getLogger(__name__)
 #mycmap = mcolors.LinearSegmentedColormap('my_colormap', colormap._segmentdata, 256)
 #color_list = [mycmap(i) for i in range(mycmap.N)]
 
-colormap = cm.get_cmap("viridis")  # cm.get_cmap("CMRmap")
+#colormap = cm.get_cmap("viridis")  # cm.get_cmap("CMRmap")
+
+colormap = ListedColormap(mpl.colormaps['Spectral_r'](range(256)))
+
 colormap._init()
 lut = np.array(colormap.colors)*255 # Convert matplotlib colormap from 0-1 to 0-255 for Qt
 
@@ -414,7 +419,8 @@ class _2D_live_plot(live_plot):
     def set_colorbar(self, enabled):
         if enabled:
             for pwd in self.plot_widgets:
-                cb = pg.ColorBarItem(colorMap='viridis', interactive=False, width=14)
+                cb = pg.ColorBarItem(colorMap='viridis', interactive=False, width=14) # must be a Qt type color defined in GradientEditorItem.py  !!!
+                #cb = pg.ColorBarItem(colorMap=colormap, interactive=False, width=14)
                 cb.setImageItem(pwd.plot_items[0], insert_in=pwd.plot_widget.plotItem)
                 pwd.color_bar = cb
 
@@ -514,6 +520,7 @@ class _2D_live_plot(live_plot):
                 else:
                     logger.warning(f'Unknown gradient setting {self.gradient}')
 
+                img_item.setLookupTable(lut)  # define the color map for main plot, does not change the colorbar though! 
                 img_item.setImage(plot_data)
             self.prog_bar.setValue(self.prog_per)
             if self.gates is not None:
