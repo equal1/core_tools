@@ -318,8 +318,8 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         '''
 
         for i in sorted(gates, key=str.lower):
-            #print(f'(init_defaults) {i}')
-            if str(i)[-1] == 'P':   # only add the pulse gates to the gui
+            # #print(f'(init_defaults) {i}')
+            # if str(i)[-1] == 'P':   # only add the pulse gates to the gui
                 self._1D_gate_name.addItem(str(i))
                 self._2D_gate1_name.addItem(str(i))
                 self._2D_gate2_name.addItem(str(i))

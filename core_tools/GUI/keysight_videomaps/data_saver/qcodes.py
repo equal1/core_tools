@@ -1,8 +1,7 @@
 from typing import Dict, Tuple
-
 from qcodes import MultiParameter
-from qcodes.measure import Measure
-from qcodes.data.data_set import DataSet
+from qcodes_loop.measure import Measure
+from qcodes_loop.data.data_set import DataSet
 
 from core_tools.GUI.keysight_videomaps.data_saver import IDataSaver
 
