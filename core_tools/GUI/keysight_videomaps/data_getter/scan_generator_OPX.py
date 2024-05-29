@@ -138,7 +138,7 @@ class dummy_digitzer_scan_parameter(MultiParameter):
     generator for the parameter f
     """
     def __init__(self, digitizer, my_seq, pulse_lib, t_measure, shape, names, setpoint, voltages2,
-                 biasT_corr, sample_rate, data_mode = 0, channels = [1] ):
+                 biasT_corr, sample_rate, data_mode = 0, channels = [1,2] ):
         """
         args:
             digitizer (SD_DIG) : digizer driver:
@@ -154,15 +154,28 @@ class dummy_digitzer_scan_parameter(MultiParameter):
             channels (list<int>): channels to measure
             voltages2: list of voltages for the y axis (outer loop) that may be alternating values if biasT_corr is enabled
         """
+
+        # Define the plots to be displayed depending on the measurement_type
+        if pulse_lib.opx.measurement_type == 'I+Q':
+            channels = [ '_I', '_Q']
+        elif pulse_lib.opx.measurement_type == 'I':
+            channels = [ '_I']
+        elif pulse_lib.opx.measurement_type == 'Q':
+            channels = [ '_Q']
+        elif pulse_lib.opx.measurement_type == 'Magnitude':
+            channels = [ '_Magnitude']
+        elif pulse_lib.opx.measurement_type == 'Magnitude+Phase':
+            channels = [ '_Magnitude', '_Phase']
+        elif pulse_lib.opx.measurement_type == 'MagdBm+Phase':
+            channels = [ '_Mag_dBm', '_Phase']
+        elif pulse_lib.opx.measurement_type == 'Phase':
+            channels = [ '_Phase']
+        elif pulse_lib.opx.measurement_type == 'transport':
+            channels = [ '_Transport_DC_current']
+        pulse_lib.opx.channels = channels
+
         channel_names = [f'ch{ch}' for ch in channels]
-        units = ['mV'] * len(channels)
-
-        #sys.path.append(str(Path('~/work/eq1x-scripts/opx-scripts').expanduser()))
-        #from alice.Reflecto.opx_vm_functions import OPX_VM_Functions
-        # self.opx = OPX_VM_Functions(pulse_lib)
-        # self.opx.opx_startup_2D()
-
-
+        units = [''] * len(channels)
 
         self.dig = digitizer
         self.my_seq = my_seq
@@ -190,13 +203,13 @@ class dummy_digitzer_scan_parameter(MultiParameter):
                 setpoint_units=tuple([tuple(["mV"]*len(names))]*len(channels)),
                 docstring='scan parameter for digitizer')
 
-        pulse_lib.opx.opx_update_sweep(names, setpoint, t_measure, sample_rate, biasT_corr, voltages2)
+        pulse_lib.opx.opx_update_sweep(self, names, setpoint, t_measure, sample_rate, biasT_corr, voltages2)
 
 
        
     ###########################################################################################################
     def get_raw(self):
-        data_out = self.pulse_lib.opx.opx_run_2d()
+        data_out = self.pulse_lib.opx.opx_run()
         return tuple(data_out)
     ###########################################################################################################
 

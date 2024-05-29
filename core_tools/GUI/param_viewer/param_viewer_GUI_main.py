@@ -352,7 +352,7 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
     @qt_log_exception
     def _set_set(self, setting, value, division):
         logger.info(f'setting {setting} to {value():.1f} times {division:.1f}')
-        print(f'(_set_set) {setting=} {value()=} {division=}')
+        #print(f'(_set_set) {setting=} {value()=} {division=}')
         setting.set(value()*division)
         #self.gates_object.hardware.RF_settings[setting.full_name] = value()*division
         #self.gates_object.hardware.sync_data()
