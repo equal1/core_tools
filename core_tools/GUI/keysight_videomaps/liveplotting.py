@@ -324,6 +324,12 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
                 self._2D_gate1_name.addItem(str(i))
                 self._2D_gate2_name.addItem(str(i))
 
+        measure_IQ_mode_list = 'Mag+Phase  MagdBm+Phase  Magnitude   MagdBm   Phase   I+Q I Q  transport'.split()
+        for meas_IQ_mode in measure_IQ_mode_list:
+            self._2D_measure_IQ_mode.addItem(meas_IQ_mode)
+            #self._1D_measure_IQ_mode.addItem(meas_IQ_mode)
+
+
         for dim in ['1D', '2D']:
             for i in [1,2,3]:
                 cb_offset = getattr(self, f'_{dim}_offset{i}_name')
@@ -666,6 +672,7 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
                         channel_map=self._active_channel_map,
                         pulse_gates=self._2D__offsets,
                         line_margin=self._gen__line_margin,
+                        iq_mode=self._2D_measure_IQ_mode.currentText(),
                         )
                 logger.info('Finished Param, now plot')
                 self.current_plot._2D = _2D_live_plot(

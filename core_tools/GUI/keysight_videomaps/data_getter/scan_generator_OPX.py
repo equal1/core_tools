@@ -130,7 +130,7 @@ def construct_2D_scan_fast(gate1, swing1, n_pt1, gate2, swing2, n_pt2, t_step, b
     return dummy_digitzer_scan_parameter(digitizer, None, pulse_lib, t_step,
                                          (n_pt2, n_pt1), (gate2, gate1),
                                          (tuple(voltages2_sp), (tuple(voltages1),)*n_pt2), (tuple(voltages2)),
-                                         biasT_corr, 500e6, )
+                                         biasT_corr, 500e6, iq_mode=iq_mode )
 
 
 class dummy_digitzer_scan_parameter(MultiParameter):
@@ -138,7 +138,7 @@ class dummy_digitzer_scan_parameter(MultiParameter):
     generator for the parameter f
     """
     def __init__(self, digitizer, my_seq, pulse_lib, t_measure, shape, names, setpoint, voltages2,
-                 biasT_corr, sample_rate, data_mode = 0, channels = [1,2] ):
+                 biasT_corr, sample_rate, data_mode = 0, channels = [1,2], iq_mode=None ):
         """
         args:
             digitizer (SD_DIG) : digizer driver:
@@ -155,22 +155,25 @@ class dummy_digitzer_scan_parameter(MultiParameter):
             voltages2: list of voltages for the y axis (outer loop) that may be alternating values if biasT_corr is enabled
         """
 
+
         # Define the plots to be displayed depending on the measurement_type
-        if pulse_lib.opx.measurement_type == 'I+Q':
+        if iq_mode == 'I+Q':
             channels = [ '_I', '_Q']
-        elif pulse_lib.opx.measurement_type == 'I':
+        elif iq_mode == 'I':
             channels = [ '_I']
-        elif pulse_lib.opx.measurement_type == 'Q':
+        elif iq_mode == 'Q':
             channels = [ '_Q']
-        elif pulse_lib.opx.measurement_type == 'Magnitude':
+        elif iq_mode == 'Magnitude':
             channels = [ '_Magnitude']
-        elif pulse_lib.opx.measurement_type == 'Magnitude+Phase':
+        elif iq_mode == 'Mag+Phase':
             channels = [ '_Magnitude', '_Phase']
-        elif pulse_lib.opx.measurement_type == 'MagdBm+Phase':
+        elif iq_mode == 'MagdBm':
+            channels = [ '_Mag_dBm']
+        elif iq_mode == 'MagdBm+Phase':
             channels = [ '_Mag_dBm', '_Phase']
-        elif pulse_lib.opx.measurement_type == 'Phase':
+        elif iq_mode == 'Phase':
             channels = [ '_Phase']
-        elif pulse_lib.opx.measurement_type == 'transport':
+        elif iq_mode == 'transport':
             channels = [ '_Transport_DC_current']
         pulse_lib.opx.channels = channels
 
