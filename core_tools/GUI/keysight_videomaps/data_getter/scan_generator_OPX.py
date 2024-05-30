@@ -67,13 +67,13 @@ def construct_1D_scan_fast(gate, swing, n_pt, t_step, biasT_corr, pulse_lib, dig
         voltages = voltages_sp
 
     return dummy_digitzer_scan_parameter(digitizer, None, pulse_lib, t_step, (n_pt, ), (gate, ),
-                                          ( tuple(voltages_sp), ), tuple(voltages), biasT_corr, 500e6)
+                                          ( tuple(voltages_sp), ), tuple(voltages), biasT_corr, 500e6, iq_mode=iq_mode)
 
 
 def construct_2D_scan_fast(gate1, swing1, n_pt1, gate2, swing2, n_pt2, t_step, biasT_corr, pulse_lib,
                            digitizer, channels, dig_samplerate=None, dig_vmax=None, iq_mode=None,
                            acquisition_delay_ns=None, enabled_markers=[], channel_map=None,
-                           pulse_gates={}, line_margin=0):
+                           pulse_gates={}, line_margin=0,):
     """
     2D fast scan parameter constructor.
 
@@ -153,8 +153,8 @@ class dummy_digitzer_scan_parameter(MultiParameter):
             data mode (int): data mode of the digizer
             channels (list<int>): channels to measure
             voltages2: list of voltages for the y axis (outer loop) that may be alternating values if biasT_corr is enabled
+            iq_mode: type of measurement plot or plots to show
         """
-
 
         # Define the plots to be displayed depending on the measurement_type
         if iq_mode == 'I+Q':
@@ -209,7 +209,6 @@ class dummy_digitzer_scan_parameter(MultiParameter):
         pulse_lib.opx.opx_update_sweep(self, names, setpoint, t_measure, sample_rate, biasT_corr, voltages2)
 
 
-       
     ###########################################################################################################
     def get_raw(self):
         data_out = self.pulse_lib.opx.opx_run()

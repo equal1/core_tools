@@ -42,7 +42,7 @@
        <enum>QTabWidget::North</enum>
       </property>
       <property name="currentIndex">
-       <number>1</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="_1D">
        <attribute name="title">
@@ -88,7 +88,7 @@
                </property>
                <property name="font">
                 <font>
-                 <pointsize>14</pointsize>
+                 <pointsize>12</pointsize>
                 </font>
                </property>
                <property name="text">
@@ -155,14 +155,14 @@
                  </property>
                 </widget>
                </item>
-               <item row="1" column="0">
+               <item row="3" column="0">
                 <widget class="QLabel" name="_1D_gate_name_label">
                  <property name="text">
                   <string>Gate</string>
                  </property>
                 </widget>
                </item>
-               <item row="1" column="1">
+               <item row="3" column="1">
                 <widget class="QComboBox" name="_1D_gate_name">
                  <property name="enabled">
                   <bool>true</bool>
@@ -181,14 +181,14 @@
                  </property>
                 </widget>
                </item>
-               <item row="2" column="0">
+               <item row="4" column="0">
                 <widget class="QLabel" name="label_5">
                  <property name="text">
                   <string>V Swing  (mV)</string>
                  </property>
                 </widget>
                </item>
-               <item row="2" column="1">
+               <item row="4" column="1">
                 <widget class="QDoubleSpinBox" name="_1D_V_swing">
                  <property name="minimumSize">
                   <size>
@@ -207,14 +207,14 @@
                  </property>
                 </widget>
                </item>
-               <item row="3" column="0">
+               <item row="5" column="0">
                 <widget class="QLabel" name="label_2">
                  <property name="text">
                   <string>N pt</string>
                  </property>
                 </widget>
                </item>
-               <item row="3" column="1">
+               <item row="5" column="1">
                 <widget class="QSpinBox" name="_1D_npt">
                  <property name="minimumSize">
                   <size>
@@ -227,14 +227,14 @@
                  </property>
                 </widget>
                </item>
-               <item row="4" column="0">
+               <item row="6" column="0">
                 <widget class="QLabel" name="label">
                  <property name="text">
                   <string>T meas (us)</string>
                  </property>
                 </widget>
                </item>
-               <item row="4" column="1">
+               <item row="6" column="1">
                 <widget class="QDoubleSpinBox" name="_1D_t_meas">
                  <property name="minimumSize">
                   <size>
@@ -250,14 +250,14 @@
                  </property>
                 </widget>
                </item>
-               <item row="5" column="0" colspan="2">
+               <item row="7" column="0" colspan="2">
                 <widget class="QLabel" name="label_DC_offsets1D">
                  <property name="text">
                   <string>Pulsed offsets</string>
                  </property>
                 </widget>
                </item>
-               <item row="6" column="0">
+               <item row="8" column="0">
                 <widget class="QComboBox" name="_1D_offset1_name">
                  <property name="enabled">
                   <bool>true</bool>
@@ -276,7 +276,7 @@
                  </property>
                 </widget>
                </item>
-               <item row="6" column="1">
+               <item row="8" column="1">
                 <widget class="QDoubleSpinBox" name="_1D_offset1_voltage">
                  <property name="minimum">
                   <double>-1000.000000000000000</double>
@@ -286,7 +286,7 @@
                  </property>
                 </widget>
                </item>
-               <item row="7" column="0">
+               <item row="9" column="0">
                 <widget class="QComboBox" name="_1D_offset2_name">
                  <property name="enabled">
                   <bool>true</bool>
@@ -305,7 +305,7 @@
                  </property>
                 </widget>
                </item>
-               <item row="7" column="1">
+               <item row="9" column="1">
                 <widget class="QDoubleSpinBox" name="_1D_offset2_voltage">
                  <property name="minimum">
                   <double>-1000.000000000000000</double>
@@ -315,7 +315,7 @@
                  </property>
                 </widget>
                </item>
-               <item row="8" column="0">
+               <item row="10" column="0">
                 <widget class="QComboBox" name="_1D_offset3_name">
                  <property name="enabled">
                   <bool>true</bool>
@@ -334,47 +334,13 @@
                  </property>
                 </widget>
                </item>
-               <item row="8" column="1">
+               <item row="10" column="1">
                 <widget class="QDoubleSpinBox" name="_1D_offset3_voltage">
                  <property name="minimum">
                   <double>-1000.000000000000000</double>
                  </property>
                  <property name="maximum">
                   <double>1000.000000000000000</double>
-                 </property>
-                </widget>
-               </item>
-               <item row="9" column="0">
-                <spacer>
-                 <property name="maximumSize">
-                  <size>
-                   <width>20</width>
-                   <height>8</height>
-                  </size>
-                 </property>
-                 <property name="orientation">
-                  <enum>Qt::Vertical</enum>
-                 </property>
-                 <property name="sizeType">
-                  <enum>QSizePolicy::MinimumExpanding</enum>
-                 </property>
-                 <property name="sizeHint" stdset="0">
-                  <size>
-                   <width>0</width>
-                   <height>0</height>
-                  </size>
-                 </property>
-                </spacer>
-               </item>
-               <item row="10" column="0" colspan="2">
-                <widget class="QPushButton" name="_1D_update_plot">
-                 <property name="font">
-                  <font>
-                   <pointsize>12</pointsize>
-                  </font>
-                 </property>
-                 <property name="text">
-                  <string>Upload waveform</string>
                  </property>
                 </widget>
                </item>
@@ -401,6 +367,40 @@
                 </spacer>
                </item>
                <item row="12" column="0" colspan="2">
+                <widget class="QPushButton" name="_1D_update_plot">
+                 <property name="font">
+                  <font>
+                   <pointsize>12</pointsize>
+                  </font>
+                 </property>
+                 <property name="text">
+                  <string>Upload waveform</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="13" column="0">
+                <spacer>
+                 <property name="maximumSize">
+                  <size>
+                   <width>20</width>
+                   <height>8</height>
+                  </size>
+                 </property>
+                 <property name="orientation">
+                  <enum>Qt::Vertical</enum>
+                 </property>
+                 <property name="sizeType">
+                  <enum>QSizePolicy::MinimumExpanding</enum>
+                 </property>
+                 <property name="sizeHint" stdset="0">
+                  <size>
+                   <width>0</width>
+                   <height>0</height>
+                  </size>
+                 </property>
+                </spacer>
+               </item>
+               <item row="14" column="0" colspan="2">
                 <widget class="QLabel" name="label_8">
                  <property name="sizePolicy">
                   <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
@@ -439,7 +439,7 @@
                  </property>
                 </widget>
                </item>
-               <item row="13" column="0">
+               <item row="15" column="0">
                 <layout class="QHBoxLayout">
                  <item>
                   <widget class="QLabel" name="label_3">
@@ -473,7 +473,7 @@
                  </item>
                 </layout>
                </item>
-               <item row="13" column="1">
+               <item row="15" column="1">
                 <layout class="QHBoxLayout">
                  <item>
                   <widget class="QSpinBox" name="_1D_average">
@@ -510,17 +510,27 @@
                  </item>
                 </layout>
                </item>
-               <item row="14" column="0">
+               <item row="16" column="0">
                 <widget class="QLabel" name="label_7">
                  <property name="text">
                   <string>Differentiate</string>
                  </property>
                 </widget>
                </item>
-               <item row="14" column="1">
+               <item row="16" column="1">
                 <widget class="QCheckBox" name="_1D_diff">
                  <property name="text">
                   <string/>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="1">
+                <widget class="QComboBox" name="_1D_measure_IQ_mode"/>
+               </item>
+               <item row="1" column="0">
+                <widget class="QLabel" name="label_6">
+                 <property name="text">
+                  <string>Measure IQ_mode</string>
                  </property>
                 </widget>
                </item>
@@ -552,7 +562,7 @@
                </property>
                <property name="font">
                 <font>
-                 <pointsize>14</pointsize>
+                 <pointsize>12</pointsize>
                 </font>
                </property>
                <property name="text">
@@ -589,7 +599,7 @@
                </property>
                <property name="font">
                 <font>
-                 <pointsize>14</pointsize>
+                 <pointsize>12</pointsize>
                 </font>
                </property>
                <property name="text">
@@ -623,7 +633,7 @@
                </property>
                <property name="font">
                 <font>
-                 <pointsize>14</pointsize>
+                 <pointsize>12</pointsize>
                 </font>
                </property>
                <property name="text">
@@ -657,7 +667,7 @@
                </property>
                <property name="font">
                 <font>
-                 <pointsize>14</pointsize>
+                 <pointsize>12</pointsize>
                 </font>
                </property>
                <property name="text">

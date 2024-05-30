@@ -327,7 +327,7 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         measure_IQ_mode_list = 'Mag+Phase  MagdBm+Phase  Magnitude   MagdBm   Phase   I+Q I Q  transport'.split()
         for meas_IQ_mode in measure_IQ_mode_list:
             self._2D_measure_IQ_mode.addItem(meas_IQ_mode)
-            #self._1D_measure_IQ_mode.addItem(meas_IQ_mode)
+            self._1D_measure_IQ_mode.addItem(meas_IQ_mode)
 
 
         for dim in ['1D', '2D']:
@@ -618,7 +618,8 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
                         enabled_markers=self._gen__enabled_markers,
                         channel_map=self._active_channel_map,
                         pulse_gates=self._1D__offsets,
-                        line_margin=self._gen__line_margin)
+                        line_margin=self._gen__line_margin,
+                        iq_mode=self._1D_measure_IQ_mode.currentText(),)
                 self.current_plot._1D = _1D_live_plot(
                         self._1D_plotter_layout, self.current_param_getter._1D,
                         self._1D_average.value(), self._1D_diff.isChecked(),
