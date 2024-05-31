@@ -1,4 +1,5 @@
 import logging
+import re
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, Tuple, Union, Callable
 
@@ -932,8 +933,15 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
     def _on_mouse_clicked_1D(self, x):
         if self._1D_set_DC.isChecked():
             vx = self.current_plot._1D.gate_x_voltage + x
-            self.gates.set(self._1D__gate_name, vx)
-            msg = (f'Set {self._1D__gate_name}:{vx:6.3f} mV')
+            # self.gates.set(self._1D__gate_name, vx)
+            # msg = (f'Set {self._1D__gate_name}:{vx:6.3f} mV')
+
+            print( f'(_on_mouse_clicked_1D) {self._1D__gate_name=} {x=} {vx=} ')
+            # Update the DC gates (which is the same name but ends with B )
+            # Get the matching bias 'B' gate name from the pulse 'P' gate name
+            x_b_gate = re.sub('P$', 'B', self._1D__gate_name)
+            self.gates.set(x_b_gate, vx)
+            msg = (f'Set {x_b_gate}:{vx:6.3f} mV')
             print(msg)
             self.cursor_value_label.setText(msg)
             self.current_plot._1D.clear_buffers = True
@@ -954,9 +962,19 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         if self._2D_set_DC.isChecked():
             vx = self.current_plot._2D.gate_x_voltage + x
             vy = self.current_plot._2D.gate_y_voltage + y
-            self.gates.set(self._2D__gate1_name, vx)
-            self.gates.set(self._2D__gate2_name, vy)
-            msg = (f'Set {self._2D__gate1_name}:{vx:6.3f} mV, {self._2D__gate2_name}:{vy:6.3f}')
+            # self.gates.set(self._2D__gate1_name, vx)
+            # self.gates.set(self._2D__gate2_name, vy)
+            # msg = (f'Set {self._2D__gate1_name}:{vx:6.3f} mV, {self._2D__gate2_name}:{vy:6.3f}')
+            #print( f'(_on_mouse_clicked_2D) {self._2D__gate1_name=} {x=} {vx=} ')
+            #print( f'(_on_mouse_clicked_2D) {self._2D__gate2_name=} {y=} {vy=} ')
+
+            # Update the DC gates (which is the same name but ends with B )
+            # Get the matching bias 'B' gate name from the pulse 'P' gate name
+            x_b_gate = re.sub('P$', 'B', self._2D__gate1_name)
+            y_b_gate = re.sub('P$', 'B', self._2D__gate2_name)
+            self.gates.set(x_b_gate, vx)
+            self.gates.set(y_b_gate, vy)
+            msg = (f'Set {x_b_gate}:{vx:6.3f} mV, {y_b_gate}:{vy:6.3f}')
             print(msg)
             self.cursor_value_label.setText(msg)
             self.current_plot._2D.clear_buffers = True

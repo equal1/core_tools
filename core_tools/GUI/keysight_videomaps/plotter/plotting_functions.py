@@ -6,6 +6,7 @@ from PyQt5 import QtCore
 import pyqtgraph as pg
 import numpy as np
 from scipy import ndimage
+import re
 import time
 import logging
 from matplotlib import cm
@@ -271,7 +272,11 @@ class _1D_live_plot(live_plot):
             self.plot_widgets.append(plot_data)
 
     def _read_dc_voltages(self):
-        self.gate_x_voltage = self._read_dc_voltage(self.plot_params[0].setpoint_names[0])
+        #self.gate_x_voltage = self._read_dc_voltage(self.plot_params[0].setpoint_names[0])
+        x_p_gate = self.plot_params[0].setpoint_names[0]
+        x_b_gate = re.sub('P$', 'B', x_p_gate)
+        self.gate_x_voltage = self._read_dc_voltage(x_b_gate)
+        #print( f'(_read_dc_voltages)  {x_p_gate=} {x_b_gate=} {self.gate_x_voltage=}  ')
 
     def _get_plot_coords(self, plot, index, coordinates):
         if plot.sceneBoundingRect().contains(coordinates):
@@ -466,8 +471,15 @@ class _2D_live_plot(live_plot):
         self.refresh()
 
     def _read_dc_voltages(self):
-        self.gate_x_voltage = self._read_dc_voltage(self.plot_params[0].setpoint_names[1])
-        self.gate_y_voltage = self._read_dc_voltage(self.plot_params[0].setpoint_names[0])
+        x_p_gate = self.plot_params[0].setpoint_names[1]
+        x_b_gate = re.sub('P$', 'B', x_p_gate)
+        self.gate_x_voltage = self._read_dc_voltage(x_b_gate)
+        y_p_gate = self.plot_params[0].setpoint_names[0]
+        y_b_gate = re.sub('P$', 'B', y_p_gate)
+        self.gate_y_voltage = self._read_dc_voltage(y_b_gate)
+
+        # print( f'(_read_dc_voltages)  {x_p_gate=} {x_b_gate=} {self.gate_x_voltage=}  ')
+        # print( f'(_read_dc_voltages)  {y_p_gate=} {y_b_gate=} {self.gate_y_voltage=}  ')
 
     def update_plot(self):
         try:
@@ -521,6 +533,8 @@ class _2D_live_plot(live_plot):
                     logger.warning(f'Unknown gradient setting {self.gradient}')
 
                 img_item.setLookupTable(lut)  # define the color map for main plot, does not change the colorbar though! 
+
+                
                 img_item.setImage(plot_data)
             self.prog_bar.setValue(self.prog_per)
             if self.gates is not None:
