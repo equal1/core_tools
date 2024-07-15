@@ -498,7 +498,9 @@ class _2D_live_plot(live_plot):
                     if self.enhanced_contrast:
                         plot_data = compress_range(plot_data, upper=99.5, lower=0.5)
                     mn, mx = np.min(plot_data), np.max(plot_data)
-                    self.min_max[i].setText(f"min:{mn:4.0f} mV<br/>max:{mx:4.0f} mV")
+                    #self.min_max[i].setText(f"min:{mn:4.0f} mV<br/>max:{mx:4.0f} mV")
+                    mn_mx_diff = mx - mn
+                    self.min_max[i].setText(f"min_max_diff:{mn_mx_diff:6.4f}")
                     if color_bar:
                         color_bar.setLevels(values=(mn,mx))
                         if img_item.lut is None:
