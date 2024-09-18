@@ -86,6 +86,9 @@ class gates(qc.Instrument):
             voltage (double) : voltage to set
             gate_name (str) : name of the gate to set
         '''
+
+        #if gate_name == 'VR1':  print(f'(_set_voltage)  {gate_name} {voltage}')
+
         dac_location = self.hardware.dac_gate_map[gate_name]
         if gate_name in self.hardware.boundaries.keys():
             min_voltage, max_voltage = self.hardware.boundaries[gate_name]
@@ -116,6 +119,8 @@ class gates(qc.Instrument):
         if dac_location[0] == 2:  # dac location 2 is for opx instrument, we can't read it, its for pulsing only
             return 0.0
         voltage = getattr(self.dac_sources[dac_location[0]], f'dac{int(dac_location[1])}').cache()
+
+        #if gate_name == 'VR1': print(f'(_get_voltage)  {gate_name} {voltage}')
         if gate_name in self.dc_gain:
             return voltage * self.dc_gain[gate_name]
         else:

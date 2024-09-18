@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from ..qt_util import qt_log_exception
 import numpy as np
 import os
+import sys
 import json
 from pathlib import Path
 import logging
@@ -46,6 +47,11 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
         self.locked = locked
         self.real_gates_qt_voltage_input = dict()
         self.SETTINGS_DICT = dict()
+        self.command_line_settings_file = None
+
+
+        if len(sys.argv) >= 2:
+            self.command_line_settings_file = sys.argv[1]
 
         self.load_settings_file()
 
@@ -98,17 +104,25 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
         for gate_name in self.gates_object.hardware.dac_gate_map.keys():
             param = getattr(self.gates_object, gate_name)
             self._add_gate(param, False)
-            if gate_name in self.SETTINGS_DICT:
+            if self.command_line_settings_file is not None and gate_name in self.SETTINGS_DICT:
                 if not find_opx_element( opx_instr, gate_name):
-                    param.set( self.SETTINGS_DICT[gate_name])
+                    #if gate_name == 'VR1': print( f'(parma_viewer.init)  {gate_name=} {self.SETTINGS_DICT[gate_name]=} ')
+                    val = self.SETTINGS_DICT[gate_name]
+                    param.set( val )
+                    qt_voltage_input = self.real_gates_qt_voltage_input[gate_name]
+                    qt_voltage_input.setValue( val )
 
         # add virtual gates
         for gate_name in self.gates_object.v_gates:
             param = getattr(self.gates_object, gate_name)
             self._add_gate(param, True)
-            if gate_name in self.SETTINGS_DICT:
+            if self.command_line_settings_file is not None and gate_name in self.SETTINGS_DICT:
                 if not find_opx_element( opx_instr, gate_name):
-                    param.set( self.SETTINGS_DICT[gate_name])
+                    val = self.SETTINGS_DICT[gate_name]
+                    param.set( val )
+                    qt_voltage_input = self.real_gates_qt_voltage_input[gate_name]
+                    qt_voltage_input.setValue( val )
+
 
 
         self.step_size.clear()
@@ -139,8 +153,8 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
         opx = station.get_component('opx_instr')
         if opx.job:
             opx.job.halt()
-        qdac2 = station.get_component('opx_instr')
-        qdac2.abort()  
+        #qdac2 = station.get_component('opx_instr')
+        #qdac2.abort()  
 
 
     @qt_log_exception
@@ -429,19 +443,28 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
     ##############################################################
     def load_settings_file(self):
 
-        if os.access(SETTINGS_FILE, os.R_OK):
+        if self.command_line_settings_file is not None:
+            settings_file_to_load = self.command_line_settings_file
+            if settings_file_to_load.lower() == 'last_settings':
+                settings_file_to_load = SETTINGS_FILE
+        else:
+            settings_file_to_load = SETTINGS_FILE
+            print( '...Not loading param_viewer qdac settings from file, qdac voltages will not change on videomode startup'   )
+            print( '   However the OPX RF Frequency and Power will be loaded from the last saved settings file'   )
+
+        if os.access(settings_file_to_load, os.R_OK):
 
             # print( '---------------------------------------------------' )
-            print( '...loading param_viewer settings from file:', SETTINGS_FILE )
+            print( '...loading param_viewer settings from file:', settings_file_to_load )
             # print( '---------------------------------------------------' )
             try:
-                with open(SETTINGS_FILE, 'r') as f:
+                with open(settings_file_to_load, 'r') as f:
                     self.SETTINGS_DICT = json.load(f)
             except:
-                print(f'***ERROR*** while trying to read settings file {SETTINGS_FILE}, voltages may not be correctly setup as expected')
+                print(f'***ERROR*** while trying to read settings file {settings_file_to_load}, voltages may not be correctly setup as expected')
 
         else:
-            print(f'***warning*** could not read param_viewer settings file {SETTINGS_FILE}, voltages may not be correctly setup as expected')
+            print(f'***warning*** could not read param_viewer settings file {settings_file_to_load}, voltages may not be correctly setup as expected')
 
     ##############################################################
     def update_settings_value(self, param_name, param_value):
