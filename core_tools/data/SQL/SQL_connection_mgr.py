@@ -38,7 +38,7 @@ class SQL_database_init:
                     password=SQL_conn_info_local.passwd,
                     host=SQL_conn_info_local.host,
                     port=SQL_conn_info_local.port,
-                    gssencmode="disable")
+                    gssencmode="disable"
                 )
             else:
                 self.conn_local = sqlite3.connect(
