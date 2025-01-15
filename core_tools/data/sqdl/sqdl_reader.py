@@ -201,10 +201,7 @@ def sqdl_query(
 
 
 def list_scopes():
-    global _DATASET_READER
-    if _DATASET_READER is None:
-        _DATASET_READER = DatasetReader()
-    return _DATASET_READER.list_scopes()
+    return _get_dataset_reader().list_scopes()
 
 
 def load_by_uuid(uuid: str | int):
@@ -239,7 +236,8 @@ def download_hdf5_parallel(
         return list(
             executor.map(
                 partial(reader.download_hdf5_by_uid, download_dir=download_dir),
-                iterator)
+                iterator
+            )
         )
 
 

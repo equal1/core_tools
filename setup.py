@@ -24,4 +24,4 @@ setup(
         "core_tools": ["py.typed"],
         "": ["*.qml", "*.png"],
     },
-    )
+)
