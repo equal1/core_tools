@@ -1,5 +1,5 @@
-from sqdl_coretools_sync.uploader.model import UploadLog
-from sqdl_coretools_sync.uploader.uploader_db import UploaderDb
+from core_tools.data.sqdl.model import UploadLog
+from core_tools.data.sqdl.uploader_db import UploaderDb
 
 
 class UploadLogger:

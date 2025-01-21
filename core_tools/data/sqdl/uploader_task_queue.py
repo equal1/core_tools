@@ -3,9 +3,9 @@ from dataclasses import dataclass
 from typing import List
 
 from sqlalchemy import select, delete, update, func
-from sqlalchemy.dialects.sqlite import insert as sqlite_upsert
-from sqdl_coretools_sync.uploader.model import UploadTask
-from sqdl_coretools_sync.uploader.uploader_db import UploaderDb
+from sqlalchemy.dialects.postgresql import insert as psql_insert
+from core_tools.data.sqdl.model import UploadTask
+from core_tools.data.sqdl.uploader_db import UploaderDb
 
 
 logger = logging.getLogger(__name__)
@@ -141,9 +141,11 @@ class UploaderTaskQueue:
         scope = ds_locator.scope
         uid = ds_locator.uid
         path = ds_locator.path
+
         with self.db.session() as session:
-            stmt = sqlite_upsert(UploadTask).values(version_id=1, scope=scope, uid=uid, ds_path=path, **kwargs)
+            stmt = psql_insert(UploadTask).values(version_id=1, scope=scope, uid=uid, ds_path=path, **kwargs)
             stmt = stmt.on_conflict_do_update(
+                constraint="upload_task_uid_key",
                 set_=dict(version_id=UploadTask.version_id + 1, **kwargs))
             session.execute(stmt)
             session.commit()
@@ -161,39 +163,3 @@ class UploaderTaskQueue:
             counts["failed"] = results.get((True, False), 0)
             counts["retry"] = results.get((True, True), 0)
             return counts
-
-
-if __name__ == "__main__":
-    db = UploaderDb('~/.sqdl_uploader/uploader-test.db')
-    uploader = UploaderTaskQueue(db)
-
-    print(uploader.get_tasks())
-
-    uploader.add_dataset(1234, 'somewhere')
-    uploader.add_dataset(1235, 'else')
-    uploader.add_dataset(1299, 'there')
-    uploader._insert_or_update_task(1234, 'somewhere', failed=False, retry=False)
-    uploader._insert_or_update_task(1235, 'else', failed=False, retry=False)
-    uploader._insert_or_update_task(1299, 'there', failed=False, retry=False)
-
-    uploader.update_dataset(1234, 'somewhere')
-    uploader.update_dataset(1235, 'else', final=True)
-    print('All:', uploader.get_tasks())
-
-    print('Fail:', uploader.get_oldest_task())
-    task = uploader.get_oldest_task()
-    uploader.set_failed(task)
-    print('Delete', uploader.get_oldest_task())
-    task = uploader.get_oldest_task()
-    uploader.delete_task(task)
-
-    print('All:', uploader.get_tasks())
-
-    print('Update', uploader.get_oldest_task())
-    task = uploader.get_oldest_task()
-    uploader.update_rating(task.uid, task.ds_path)
-    uploader.update_name(task.uid, task.ds_path)
-    print(uploader.get_tasks())
-
-    uploader.delete_task(task)
-    print('After delete', uploader.get_tasks())

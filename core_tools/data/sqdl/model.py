@@ -98,7 +98,7 @@ class UploadLog(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     scope: Mapped[str | None]
-    ds_uid: Mapped[int]
+    ds_uid: Mapped[int] = mapped_column(BigInteger)
     upload_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     message: Mapped[str]  # new dataset, uploaded files, exception xxx.
 

@@ -56,44 +56,42 @@ class Exporter:
         self.export_path = cfg.get('export.path')
         self.inter_ds_delay = float(cfg.get('export.delay'))
         self.connection = SqlConnection()
-        self.uploader_db = UploaderDb(cfg.get('uploader.db_path'))
+        self.uploader_db = UploaderDb(cfg)
         self.uploader_queue = UploaderTaskQueue(self.uploader_db)
         self.scopes = cfg.get('export.scopes', {})
         self.setup_name_corrections = cfg.get('export.setup_name_corrections', {})
 
-    def run(self) -> None:
-        no_action_cnt = 0
-        loop_cnt = 0
-        process = psutil.Process()
-        while True:
-            try:
-                loop_cnt += 1
-                done_work = self.export_one()
-                if not done_work:
-                    if no_action_cnt == 0:
-                        self.timer.log_times()
-                    if (no_action_cnt % 100) == 0:
-                        logger.info('Nothing to export')
-                    no_action_cnt += 1
-                    time.sleep(0.2)
-                else:
-                    no_action_cnt = 0
-                    unreachable = gc.collect()
-                    logger.info(f"GC unreachable: {unreachable} counts:{gc.get_count()} {gc.get_freeze_count()}")
-                    logger.info(f"MEM: {process.memory_info()}")
+        self.no_action_count = 0
+        self.loop_count = 0
 
-                if loop_cnt % 1_000 == 0:
-                    logger.info("Close database connection to free memory")
-                    self.connection.close()
-                    unreachable = gc.collect()
-                    logger.info(f"GC2 unreachable: {unreachable} counts:{gc.get_count()} {gc.get_freeze_count()}")
-                    logger.info(f"MEM2: {process.memory_info()}")
-            except (psycopg2.Error, psycopg2.Warning):
-                logger.error("Database error", exc_info=True)
-                time.sleep(2.0)
-            except Exception:
-                logger.error("Unanticipated error", exc_info=True)
-                time.sleep(2.0)
+        self.process = psutil.Process()
+
+    def poll(self) -> None:
+        try:
+            self.loop_count += 1
+            done_work = self.export_one()
+            if not done_work:
+                if self.no_action_count == 0:
+                    self.timer.log_times()
+                if (self.no_action_count % 100) == 0:
+                    logger.info('Nothing to export')
+                self.no_action_count += 1
+            else:
+                self.no_action_count = 0
+                unreachable = gc.collect()
+                logger.info(f"GC unreachable: {unreachable} counts:{gc.get_count()} {gc.get_freeze_count()}")
+                logger.info(f"MEM: {self.process.memory_info()}")
+
+            if self.loop_count % 1_000 == 0:
+                logger.info("Close database connection to free memory")
+                self.connection.close()
+                unreachable = gc.collect()
+                logger.info(f"GC2 unreachable: {unreachable} counts:{gc.get_count()} {gc.get_freeze_count()}")
+                logger.info(f"MEM2: {self.process.memory_info()}")
+        except (psycopg2.Error, psycopg2.Warning):
+            logger.error("Database error", exc_info=True)
+        except Exception:
+            logger.error("Unanticipated error", exc_info=True)
 
     def export_one(self):
         self.timer = Timer()
@@ -401,7 +399,7 @@ def main(configuration_file: str):
         exporter = Exporter(cfg)
         if cfg.get('export.retry_failed', False):
             exporter.retry_failed_exports()
-        exporter.run()
+        exporter.poll()
     except Exception:
         logger.error('Error running exporter', exc_info=True)
         raise

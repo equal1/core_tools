@@ -1,10 +1,9 @@
-
 from sqlalchemy import select, insert, delete, update, func
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.dialects.sqlite import insert as sqlite_upsert
+from sqlalchemy.dialects.postgresql import insert as psql_insert
 
-from sqdl_coretools_sync.uploader.model import UploadedDataset, UploadedFile
-from sqdl_coretools_sync.uploader.uploader_db import UploaderDb
+from core_tools.data.sqdl.model import UploadedDataset, UploadedFile
+from core_tools.data.sqdl.uploader_db import UploaderDb
 
 # %%
 
@@ -33,12 +32,14 @@ class UploadRegistry:
 
     def add_update_file(self, dataset_id, file_sqdl_uuid, filename, st_mtime_ns) -> None:
         with self.db.session() as session:
-            stmt = sqlite_upsert(UploadedFile).values(
+            # stmt = sqlite_upsert(UploadedFile).values(
+            stmt = psql_insert(UploadedFile).values(
                 dataset_id=dataset_id,
                 sqdl_uuid=file_sqdl_uuid,
                 filename=filename,
                 st_mtime_us=st_mtime_ns // 1000)
             stmt = stmt.on_conflict_do_update(
+                constraint="uploaded_file_sqdl_uuid_key",
                 set_=dict(sqdl_uuid=file_sqdl_uuid, st_mtime_us=st_mtime_ns // 1000))
             session.execute(stmt)
             session.commit()
@@ -51,20 +52,3 @@ class UploadRegistry:
             stmt = select(func.count()).select_from(UploadedFile)
             counts["uploaded files"] = session.scalar(stmt)
             return counts
-
-
-if __name__ == "__main__":
-    from datetime import datetime
-    db = UploaderDb('~/.sqdl_uploader/uploader.db')
-    uploader = UploadRegistry(db)
-
-    ds_id = uploader.get_create_dataset('a1234', 'test', 1234)
-    print(ds_id)
-    print(uploader.get_files(ds_id))
-
-    uploader.add_update_file(ds_id, 'f1234', 'test.txt',
-                             int(datetime.now().timestamp() * 1e9))
-    uploader.add_update_file(ds_id, 'f1235', 'test2.txt',
-                             int(datetime.now().timestamp() * 1e9))
-
-    print(uploader.get_files(ds_id))

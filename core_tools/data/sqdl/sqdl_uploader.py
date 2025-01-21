@@ -44,8 +44,8 @@ class SqdlUploader:
         if api_key:
             self.client.use_api_key(api_key)
 
-        db_path = self.cfg.get('uploader.database', '~/.sqdl_uploader/uploader.db')
-        self.db = UploaderDb(db_path)
+        # db_path = self.cfg.get('uploader.database', '~/.sqdl_uploader/uploader.db')
+        self.db = UploaderDb(self.cfg)
         self.task_queue = UploaderTaskQueue(self.db)
         self.upload_registry = UploadRegistry(self.db)
         self.logger = UploadLogger(self.db)
@@ -57,6 +57,8 @@ class SqdlUploader:
         self.pid = os.getpid()
         self.cleanup_abandoned_tasks()
         logger.info(f"Started uploader, pid:{self.pid}")
+
+        self.idle_cnt = 0
 
     def process_task(self) -> bool:
         start = time.perf_counter()
@@ -269,23 +271,19 @@ class SqdlUploader:
             if not alive:
                 self.task_queue.release_task(task)
 
-    def run(self) -> None:
+    def poll(self) -> None:
         # NOTE: KeyboardInterrupt and SystemExit will not be caught.
-        idle_cnt = 0
-        while True:
-            try:
-                work_done = self.process_task()
-                if not work_done:
-                    idle_cnt += 1
-                    if idle_cnt % 300 == 0:
-                        logger.info('Nothing to upload')
-                    time.sleep(0.2)
-                else:
-                    idle_cnt = 0
-            except Exception:
-                # anticipated causes: database connection failure when trying to get task.
-                logger.error('Task processing failed', exc_info=True)
-                time.sleep(1.0)
+        try:
+            work_done = self.process_task()
+            if not work_done:
+                self.idle_cnt += 1
+                if self.idle_cnt % 300 == 0:
+                    logger.info('Nothing to upload')
+            else:
+                self.idle_cnt = 0
+        except Exception:
+            # anticipated causes: database connection failure when trying to get task.
+            logger.error('Task processing failed', exc_info=True)
 
 
 def fix_filename(filename):
@@ -302,7 +300,7 @@ def main(configuration_file: str, client: QDLClient = None):
     cfg = get_configuration()
     try:
         uploader = SqdlUploader(cfg, client=client)
-        uploader.run()
+        uploader.poll()
     except Exception:
         logger.error('Error running exporter', exc_info=True)
         raise
