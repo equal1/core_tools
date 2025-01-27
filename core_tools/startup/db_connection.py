@@ -50,11 +50,21 @@ def _config_local_db(readonly):
         user = cfg['local_database.user']
         passwd = cfg['local_database.password']
         dbname = cfg['local_database.database']
+        address = cfg.get("local_database.address", default="localhost:5432")
+        host, port = address.split(":")
+        assert_msg = (
+                f"Illegal host name '{host}' for local database. "
+                "Should be 'localhost'."
+        )
+        assert host == "localhost", assert_msg
     except KeyError:
         raise Exception("Local database not configured") from None
-    SQL_conn_info_local('localhost', 5432,
-                        user, passwd, dbname,
-                        readonly)
+    SQL_conn_info_local(
+        host, int(port),
+        user, passwd, dbname,
+        readonly
+    )
+    print(f"connecting to host '{host}' at port '{port}' to database '{dbname}'")
 
 
 def _connect():
