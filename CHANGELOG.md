@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[1.5.8] - 2025-02-11
+
+- Fix flip-axes in VideoMode.
+
 ## \[1.5.7] - 2025-01-19
 
 - Fix update of general settings in VideoMode.

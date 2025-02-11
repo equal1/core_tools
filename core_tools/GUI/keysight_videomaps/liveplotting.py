@@ -916,7 +916,7 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         settings.set_value("V1_swing", old_y_swing)
         settings.set_value("V1_swing", old_x_swing)
         if self._run_state == "2D":
-            self.update_plot_settings_2D()
+            self.reload_2D()
 
     @qt_log_exception
     def tab_changed(self):
