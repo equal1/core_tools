@@ -222,7 +222,7 @@ class live_plot(QThread):
     def _read_dc_voltage(self, gate_name):
         if self.gates is not None:
             try:
-                return self.gates.get(gate_name)
+                return self.gates.parameters[gate_name].get()
             except Exception:
                 logging.debug(f'Cannot read DC gate {gate_name}')
 
