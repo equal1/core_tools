@@ -5,21 +5,25 @@ import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 
 import numpy as np
 
 import psycopg2
+from psycopg2._psycopg import connection as Connection
+
 import core_tools as ct
 from core_tools.startup.config import get_configuration
 from core_tools.data.ds.data_set import load_by_uuid
 
-from core_tools.data.export.psql_commands import SqlConnection
+from core_tools.data.sqdl.export.psql_commands import SqlConnection
 from core_tools.data.utils.timer import Timer
-from core_tools.data.export.data_export import export_data
-from core_tools.data.export.data_preview import generate_previews
-from core_tools.data.sqdl.uploader_db import UploaderDb
-from core_tools.data.sqdl.uploader_task_queue import UploaderTaskQueue, DatasetLocator
+from core_tools.data.sqdl.export.data_export import export_data
+from core_tools.data.sqdl.export.data_preview import generate_previews
+# from core_tools.data.sqdl.uploader_db import UploaderDb
+
+from core_tools.data.sqdl.model.task_queue import TaskQueueOperations, DatasetInfo
+# from core_tools.data.sqdl.uploader_task_queue import UploaderTaskQueue, DatasetLocator
 
 logger = logging.getLogger(__name__)
 
@@ -51,13 +55,17 @@ class SqdlUpdate:
 
 class Exporter:
 
-    def __init__(self, cfg):
+    def __init__(self, cfg: Dict):
         self.cfg = cfg
         self.export_path = cfg.get('export.path')
         self.inter_ds_delay = float(cfg.get('export.delay'))
         self.connection = SqlConnection()
-        self.uploader_db = UploaderDb(cfg)
-        self.uploader_queue = UploaderTaskQueue(self.uploader_db)
+        # self.uploader_db = UploaderDb(cfg)
+        # self.connection = self.uploader_db.engine.connect()
+
+        # self.uploader_queue = UploaderTaskQueue(self.uploader_db)
+        self.uploader = TaskQueueOperations()
+
         self.scopes = cfg.get('export.scopes', {})
         self.setup_name_corrections = cfg.get('export.setup_name_corrections', {})
 
@@ -66,10 +74,10 @@ class Exporter:
 
         self.process = psutil.Process()
 
-    def poll(self) -> None:
+    def poll(self, conn: Connection) -> None:
         try:
             self.loop_count += 1
-            done_work = self.export_one()
+            done_work = self.export_one(conn)
             if not done_work:
                 if self.no_action_count == 0:
                     self.timer.log_times()
@@ -93,7 +101,7 @@ class Exporter:
         except Exception:
             logger.error("Unanticipated error", exc_info=True)
 
-    def export_one(self):
+    def export_one(self, conn: Connection):
         self.timer = Timer()
         self.timer.time('query actions')
 
@@ -126,7 +134,7 @@ class Exporter:
             sqdl_update, ds_path = self.export_measurement(ds, action)
             sqdl_update.update_star |= action.update_star
             sqdl_update.update_name |= action.update_name
-            self.add_sqdl_update(sqdl_update, ds_path)
+            self.add_sqdl_update(conn, sqdl_update, ds_path)
             self.set_exported(ds, ds_path, action.completed)
             if action.id is not None:
                 # id is None for expired measurements
@@ -315,14 +323,25 @@ class Exporter:
             ''',
         )
 
-    def add_sqdl_update(self, sqdl_update: SqdlUpdate, ds_path: str) -> None:
-        ds_locator = DatasetLocator(sqdl_update.scope, uid=sqdl_update.uuid, path=ds_path)
-        if sqdl_update.upload_dataset or sqdl_update.upload_raw_data:
-            self.uploader_queue.update_dataset(ds_locator, final=sqdl_update.raw_final)
-        if sqdl_update.update_star:
-            self.uploader_queue.update_rating(ds_locator)
-        if sqdl_update.update_name:
-            self.uploader_queue.update_name(ds_locator)
+    def add_sqdl_update(self, conn: Connection, sqdl_update: SqdlUpdate, ds_path: str) -> None:
+        # ds_locator = DatasetLocator(sqdl_update.scope, uid=sqdl_update.uuid, path=ds_path)
+        ds_info = DatasetInfo(
+            scope=sqdl_update.scope,
+            uid=sqdl_update.uuid,
+            path=ds_path
+        )
+
+        with conn:
+            c = conn.cursor()
+            if sqdl_update.upload_dataset or sqdl_update.upload_raw_data:
+                # self.uploader_queue.update_dataset(ds_locator, final=sqdl_update.raw_final)
+                self.uploader.update_dataset(c, dsi=ds_info, is_finished=sqdl_update.raw_final)
+            if sqdl_update.update_star:
+                # self.uploader_queue.update_rating(ds_locator)
+                self.uploader.update_rating(c, dsi=ds_info)
+            if sqdl_update.update_name:
+                # self.uploader_queue.update_name(ds_locator)
+                self.uploader.update_name(c, dsi=ds_info)
 
     @property
     def measurement_expiration_time(self):
@@ -354,7 +373,6 @@ class Exporter:
         scope = self.get_scope(measurement)
         measurement.set_up = self.fix_setup_name(measurement.set_up)
         updates = SqdlUpdate(measurement.exp_uuid, scope, raw_final=action.completed)
-        updates.scope = scope
         try:
             dsx, ds_path, var_descr = export_data(
                 measurement,

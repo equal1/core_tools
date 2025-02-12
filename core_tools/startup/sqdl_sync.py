@@ -5,7 +5,7 @@ from core_tools.data.sqdl.sqdl_writer import SQDLWriter
 
 
 def sync_init():
-    # to-do: validate if setting sample info is still required
+    # todo: validate if setting sample info is still required
     set_sample_info('Any', 'Any', 'Any')
     connect_local_db()
     print('Starting SQDL Sync')

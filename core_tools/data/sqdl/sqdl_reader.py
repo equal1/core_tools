@@ -30,9 +30,9 @@ class DatasetInfo:
 
 class DatasetReader:
     def __init__(self, scope_name: str | None = None):
-        client = QDLClient()
+        client = QDLClient(dev_mode=True)
         self.client = client
-        client.login()
+        # client.login()
         self.s3_session = requests.Session()
         if scope_name:
             self.set_scope(scope_name)

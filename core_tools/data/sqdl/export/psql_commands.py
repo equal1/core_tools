@@ -1,5 +1,10 @@
+import logging
+
 from core_tools.data.SQL.SQL_connection_mgr import SQL_database_manager
 from psycopg2.extras import RealDictCursor
+
+
+logger = logging.getLogger(__name__)
 
 
 class SqlConnection:
@@ -18,7 +23,8 @@ class SqlConnection:
             res = cur.fetchall()
             cur.close()
             return res
-        except Exception:
+        except Exception as err:
+            logger.error("error in export database connection: {}".format(err))
             connection.close()
             raise
 

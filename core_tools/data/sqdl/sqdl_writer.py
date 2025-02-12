@@ -1,39 +1,22 @@
 import time
 import logging
-from typing import Tuple, Optional
+from typing import Optional
 import datetime
 
 from core_tools.startup.config import get_configuration
 from core_tools.data.SQL.SQL_connection_mgr import SQL_database_init as DatabaseInit
-from core_tools.data.SQL.queries.dataset_sync_queries import sync_mgr_queries
-from core_tools.data.export.coretools_export import Exporter
-from core_tools.data.sqdl.sqdl_uploader import SqdlUploader as Uploader
+from core_tools.data.sqdl.export.coretools_export import Exporter
+from core_tools.data.sqdl.uploader.sqdl_uploader import SqdlUploader as Uploader
+
+from core_tools.data.sqdl.model import core, export, version
+from core_tools.data.sqdl.model.export import Metadata
 
 import sqdl_client
 from sqdl_client.client import QDLClient
-from sqdl_client.utils.fakes.fake_client import QDLFake
 
+__database_version__ = "1.1.0"
 
 logger = logging.getLogger(__name__)
-
-
-def _create_fake_client() -> QDLClient:
-    schema_name = "coretools-default"
-    qdl_fake = QDLFake()
-    qdl_fake.add_schema(
-        schema_name,
-        '''
-        measurement_data(
-            setup(min_length=5, type=str),
-            sample(min_length=5),
-            variables_measured(type=list),
-            dimensions(type=list))
-        ''')
-
-    for scope_name in ["Test",]:
-        qdl_fake.add_scope(scope_name, 'Scope to test QDL', schema_name)
-
-    return qdl_fake.client
 
 
 class SQDLWriter():
@@ -44,292 +27,125 @@ class SQDLWriter():
     """
 
     def __init__(self):
-        self.config = get_configuration()
+        # configuration
+        config = get_configuration()
 
+        # local database
         self.database = DatabaseInit()
+
         self.database._connect()
-        self.create_export_tables_if_not_exist()  # done: create required tables if they do not exist yet
+        self.connection = self.database.conn_local
+        self.validate_version()
 
-        # done: make sure that exporter creates the required tables --> already did using SQLalchemy ORM
-        self.exporter = Exporter(self.config)
+        # core
+        self.exporter = Exporter(config)
+        self.uploader = Uploader(
+            config,
+            conn=self.connection,
+            client=QDLClient(
+                dev_mode=config.get("sqdl.dev_mode", default=True)
+            )
+        )
 
-        client = None
-        if self.config.get("use-sqdl-testing-environment", default=True):  # to-do: change default to False when wrapping up
-            logger.info("Using fake SQDL Client for testing purposes")
-            client = _create_fake_client()
-        self.uploader = Uploader(self.config, client=client)
-
+        # event loop
         self.tick_rate = datetime.timedelta(
-            seconds=self.config.get("tick_rate", default=10)
+            seconds=config.get("sqdl.tick_rate", default=6)
         )
         self.is_running = False
+        self.next_tick = None
+        self.database._disconnect()
 
     def run(self):
         """
         Start the SQDL Writer event loop.
         """
-        self.database._connect()  # okay to skip disconnect, since the loop only stops at Writer shutdown (otherwise, use try-finally block or create context manager)
-        self.is_running = True
+        try:
+            logger.info("Starting SQDL Writer event loop...")
 
-        next_tick = datetime.datetime.now() + self.tick_rate
-        while self.is_running:
-            # done: identify data that needs to be handled
-            uuids_for_data_to_update = sync_mgr_queries.get_sync_items_raw_data(self.database)  # checks 'data-synchronised' column value
+            self.database._connect()
+            self.connection = self.database.conn_local
 
-            # validate that the work done by db-sync does not significantly alter the contents of the postgresql database
-            # done: check contents of "sync raw data" method
-            # - query on UUID for 'data location', 'sync location' and 'update count'
-            # - data location and sync location just used for old output format
-            # - update count used to set 'data-synchronised' to true, so the entry is only processed once
-            # - the sync process deletes all remote data, then re-writes local data to remote
-            # -- this means that the entire section is trivialised by having only local data
-            # -- need to set the 'data synchronised' column
-            for uuid in uuids_for_data_to_update:
-                logger.debug("sync data for uuid: '{}'".format(uuid))
-                # (correction) done: part of the work is being done by the database triggers on the remote database -> insert into Exporter's database that data has changed (see ExportAction)
-                self.export_changed_measurement_data(uuid)
-                self.register_data_as_synchronised(uuid)
+            self.is_running = True
+            self.next_tick = datetime.datetime.now() + self.tick_rate
 
-            uuids_for_meta_to_update = sync_mgr_queries.get_sync_items_meas_table(self.database)  # checks 'table synchronised' column value
-            # done: check contents of "sync table" method
+            while self.is_running:
+                if self.connection.closed > 0:
+                    logger.warning("Connection to local database lost. Reconnecting...")
+                    self.database._disconnect()
+                    self.database._connect()
+                    self.connection = self.database.conn_local
+                    assert self.connection.closed == 0, "failed to reconnect"
+                    # todo: instead of passing connection every time, set connection for exporter and uploader here once. If any of the components closes the connection, the reconnect will be triggered.
 
-            # [!] previously, the 'new-measurement' status could be derived from a 'uuid' existing in local and not existing in remote. Need to find a new mechanism to trigger 'export-new-measurement' (to be validated)
-            # >> same problem applied to 'star changed' and 'name changed'
-            # >> should be that 'data update count' column starts at 0 for new measurements, marking a clear beginning. Have to test for edge cases
+                self.queue_datasets_for_export()
+                # todo: check if there is a good way to export more than one action
+                #   ExportAction stack can grow quite a bit, since one event loop check for all local changes,
+                #   but only exports one (maybe temporary growing of the task stack is not harmful)
+                self.exporter.poll(self.connection)
+                self.uploader.poll(self.connection)
 
-            #   - uuids for data to update will result in triggers for 'measurement-parameter' table
-            #   - uuids for meta to update will result in triggers for 'global-overview' table
+                self.sleep_to_limit_rate()
 
-            # cover behaviour that would usually be handled by triggers
-            for uuid in uuids_for_meta_to_update:
-                # to-do: parse data from 'global_measurement_overview'
-                # to-do: check local data agains SQDL remote data
-                metadata = self.collect_measurement_info(uuid)
-                if metadata is None:
-                    continue
+        except Exception as exc:
+            logger.exception("An Exception with the following message occured: {}".format(exc))
 
-                if self.check_if_uuid_is_new(metadata):
-                    self.export_new_measurement(
-                        uuid=uuid,
-                        completed=metadata.get("is_complete", default=False)
-                    )
+        finally:
+            self.database._disconnect()
+            logger.info("Stopping SQDL Writer event loop...")
+
+    def queue_datasets_for_export(self):
+        """
+        Covers the behaviour that would originally be done by db-sync and the remote database triggers.
+        Looks up measurement data that needs to be synchronized from the local database, and creates the appropriate ExportActions.
+        """
+        with self.connection:
+            cursor = self.connection.cursor()
+            uids_for_data_to_update = core.CoreOperations().get_data_to_sync(cursor)
+
+            for ct_uid in uids_for_data_to_update:
+                logger.debug("sync data for core-tools UID: '{}'".format(ct_uid))
+                export.ExportOperations().export_changed_data(cursor, ct_uid)
+                core.CoreOperations().set_data_as_synced(cursor, ct_uid)
+
+        with self.connection:
+            cursor = self.connection.cursor()
+            uids_for_meta_to_update = core.CoreOperations().get_table_to_sync(cursor)
+
+        # cover behaviour that would usually be handled by triggers
+        for ct_uid in uids_for_meta_to_update:
+            metadata = self.collect_measurement_status(ct_uid)
+            if metadata is None:
+                continue
+
+            with self.connection:
+                cursor = self.connection.cursor()
+                if metadata.is_new:
+                    export.ExportOperations().export_new_measurement(cursor, ct_uid, metadata.is_complete)
                 else:
-                    # done: assert if there are any edge cases that reach this point without ever running export_new_measurement()
-                    star_changed, name_changed = self.check_for_measurement_changes(metadata)
-                    self.export_changed_measurement(
-                        uuid=uuid,
-                        complete=metadata.get("is_complete", default=False),
-                        star_changed=star_changed,
-                        name_changed=name_changed,
-                    )
+                    export.ExportOperations().export_changed_measurement(cursor, ct_uid, metadata)
+                core.CoreOperations().set_table_as_synced(cursor, ct_uid)
 
-                # done: label table as synchronised
-                self.register_table_as_synchronised(uuid)
-
-            # export datasets
-            # to-do: check if there is a good way to export more than one action
-            #   ExportAction stack can grow quite a bit, since one event loop check for all local changes,
-            #   but only exports one (maybe temporary growing of the task stack is not harmful)
-            self.exporter.poll()
-            # done: modify exporter to use a poll method instead of a run method
-            # done: modify exporter to use PostgreSQL instead of SQLite
-
-            # update datasets
-            self.uploader.poll()
-            pass  # done: modify uplaoder to use a poll method instead of a run method
-            pass  # done: modify uploader to use PostgreSQL instead of SQLite --> (same class as exporter)
-
-            # done: sleep for deltatime if loop is running too fast
-            now = datetime.datetime.now()
-            if next_tick > now:
-                time.sleep((next_tick - now).total_seconds())
-            logger.debug("tick")
-            next_tick = datetime.datetime.now() + self.tick_rate
-
-    def create_export_tables_if_not_exist(self):
-        with self.database.conn_local.cursor() as cur:
-            table_statement, index_statement = self._create_export_updates_table()
-            cur.execute(table_statement)
-            cur.execute(index_statement)
-
-            table_statement, index_statement = self._create_exported_table()
-            cur.execute(table_statement)
-            cur.execute(index_statement)
-
-    def _create_export_updates_table(self) -> Tuple[str, str]:
-        """
-        Provides the statements to create the coretools-export-updates table, if it does not already exist.
-
-        The following five columns function as boolean flag that dictate operations.
-        new-measurement - not really needed, but overwrites all data
-        data-changed - export previews, export metadata
-        completed - export raw data
-        update-star - compare with exported metadata
-        update-name - compare with exported metadata
-        """
-        create_table_statement = """
-        CREATE TABLE IF NOT EXISTS coretools_export_updates (
-           id INT GENERATED ALWAYS AS IDENTITY,
-           uuid BIGINT NOT NULL UNIQUE,
-           modify_count INT default 0,
-
-           new_measurement BOOLEAN default FALSE,
-           data_changed BOOLEAN default FALSE,
-           completed BOOLEAN default FALSE,
-           update_star BOOLEAN default FALSE,
-           update_name BOOLEAN default FALSE,
-
-           PRIMARY KEY(id)
-        );
-        """
-        create_index_statement = """
-        CREATE INDEX IF NOT EXISTS qdl_export_updates_uuid_index ON coretools_export_updates USING BTREE (uuid);
-        """
-        return create_table_statement, create_index_statement
-
-    def _create_exported_table(self) -> Tuple[str, str]:
-        """
-        Provides the statements to create the coretools-exported table, if it does not already exist.
-        """
-        create_table_statement = """
-        CREATE TABLE IF NOT EXISTS coretools_exported (
-           id INT GENERATED ALWAYS AS IDENTITY,
-           uuid BIGINT NOT NULL UNIQUE,
-           path TEXT,
-           measurement_start_time timestamp, -- export raw after timeout and not completed.
-           raw_final BOOLEAN default FALSE, -- Set when completed or after timeout.
-
-           -- export state
-           export_state INT default 0, -- (0:todo, 1:done, 99: failed),
-           export_errors TEXT,
-
-           PRIMARY KEY(id)
-        );
-        """
-        create_index_statement = """
-        CREATE INDEX IF NOT EXISTS coretools_exported_uuid_index ON coretools_exported USING BTREE (uuid);
-        """
-        return create_table_statement, create_index_statement
-
-    def export_new_measurement(self, uuid: int, completed: bool):
-        """
-        Original behaviour triggered on INSERT operations in the 'global_measurement_overview' table.
-        """
-        statement = """
-        INSERT INTO coretools_export_updates(uuid, new_measurement, data_changed, completed)
-        VALUES (%{uuid}s, TRUE, TRUE, %(completed)s)
-        ON CONFLICT (uuid) DO
-          UPDATE SET
-             modify_count = coretools_export_updates.modify_count + 1,
-             new_measurement = TRUE,
-             completed = %(completed)s;
-        """
-        parameters = {
-            "uuid": uuid,
-            "completed": completed,
-        }
-        with self.database.conn_local.cursor() as cur:
-            cur.execute(
-                query=statement,
-                vars=parameters,
-            )
-
-    def export_changed_measurement(self, uuid, complete: bool, star_changed: bool, name_changed: bool):
-        """
-        Original behaviour triggered on UPDATE operations in the 'global_measurement_overview' table.
-        """
-        statement = """
-        INSERT INTO coretools_export_updates(uuid, update_star, update_name, completed)
-        VALUES (%(uuid)s, %(update-star)s, %(name-changed)s, %(completed)s)
-        ON CONFLICT (uuid) DO
-          UPDATE SET
-             modify_count = coretools_export_updates.modify_count + 1,
-             update_star = coretools_export_updates.update_star OR %(star-changed)s,
-             update_name = coretools_export_updates.update_name OR %(name-changed)s,
-             completed = NEW.completed;
-        """
-        parameters = {
-            "uuid": uuid,
-            "star-changed": star_changed,  # star value in global-overview not equal to new value
-            "name-changed": name_changed,  # experiment name value in global-overview not equal to new value
-            "completed": complete
-        }
-        with self.database.conn_local.cursor() as cur:
-            cur.execute(
-                query=statement,
-                vars=parameters,
-            )
-
-    def export_changed_measurement_data(self, uuid):
-        """
-        Original behaviour triggered on INSERT and UPDATE operations in the 'measurement_parameters' table.
-        """
-        statement = """
-        INSERT INTO coretools_export_updates(uuid, data_changed)
-        VALUES (%(uuid)s, TRUE)
-        ON CONFLICT (uuid) DO
-          UPDATE SET
-             modify_count = coretools_export_updates.modify_count + 1,
-             data_changed = TRUE;
-        """
-        parameters = {
-            "uuid": uuid
-        }
-        with self.database.conn_local.cursor() as cur:
-            cur.execute(
-                query=statement,
-                vars=parameters,
-            )
-
-    def register_data_as_synchronised(self, uuid) -> None:
-        """
-        Update 'global_measurement_overview' to register measurement data as synchronised
-        """
-        statement = """
-        UPDATE global_measurement_overview
-        SET data_synchronized = TRUE
-        WHERE uuid = %(uuid)s;
-        """
-        parameters = {
-            "uuid": uuid
-        }
-        with self.database.conn_local.cursor() as cur:
-            cur.execute(
-                query=statement,
-                vars=parameters,
-            )
-
-    def register_table_as_synchronised(self, uuid) -> None:
-        """
-        Update 'global_measurement_overview' to register measurement table as synchronised
-        """
-        statement = """
-        UPDATE global_measurement_overview
-        SET table_synchronized = TRUE
-        WHERE uuid = %(uuid)s;
-        """
-        parameters = {
-            "uuid": uuid
-        }
-        with self.database.conn_local.cursor() as cur:
-            cur.execute(
-                query=statement,
-                vars=parameters,
-            )
-
-    def collect_measurement_info(self, uuid) -> Optional[dict]:
+    def collect_measurement_status(self, uuid: str) -> Optional[Metadata]:
         """
         Select relevant data from 'global_measurement_overview' to use in data syncronisation.
         """
-        # to-do: replace dict with static type (?)
+        # todo: check local data agains SQDL remote data
+        # todo: revise how changes in name and rating are handled, because without the intermediary remote database, we lose our method for tracking changes
+        #   in the current solution, 'local' becomes the authority on name and rating, which is not what we want
         statement = """
-        SELECT exp_name, starred, completed FROM global_measurement_overview WHERE uuid = %(uuid)s;
+            SELECT overview.uuid, overview.exp_name, overview.starred, overview.completed, datasets.sqdl_uuid
+            FROM global_measurement_overview AS overview
+            JOIN sqdl_dataset AS datasets
+            ON overview.uuid = datasets.coretools_uid
+            WHERE overview.uuid = %(ct-uid)s;
         """
         parameters = {
-            "uuid": uuid
+            "ct-uid": uuid
         }
+
         result = None
-        with self.database.conn_local.cursor() as cur:
+        with self.connection:
+            cur = self.connection.cursor()
             cur.execute(
                 query=statement,
                 vars=parameters,
@@ -339,58 +155,59 @@ class SQDLWriter():
             logger.error("Failed to fetch data, or no entry exists with uuid '{}'".format(uuid))
             return None
 
-        # to-do: fetch SQDL status on 'starred' and 'experiment-name' parameters, for comparison
-        self.uploader.client.login()
+        ct_uid, ct_name, ct_star, ct_complete, sqdl_uuid = result
 
-        # schema: sqdl_client.api.v1.schema.SchemaAPI = self.uploader.client.api.schemas
-        # logger.info(schema.list())
-        # schema_instance = schema.retrieve_from_name("coretools-default")
-        # logger.info(schema_instance.to_json())
+        # statement = """
+        # SELECT exp_name, starred, completed FROM global_measurement_overview WHERE uuid = %(uuid)s;
+        # """
+        # statement = """
+        # SELECT sqdl_uuid FROM uploaded_dataset WHERE uid = %(uid)s;
+        # """
+
+        # # do not use 'login' functionality when doing local development
+        # self.uploader.client.login()
 
         scope_api: sqdl_client.api.v1.scope.ScopeAPI = self.uploader.client.api.scope
-        # logger.info(scope_api.list())
+        scope = scope_api.retrieve_from_name("scope_command_generated_1")
 
-        scope = scope_api.retrieve_from_name("Test")
-        # logger.info(scope.list_data_identifiers())
-        logger.info("dataset uid: {}".format(uuid))
+        logger.info("dataset uid: {}".format(ct_uid))
         try:
-            dataset: sqdl_client.api.v1.dataset.Dataset = scope.retrieve_dataset_from_uid(uuid)
+            dataset: sqdl_client.api.v1.dataset.Dataset = scope.retrieve_dataset_from_uid(str(ct_uid))
+            logger.info("found dataset")
         except sqdl_client.exceptions.ObjectNotFoundException as err:
-            logger.error(err)
-            return None
+            logger.info("No dataset with CoreTools UID '{}'. SQDL response: {}".format(ct_uid, err))
+            metadata = Metadata(
+                is_new=True,
+                is_complete=ct_complete,
+            )
+            return metadata
 
         logger.info("dataset name: {}".format(dataset.name))
         logger.info("dataset rating: {}".format(dataset.rating))
-
-        metadata = {
-            "is_new": False,
-            "is_complete": False,
-            "name_changed": False,
-            "star_changed": False,
-        }
+        metadata = Metadata(
+            is_new=False,
+            is_complete=ct_complete,
+            changed_name=ct_name != dataset.name,
+            changed_rating=ct_star != (dataset.rating > 0)
+        )
         return metadata
 
-    def check_if_uuid_is_new(self, uuid) -> bool:
+    def validate_version(self) -> None:
         """
-        'update count' is 0
+        Assert that the local database version matches requirements.
         """
-        statement = """
-        SELECT data_update_count
-        FROM global_measurement_overview
-        WHERE uuid = %(uuid)s;
-        """
-        # to-do: fix check for new data
-        logger.warning("column value 'data_update_count' equal to 0 is not a safe test for new data: measurement can easily do multiple updates within one polling round, creating a race-condition")
+        with self.connection as conn:
+            cursor = conn.cursor()
+            database_version = version.VersionOperations().read(cursor)
 
-        parameters = {
-            "uuid": uuid
-        }
-        with self.database.conn_local.cursor() as cur:
-            cur.execute(
-                query=statement,
-                vars=parameters,
-            )
-            result = cur.fetchone()
-            assert result is not None, "Already queries UUID cannot be None"
+        assert database_version == __database_version__, "Database is not up to date: expected '{}', found '{}'".format(__database_version__, database_version)
 
-        return result[0] == 0
+    def sleep_to_limit_rate(self) -> None:
+        now = datetime.datetime.now()
+        if self.next_tick > now:
+            seconds = (self.next_tick - now).total_seconds()
+            logger.info("Sleep for {} seconds as rate-limit".format(seconds))
+            time.sleep(seconds)
+        else:
+            logger.info("Too busy to sleep!")
+        self.next_tick = datetime.datetime.now() + self.tick_rate
