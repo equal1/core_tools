@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[1.5.9] - 2025-02-13
+
+- Update VideoMode for qcodes 0.49.
+- Added software versions to snapshot.
+
 ## \[1.5.8] - 2025-02-11
 
 - Fix flip-axes in VideoMode.
