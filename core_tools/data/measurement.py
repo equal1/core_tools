@@ -22,15 +22,18 @@ general structure:
     The synchronization process starts in a separate thread in parallel to the measurement.
     When the last result is added, the final sync to the db is performed and you are done.
 '''
-from core_tools.data.lib.data_class import setpoint_dataclass, m_param_dataclass
-from core_tools.data.ds.data_set import create_new_data_set
 
-import qcodes as qc
-import numpy as np
 import copy
 import logging
 
+import numpy as np
+import qcodes as qc
+
+from core_tools.data.ds.data_set import create_new_data_set
+from core_tools.data.lib.data_class import setpoint_dataclass, m_param_dataclass
+
 from .name_validation import validate_dataset_name, validate_param_name
+
 
 logger = logging.getLogger(__name__)
 

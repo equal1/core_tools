@@ -1,10 +1,14 @@
+import json
 import logging
+
+import qcodes as qc
+from qcodes.utils.helpers import NumpyJSONEncoder
+
 from core_tools.data.ds.data_set_core import data_set
 from core_tools.data.ds.data_set_raw import data_set_raw
 from core_tools.data.SQL.SQL_dataset_creator import SQL_dataset_creator
-import json
-import qcodes as qc
-from qcodes.utils.helpers import NumpyJSONEncoder
+from core_tools.utility.software_versions import get_software_versions
+
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +17,9 @@ DATASET_SIZE_WARNING = 50_000_000
 DATASET_SIZE_MAX = 200_000_000
 
 REDUCE_SNAPSHOT = True
+
+
+software_versions = get_software_versions()
 
 
 def load_by_id(exp_id):
@@ -80,6 +87,7 @@ def create_new_data_set(experiment_name, measurement_snapshot, *m_params):
         print(f'Dataset with {total_size} values is quite big for storage')
 
     snapshot['measurement'] = measurement_snapshot
+    snapshot["software"] = software_versions
 
     # encode and decode to convert all numpy arrays and complex numbers to jsonable lists and dictionaries
     snapshot_json = json.dumps(snapshot, cls=NumpyJSONEncoder)
