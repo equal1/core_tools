@@ -1,6 +1,35 @@
+# Core-tools
+Core-tools is a light-weight dataset that supports common spin-qubit measurement practices. 
+It features a local data storage solution, as well as tools for remote storage.
 
-# core tools
+## Documentation
+Core-tools documentation can be found in a couple of different locations.
 
-This GitHub repository is not maintained anymore.
+### Project
+Project documentation can be found as a set of markdown files in the ```docs/source``` directory, starting with ```docs/source/index.rst```.
 
-It has moved to https://gitlab.tudelft.nl/qutech-qdlabs/core_tools
+For convenience, it is possible to compile these documents into a set of HTML files that you can read in your browser.
+
+On Windows:
+```bat
+.\.venv\Scripts\activate
+pip install sphinx
+cd docs/
+make.bat html
+```
+
+On Linux:
+```bash
+source .venv/bin/activate
+pip install sphinx 
+cd docs/
+make html
+```
+
+You can now access the documentation by opening ```docs/build/html/index.html``` in your web-browser of choice.
+
+### Configuration
+For users associated with QuTech or the TU Delft, there are wiki-pages documenting how to set up a measurement environment using core-tools.
+
+These pages are located on the [QDLabs GitLab wiki](https://gitlab.tudelft.nl/qutech-qdlabs/measurement-systems/documentation/-/wikis/home).
+
