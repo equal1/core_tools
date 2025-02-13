@@ -18,13 +18,14 @@ Steps:
 1. Download [PostgreSQL](https://www.postgresql.org/download/)
 2. Go through the installer and install the database.
 3. Launch the psql program and make a database user and a database (press enter until the shell asks for the password configured in the installation). Type the following commands:
-    * CREATE USER myusername WITH PASSWORD 'mypasswd';
-    * CREATE DATABASE 'mydbname';
-    * GRANT ALL PRIVILEGES ON DATABASE 'mydbname' TO 'myusername';
-    * \connect 'mydbname'
-    * GRANT CREATE ON SCHEMA public TO 'myusername';
-
-   Note: The last line is required since release 15 of Postgresql.
+```SQL
+CREATE USER myusername WITH PASSWORD 'mypasswd';
+CREATE DATABASE 'mydbname';
+GRANT ALL PRIVILEGES ON DATABASE 'mydbname' TO 'myusername';
+\connect 'mydbname'
+GRANT CREATE ON SCHEMA public TO 'myusername';
+```
+*Note: The last line is required since release 15 of Postgresql.*
 
 In case you are running along with a server set up, it is recommended to have 'mydbname' to be the same as the one on the server.
 
@@ -74,23 +75,19 @@ sudo apt install postgresql
 
 Set up the datasbase, in your shell swich to the postgres user and run psql, e.g.,
 ```bash
-sudo apt install postgresql
-```
-```bash
+sudo su - postgres
 psql
 ```
 
-Now, make the databases and users,
-
-Then set up a database and related users:
+Set up a database and related users:
 ```SQL
 CREATE USER myusername WITH PASSWORD 'mypasswd';
 CREATE DATABASE "mydbname";
 GRANT ALL PRIVILEGES ON DATABASE 'mydbname' TO 'myusername';
-\c mydbname
+\connect mydbname
 GRANT CREATE ON SCHEMA public TO 'myusername';
 ```
-Note: The last line is required since release 15 of Postgresql. It must be executed on the new database.
+*Note: The last line is required since release 15 of Postgresql. It must be executed on the new database.*
 
 The default install of postgress does not allow external connections. We can adjest this by typing
 ```bash
