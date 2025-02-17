@@ -28,7 +28,6 @@ def get_software_versions() -> dict[str, str]:
         }
     for name in watched_packages:
         try:
-            print(name)
             meta_version = version(name)
             version_info = meta_version
             if name not in ["qcodes", "numpy"]:
