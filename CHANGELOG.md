@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[1.5.10] - 2025-02-17
+
+- Removed unintended print statement.
+
 ## \[1.5.9] - 2025-02-13
 
 - Update VideoMode for qcodes 0.49.
