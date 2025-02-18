@@ -14,6 +14,9 @@ from core_tools.data.sqdl.model.export import SyncStatus
 import sqdl_client
 from sqdl_client.client import QDLClient
 
+from psycopg2 import InterfaceError
+from requests.exceptions import ConnectionError
+
 __database_version__ = "1.1.0"
 
 logger = logging.getLogger(__name__)
@@ -27,17 +30,16 @@ class SQDLWriter():
     """
 
     def __init__(self):
-        # configuration
         config = get_configuration()
 
         # local database
         self.database = DatabaseInit()
-
+        # todo: validate that this is actually a local database
         self.database._connect()
         self.connection = self.database.conn_local
         self.validate_version()
 
-        # core
+        # initialise
         self.exporter = Exporter(config)
         self.uploader = Uploader(
             config,
@@ -46,11 +48,11 @@ class SQDLWriter():
                 dev_mode=config.get("sqdl.dev_mode", default=True)
             )
         )
-
-        # event loop
         self.tick_rate = datetime.timedelta(
             seconds=config.get("sqdl.tick_rate", default=6)
         )
+
+        # prepare for run
         self.is_running = False
         self.next_tick = None
         self.database._disconnect()
@@ -69,47 +71,45 @@ class SQDLWriter():
             self.next_tick = datetime.datetime.now() + self.tick_rate
 
             while self.is_running:
-                if self.connection.closed > 0:
+                try:
+                    self.queue_datasets_for_export()
+                    self.exporter.poll(self.connection)
+                    self.uploader.poll(self.connection)
+
+                except InterfaceError:
                     logger.warning("Connection to local database lost. Reconnecting...")
-                    self.database._disconnect()
-                    self.database._connect()
-                    self.connection = self.database.conn_local
-                    assert self.connection.closed == 0, "failed to reconnect"
-                    # todo: instead of passing connection every time, set connection for exporter and uploader here once. If any of the components closes the connection, the reconnect will be triggered.
+                    self.reconnect()
 
-                self.queue_datasets_for_export()
-                # todo: check if there is a good way to export more than one action
-                #   ExportAction stack can grow quite a bit, since one event loop check for all local changes,
-                #   but only exports one (maybe temporary growing of the task stack is not harmful)
-                self.exporter.poll(self.connection)
-                self.uploader.poll(self.connection)
+                except ConnectionError:
+                    logger.warning("Failed to connect to SQDL. ")
 
-                self.sleep_to_limit_rate()
+                finally:
+                    self.sleep_to_limit_rate()
 
         except Exception as exc:
-            logger.exception("An Exception with the following message occured: {}".format(exc))
+            logger.exception("An unhandled exception with the following message occured: {}".format(exc))
 
         finally:
             self.database._disconnect()
             logger.info("Stopping SQDL Writer event loop...")
 
-    def queue_datasets_for_export(self):
+    def queue_datasets_for_export(self) -> None:
         """
         Covers the behaviour that would originally be done by db-sync and the remote database triggers.
         Looks up measurement data that needs to be synchronized from the local database, and creates the appropriate ExportActions.
         """
         with self.connection:
             cursor = self.connection.cursor()
-            uids_for_data_to_update = core.CoreOperations().get_data_to_sync(cursor)
+            uids_for_data_to_update = core.get_data_to_sync(cursor)
 
             for ct_uid in uids_for_data_to_update:
                 logger.debug("sync data for core-tools UID: '{}'".format(ct_uid))
-                export.ExportOperations().export_changed_data(cursor, ct_uid)
-                core.CoreOperations().set_data_as_synced(cursor, ct_uid)
+                export.export_changed_data(cursor, ct_uid)
+                core.set_data_as_synced(cursor, ct_uid)
 
         with self.connection:
             cursor = self.connection.cursor()
-            uids_for_meta_to_update = core.CoreOperations().get_table_to_sync(cursor)
+            uids_for_meta_to_update = core.get_table_to_sync(cursor)
 
         # cover behaviour that would usually be handled by triggers
         for ct_uid in uids_for_meta_to_update:
@@ -120,10 +120,10 @@ class SQDLWriter():
             with self.connection:
                 cursor = self.connection.cursor()
                 if sync_status.is_new:
-                    export.ExportOperations().export_new_measurement(cursor, ct_uid, sync_status.is_complete)
+                    export.export_new_measurement(cursor, ct_uid, sync_status.is_complete)
                 else:
-                    export.ExportOperations().export_changed_measurement(cursor, ct_uid, sync_status)
-                core.CoreOperations().set_table_as_synced(cursor, ct_uid)
+                    export.export_changed_measurement(cursor, ct_uid, sync_status)
+                core.set_table_as_synced(cursor, ct_uid)
 
     def collect_measurement_sync_status(self, uuid: str) -> Optional[SyncStatus]:
         """
@@ -189,7 +189,7 @@ class SQDLWriter():
         """
         with self.connection as conn:
             cursor = conn.cursor()
-            database_version = version.VersionOperations().read(cursor)
+            database_version = version.read(cursor)
 
         assert database_version == __database_version__, "Database is not up to date: expected '{}', found '{}'".format(__database_version__, database_version)
 
@@ -199,3 +199,9 @@ class SQDLWriter():
             seconds = (self.next_tick - now).total_seconds()
             time.sleep(seconds)
         self.next_tick = datetime.datetime.now() + self.tick_rate
+
+    def reconnect(self):
+        self.database._disconnect()
+        self.database._connect()
+        self.connection = self.database.conn_local
+        assert self.connection.closed == 0, "failed to reconnect"

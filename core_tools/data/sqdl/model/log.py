@@ -14,28 +14,27 @@ class UploadLog:
     message: str
 
 
-class LogOperations:
-    def log(self, c: Cursor, scope: str, ct_uid: int, message: str):
+def log(c: Cursor, scope: str, ct_uid: int, message: str):
+    """
+    Insert a message into the 'upload_log' table.
+    """
+    query = """
+        INSERT INTO upload_log (
+            scope,
+            ct_uid,
+            upload_timestamp,
+            message
+        ) VALUES (
+            %(scope)s,
+            %(uid)s,
+            %(ts)s,
+            %(msg)s
+        );
         """
-        Insert a message into the 'upload_log' table.
-        """
-        query = """
-            INSERT INTO upload_log (
-                scope,
-                ct_uid,
-                upload_timestamp,
-                message
-            ) VALUES (
-                %(scope)s,
-                %(uid)s,
-                %(ts)s,
-                %(msg)s
-            );
-            """
-        values = {
-            "scope": scope,
-            "uid": ct_uid,
-            "ts": datetime.now(),
-            "msg": message,
-        }
-        c.execute(query=query, vars=values)
+    values = {
+        "scope": scope,
+        "uid": ct_uid,
+        "ts": datetime.now(),
+        "msg": message,
+    }
+    c.execute(query=query, vars=values)

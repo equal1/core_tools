@@ -12,8 +12,6 @@ import numpy as np
 import psycopg2
 from psycopg2._psycopg import connection as Connection
 
-import core_tools as ct
-from core_tools.startup.config import get_configuration
 from core_tools.data.ds.data_set import load_by_uuid
 
 from core_tools.data.sqdl.export.psql_commands import SqlConnection
@@ -22,7 +20,8 @@ from core_tools.data.sqdl.export.data_export import export_data
 from core_tools.data.sqdl.export.data_preview import generate_previews
 # from core_tools.data.sqdl.uploader_db import UploaderDb
 
-from core_tools.data.sqdl.model.task_queue import TaskQueueOperations, DatasetInfo
+from core_tools.data.sqdl.model import task_queue
+from core_tools.data.sqdl.model.task_queue import DatasetInfo
 # from core_tools.data.sqdl.uploader_task_queue import UploaderTaskQueue, DatasetLocator
 
 logger = logging.getLogger(__name__)
@@ -58,7 +57,6 @@ class Exporter:
     def __init__(self, cfg: Dict):
         self.export_path = cfg.get('sqdl.export_path')
         self.connection = SqlConnection()
-        self.uploader = TaskQueueOperations()
 
         self.scopes = cfg.get('sqdl.scopes', {})
         self.setup_name_corrections = cfg.get('sqdl.setup_name_corrections', {})
@@ -328,13 +326,13 @@ class Exporter:
             c = conn.cursor()
             if sqdl_update.upload_dataset or sqdl_update.upload_raw_data:
                 # self.uploader_queue.update_dataset(ds_locator, final=sqdl_update.raw_final)
-                self.uploader.update_dataset(c, dsi=ds_info, is_finished=sqdl_update.raw_final)
+                task_queue.update_dataset(c, dsi=ds_info, is_finished=sqdl_update.raw_final)
             if sqdl_update.update_star:
                 # self.uploader_queue.update_rating(ds_locator)
-                self.uploader.update_rating(c, dsi=ds_info)
+                task_queue.update_rating(c, dsi=ds_info)
             if sqdl_update.update_name:
                 # self.uploader_queue.update_name(ds_locator)
-                self.uploader.update_name(c, dsi=ds_info)
+                task_queue.update_name(c, dsi=ds_info)
 
     @property
     def measurement_expiration_time(self):
