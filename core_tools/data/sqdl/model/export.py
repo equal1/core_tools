@@ -6,7 +6,7 @@ from psycopg2._psycopg import cursor as Cursor
 
 
 @dataclass
-class Metadata:
+class SyncStatus:
     is_new: bool
     changed_name: bool = False
     changed_rating: bool = False
@@ -37,13 +37,13 @@ class ExportOperations:
             }
         )
 
-    def export_changed_measurement(self, c: Cursor, ct_uid: int, meta: Metadata):
+    def export_changed_measurement(self, c: Cursor, ct_uid: int, meta: SyncStatus):
         c.execute(
             query="""
                 INSERT INTO coretools_export_updates (
                     uuid, update_star, update_name, completed
                 ) VALUES (
-                    %(uuid)s, %(update-star)s, %(name-changed)s, %(completed)s
+                    %(uuid)s, %(star-changed)s, %(name-changed)s, %(completed)s
                 ) ON CONFLICT ( uuid ) DO UPDATE SET
                     modify_count = coretools_export_updates.modify_count + 1,
                     update_star = coretools_export_updates.update_star OR %(star-changed)s,

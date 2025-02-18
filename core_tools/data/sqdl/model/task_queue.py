@@ -225,7 +225,7 @@ class TaskQueueOperations:
                     ( 1, %(scope)s, %(uid)s, %(path)s, TRUE )
                 ON CONFLICT (coretools_uid) DO UPDATE SET
                     task_iteration = excluded.task_iteration + 1,
-                    update_name = TRUE,
+                    update_name = TRUE
                 ;
             """,
             vars={
@@ -245,7 +245,7 @@ class TaskQueueOperations:
                     ( 1, %(scope)s, %(uid)s, %(path)s, TRUE )
                 ON CONFLICT (coretools_uid) DO UPDATE SET
                     task_iteration = excluded.task_iteration + 1,
-                    update_rating = TRUE,
+                    update_rating = TRUE
                 ;
             """,
             vars={

@@ -35,13 +35,12 @@ logger = logging.getLogger(__name__)
 
 class SqdlUploader:
     def __init__(self, cfg: Dict, conn: Connection, client=None):
-        self.cfg = cfg
         if client is None:
             self.client = QDLClient()
         else:
             self.client = client
 
-        api_key = self.cfg.get('sqdl.api_key')
+        api_key = cfg.get('sqdl.api_key')
         if api_key:
             self.client.use_api_key(api_key)
 
@@ -52,8 +51,8 @@ class SqdlUploader:
 
         self.metadata_formatter = MetadataFormatter()
         # load scopes to fix them when not set during export
-        self.scopes = cfg.get('export.scopes', {})
-        if cfg.get('uploader.retry_failed', False):
+        self.scopes = cfg.get('sqdl.scopes', {})
+        if cfg.get('sqdl.retry_failed_uploads', False):
             with self.connection:
                 c = self.connection.cursor()
                 self.task_queue.retry_all_failed(c)
@@ -351,16 +350,3 @@ def fix_filename(filename):
         filename = filename[:m.start()] + '_' * (m.end() - m.start()) + filename[m.end():]
         m = invalid_chars.search(filename)
     return filename
-
-
-def main(configuration_file: str, client: QDLClient = None):
-    ct.configure(configuration_file)
-    cfg = get_configuration()
-    try:
-        uploader = SqdlUploader(cfg, client=client)
-        uploader.poll()
-    except Exception:
-        logger.error('Error running exporter', exc_info=True)
-        raise
-    finally:
-        logger.info('Exit application')

@@ -13,6 +13,7 @@ from sqdl_client.client import QDLClient
 from core_tools.data.ds.data_set import data_set
 from core_tools.data.ds.xarray2ds import xarray2ds
 
+
 _DATASET_READER = None
 
 
@@ -30,9 +31,9 @@ class DatasetInfo:
 
 class DatasetReader:
     def __init__(self, scope_name: str | None = None):
-        client = QDLClient(dev_mode=True)
+        client = QDLClient()
         self.client = client
-        # client.login()
+        client.login()
         self.s3_session = requests.Session()
         if scope_name:
             self.set_scope(scope_name)

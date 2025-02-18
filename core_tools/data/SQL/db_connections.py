@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 def connect_local_db():
     if SQL_conn_info_local.dbname is None:
-        raise Exception("No lcoal database configured")
+        raise Exception("No local database configured")
     try:
         return psycopg2.connect(
             dbname=SQL_conn_info_local.dbname, user=SQL_conn_info_local.user,

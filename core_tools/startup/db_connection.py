@@ -64,7 +64,6 @@ def _config_local_db(readonly):
         user, passwd, dbname,
         readonly
     )
-    print(f"connecting to host '{host}' at port '{port}' to database '{dbname}'")
 
 
 def _connect():

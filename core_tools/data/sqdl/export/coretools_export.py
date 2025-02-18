@@ -56,18 +56,12 @@ class SqdlUpdate:
 class Exporter:
 
     def __init__(self, cfg: Dict):
-        self.cfg = cfg
-        self.export_path = cfg.get('export.path')
-        self.inter_ds_delay = float(cfg.get('export.delay'))
+        self.export_path = cfg.get('sqdl.export_path')
         self.connection = SqlConnection()
-        # self.uploader_db = UploaderDb(cfg)
-        # self.connection = self.uploader_db.engine.connect()
-
-        # self.uploader_queue = UploaderTaskQueue(self.uploader_db)
         self.uploader = TaskQueueOperations()
 
-        self.scopes = cfg.get('export.scopes', {})
-        self.setup_name_corrections = cfg.get('export.setup_name_corrections', {})
+        self.scopes = cfg.get('sqdl.scopes', {})
+        self.setup_name_corrections = cfg.get('sqdl.setup_name_corrections', {})
 
         self.no_action_count = 0
         self.loop_count = 0
@@ -147,7 +141,6 @@ class Exporter:
             self.timer.log_times()
             self.connection.commit()
             logger.info(f'Exported {uuid}')
-            time.sleep(self.inter_ds_delay)
 
         except (psycopg2.Error, psycopg2.Warning):
             logger.error("Database error", exc_info=True)
@@ -357,20 +350,20 @@ class Exporter:
                     return False
         return True
 
-    def get_scope(self, measurement):
+    def get_scope(self, project: str, set_up: str) -> str:
         try:
-            scope = self.scopes[measurement.project]
+            scope = self.scopes[project]
             if isinstance(scope, Mapping):
-                scope = scope[measurement.set_up]
+                scope = scope[set_up]
             return scope
         except KeyError:
-            raise Exception(f"No scope for project '{measurement.project}'")
+            raise Exception(f"No scope for project '{project}'")
 
     def fix_setup_name(self, setup):
         return self.setup_name_corrections.get(setup, setup)
 
     def export_measurement(self, measurement, action: ExportAction) -> Tuple[SqdlUpdate, str]:
-        scope = self.get_scope(measurement)
+        scope = self.get_scope(measurement.project, measurement.set_up)
         measurement.set_up = self.fix_setup_name(measurement.set_up)
         updates = SqdlUpdate(measurement.exp_uuid, scope, raw_final=action.completed)
         try:
@@ -408,18 +401,3 @@ class Exporter:
                 {'data_changed': True,
                  'completed': raw_final})
             self.connection.commit()
-
-
-def main(configuration_file: str):
-    ct.configure(configuration_file)
-    cfg = get_configuration()
-    try:
-        exporter = Exporter(cfg)
-        if cfg.get('export.retry_failed', False):
-            exporter.retry_failed_exports()
-        exporter.poll()
-    except Exception:
-        logger.error('Error running exporter', exc_info=True)
-        raise
-    finally:
-        logger.info('Exit application')
