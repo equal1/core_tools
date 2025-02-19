@@ -18,27 +18,13 @@ from core_tools.data.sqdl.export.psql_commands import SqlConnection
 from core_tools.data.utils.timer import Timer
 from core_tools.data.sqdl.export.data_export import export_data
 from core_tools.data.sqdl.export.data_preview import generate_previews
-# from core_tools.data.sqdl.uploader_db import UploaderDb
 
-from core_tools.data.sqdl.model import task_queue
+from core_tools.data.sqdl.model import task_queue, export
 from core_tools.data.sqdl.model.task_queue import DatasetInfo
-# from core_tools.data.sqdl.uploader_task_queue import UploaderTaskQueue, DatasetLocator
+from core_tools.data.sqdl.model.export import ExportAction
+
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class ExportAction:
-    uuid: int
-    id: Optional[int] = None
-    modify_count: int = 0
-    new_measurement: bool = False
-    data_changed: bool = False
-    completed: bool = False
-    update_star: bool = False
-    update_name: bool = False
-    fail_count: int = 0
-    resume_after: datetime = None
 
 
 @dataclass
@@ -53,10 +39,13 @@ class SqdlUpdate:
 
 
 class Exporter:
-
-    def __init__(self, cfg: Dict):
+    def __init__(self, cfg: Dict, conn: Connection):
         self.export_path = cfg.get('sqdl.export_path')
-        self.connection = SqlConnection()
+        # self.connection = SqlConnection()
+        self.connection = conn
+
+        if cfg.get("sqdl.retry_failed_exports", default=False):
+            self.retry_failed_exports()
 
         self.scopes = cfg.get('sqdl.scopes', {})
         self.setup_name_corrections = cfg.get('sqdl.setup_name_corrections', {})
@@ -66,34 +55,31 @@ class Exporter:
 
         self.process = psutil.Process()
 
-    def poll(self, conn: Connection) -> None:
-        try:
-            self.loop_count += 1
-            done_work = self.export_one(conn)
-            if not done_work:
-                if self.no_action_count == 0:
-                    self.timer.log_times()
-                if (self.no_action_count % 100) == 0:
-                    logger.info('Nothing to export')
-                self.no_action_count += 1
-            else:
-                self.no_action_count = 0
-                unreachable = gc.collect()
-                logger.info(f"GC unreachable: {unreachable} counts:{gc.get_count()} {gc.get_freeze_count()}")
-                logger.info(f"MEM: {self.process.memory_info()}")
+    def poll(self) -> None:
+        self.loop_count += 1
+        done_work = self.export_one()
+        if not done_work:
+            if self.no_action_count == 0:
+                self.timer.log_times()
+            if (self.no_action_count % 100) == 0:
+                logger.info('Nothing to export')
+            self.no_action_count += 1
+        else:
+            self.no_action_count = 0
+            unreachable = gc.collect()
+            logger.info(f"GC unreachable: {unreachable} counts:{gc.get_count()} {gc.get_freeze_count()}")
+            logger.info(f"MEM: {self.process.memory_info()}")
 
-            if self.loop_count % 1_000 == 0:
-                logger.info("Close database connection to free memory")
-                self.connection.close()
-                unreachable = gc.collect()
-                logger.info(f"GC2 unreachable: {unreachable} counts:{gc.get_count()} {gc.get_freeze_count()}")
-                logger.info(f"MEM2: {self.process.memory_info()}")
-        except (psycopg2.Error, psycopg2.Warning):
-            logger.error("Database error", exc_info=True)
-        except Exception:
-            logger.error("Unanticipated error", exc_info=True)
+        if self.loop_count % 1_000 == 0:
+            logger.info("Close database connection to free memory")
+            self.connection.close()
+            unreachable = gc.collect()
+            logger.info(f"GC2 unreachable: {unreachable} counts:{gc.get_count()} {gc.get_freeze_count()}")
+            logger.info(f"MEM2: {self.process.memory_info()}")
 
-    def export_one(self, conn: Connection):
+    def export_one(self):
+        """
+        """
         self.timer = Timer()
         self.timer.time('query actions')
 
@@ -103,41 +89,48 @@ class Exporter:
         # in global_measurement_overview.
         # So, an update of the data may be written before the measurement with UUID is added to the
         # global measurement overview.
-        action = self.get_export_action()
-        if not action:
-            action = self.get_expired_measurement_action()
-            if action:
-                logger.info(f'Export raw data of expired incomplete measurement {action.uuid}')
+
+        action = self.get_action()
         if not action:
             return False
 
         ds = None
         try:
-            start_time = time.perf_counter()
-            uuid = action.uuid
-            self.timer.time('load')
-            ds = load_by_uuid(uuid)
-            logger.info(f'Exporting {action.uuid}, {ds.run_timestamp}, {ds.set_up}, {ds.project}')
-            action.completed = (
-                action.completed
-                or self.measurement_is_completed(ds)
-                or ds.run_timestamp < self.measurement_expiration_time
-            )
-            sqdl_update, ds_path = self.export_measurement(ds, action)
-            sqdl_update.update_star |= action.update_star
-            sqdl_update.update_name |= action.update_name
-            self.add_sqdl_update(conn, sqdl_update, ds_path)
-            self.set_exported(ds, ds_path, action.completed)
-            if action.id is not None:
-                # id is None for expired measurements
-                deleted = self.delete_export_action(action)
-                if not deleted and not action.completed:
-                    # action is not deleted when dataset has been modified during export
-                    duration = int(time.perf_counter() - start_time)
-                    wait_time = duration + self.get_wait_time_not_completed(ds.run_timestamp)
-                    self.set_resume_after(action, wait_time)
-            self.timer.log_times()
-            self.connection.commit()
+            with self.connection:
+                cursor = self.connection.cursor()
+                start_time = time.perf_counter()
+                uuid = action.uuid
+                self.timer.time('load')
+                ds = load_by_uuid(uuid)
+                logger.info(f'Exporting {action.uuid}, {ds.run_timestamp}, {ds.set_up}, {ds.project}')
+                action.completed = (
+                    action.completed
+                    or self.measurement_is_completed(ds)
+                    or ds.run_timestamp < self.measurement_expiration_time
+                )
+                sqdl_update, ds_path = self.export_measurement(ds, action)
+
+                sqdl_update.update_star |= action.update_star
+                sqdl_update.update_name |= action.update_name
+
+                self.add_sqdl_update(cursor, sqdl_update, ds_path)
+                # self.set_exported(ds, ds_path, action.completed)
+                export.set_exported(cursor, ds, ds_path, is_complete=action.completed)
+
+                if action.id is not None:
+                    # id is None for expired measurements
+
+                    # deleted = self.delete_export_action(action)
+                    deleted = export.delete_export_action(cursor, action)
+                    if not deleted and not action.completed:
+                        # action is not deleted when dataset has been modified during export
+                        duration = int(time.perf_counter() - start_time)
+                        wait_time = duration + self.get_wait_time_not_completed(ds.run_timestamp)
+                        # self.set_resume_after(action, wait_time)
+                        export.set_resume_after(cursor, action, wait_time)
+
+                self.timer.log_times()
+
             logger.info(f'Exported {uuid}')
 
         except (psycopg2.Error, psycopg2.Warning):
@@ -149,105 +142,142 @@ class Exporter:
                 pass
 
         except Exception as ex:
-            sleep_time = 0.001
-            error_code = 99
-            retry_after = None
-            msg = str(ex)
-            # code 10 - 49: known error and (possibly) recoverable
-            # code 50 - 90: known error and retry
-            # code 99: unspecified error
-            # code > 100: know error and not recoverable, e.g. corrupt dataset.
-            if msg.startswith("No scope for project"):
-                logger.warning(str(ex))
-                error_code = 11
-            elif msg.startswith("Failed reading/writing file(s)"):
-                logger.warning(str(ex))
-                error_code = 50
-                retry_after = 5.0
-                sleep_time = 0.5
-                if action.fail_count < 30:
-                    retry_after = 1.0 * action.fail_count
-            elif msg.startswith("No data in dataset"):
-                # NOTE: new action will be created when data is written
-                logger.warning(str(ex))
-                error_code = 101
-            elif msg.startswith("m_param with id"):
-                # NOTE: new action will be created when data is written
-                logger.warning(str(ex))
-                error_code = 102
-            elif msg.startswith("Dataset ") and 'too big' in msg:
-                logger.warning(str(ex))
-                error_code = 103
-            elif "does not exist in the local/remote database" in msg:
-                # The synchronization process has not yet finished the sync.
-                logger.warning(str(ex))
-                error_code = 104
-            else:
-                logger.error(f'Failed to export {uuid}', exc_info=True)
-                self.connection.abort()
-                sleep_time = 0.5
-                if action.fail_count < 10:
-                    retry_after = 5.0 + 2.0 * action.fail_count
-            self.set_export_error(uuid, ex, error_code)
-            if action.id is not None:
-                # id is None for expired measurements
-                if retry_after is not None:
-                    self.increment_fail_count(action)
-                    self.set_resume_after(action, retry_after + sleep_time)
-                else:
-                    self.delete_export_action(action)
-            self.connection.commit()
+            message = str(ex)
+            sleep_time, error_code, retry_after = self.parse_exception(message, action)
+
+            with self.connection:
+                cursor = self.connection.cursor()
+                # self.set_export_error(uuid, ex, error_code)
+                export.set_export_error(cursor, uuid, message, error_code)
+
+                if action.id is not None:
+                    # id is None for expired measurements
+                    if retry_after is not None:
+                        # self.increment_fail_count(action)
+                        export.increment_fail_count(cursor, action)
+                        # self.set_resume_after(action, retry_after + sleep_time)
+                        export.set_resume_after(cursor, action, retry_after + sleep_time)
+                    else:
+                        # self.delete_export_action(action)
+                        export.delete_export_action(cursor, action)
+
             time.sleep(sleep_time)
 
         finally:
             if ds is not None:
                 try:
                     ds.close()
-                except:
+                except Exception:
                     pass
 
         return True
 
-    def get_export_action(self) -> Optional[ExportAction]:
-        now = datetime.now()
-        action_data = self.connection.execute_query(
-            '''
-            SELECT * FROM coretools_export_updates
-            WHERE resume_after < %(now)s
-            ORDER BY uuid LIMIT 1
-            ''',
-            return_dict=True,
-            vars={"now": now},
-        )
-        if action_data:
-            return ExportAction(**action_data[0])
-        else:
-            return None
+    def parse_exception(self, message: str, action: ExportAction) -> Tuple[float, int, float]:
+        """
+        Parse exception message to extract error code and establish retry delay.
 
-    def uuid_exists(self, uuid):
-        res = self.connection.execute_query(
-            f'''
-            SELECT uuid FROM global_measurement_overview WHERE uuid = {uuid}
-            '''
-        )
-        return len(res) > 0 and res[0][0] is not None
+        code 10 - 49: known error and (possibly) recoverable
+        code 50 - 90: known error and retry
+        code 99: unspecified error
+        code > 100: know error and not recoverable, e.g. corrupt dataset.
+        """
+        sleep_time = 0.001
+        error_code = 99
+        retry_after = None
 
-    def get_expired_measurement_action(self) -> Optional[ExportAction]:
-        data = self.connection.execute_query(
-            '''
-            SELECT uuid FROM coretools_exported
-            WHERE raw_final = False
-            AND measurement_start_time < %(expiration_time)s
-            AND export_state = 1
-            ORDER BY uuid LIMIT 1
-            ''',
-            vars={'expiration_time': self.measurement_expiration_time},
-            return_dict=True
-        )
-        if not data:
-            return None
+        if message.startswith("No scope for project"):
+            logger.warning(message)
+            error_code = 11
+        elif message.startswith("Failed reading/writing file(s)"):
+            # todo: determine expected behaviour.
+            #   stop retrying after 30 failed attempts? remove retry-after = 5
+            #   have an ever growing wait time? remove condition
+            logger.warning(message)
+            error_code = 50
+            retry_after = 5.0
+            sleep_time = 0.5
+            if action.fail_count < 30:
+                retry_after = 1.0 * action.fail_count
+        elif message.startswith("No data in dataset"):
+            # NOTE: new action will be created when data is written
+            logger.warning(message)
+            error_code = 101
+        elif message.startswith("m_param with id"):
+            # NOTE: new action will be created when data is written
+            logger.warning(message)
+            error_code = 102
+        elif message.startswith("Dataset ") and 'too big' in message:
+            logger.warning(message)
+            error_code = 103
+        elif "does not exist in the local/remote database" in message:
+            # The synchronization process has not yet finished the sync.
+            logger.warning(message)
+            error_code = 104
         else:
-            return ExportAction(data[0]['uuid'], completed=True)
+            logger.error(f'Failed to export {action.uuid}', exc_info=True)
+            self.connection.abort()
+            sleep_time = 0.5
+            if action.fail_count < 10:
+                retry_after = 5.0 + 2.0 * action.fail_count
+
+        return sleep_time, error_code, retry_after
+
+    def get_action(self) -> Optional[ExportAction]:
+        action = None
+        with self.connection:
+            cursor = self.connection.cursor(cursor_factory=export.RealDictCursor)
+            action = export.get_export_action(cursor)
+            # action = self.get_export_action()
+
+            if action:
+                return action
+
+            action = export.get_expired_export_action(cursor, self.measurement_expiration_time)
+            # action = self.get_expired_measurement_action()
+            if action:
+                logger.info(f'Export raw data of expired incomplete measurement {action.uuid}')
+        return action
+
+    # def get_export_action(self) -> Optional[ExportAction]:
+    #     now = datetime.now()
+    #     action_data = self.connection.execute_query(
+    #         '''
+    #         SELECT * FROM coretools_export_updates
+    #         WHERE resume_after < %(now)s
+    #         ORDER BY uuid LIMIT 1
+    #         ''',
+    #         return_dict=True,
+    #         vars={"now": now},
+    #     )
+    #     if action_data:
+    #         return ExportAction(**action_data[0])
+    #     else:
+    #         return None
+
+    # def uuid_exists(self, uuid):
+    #     res = self.connection.execute_query(
+    #         f'''
+    #         SELECT uuid FROM global_measurement_overview WHERE uuid = {uuid}
+    #         '''
+    #     )
+    #     return len(res) > 0 and res[0][0] is not None
+
+    # def get_expired_measurement_action(self) -> Optional[ExportAction]:
+    #     data = self.connection.execute_query(
+    #         '''
+    #         SELECT uuid FROM coretools_exported
+    #         WHERE raw_final = False
+    #         AND measurement_start_time < %(expiration_time)s
+    #         AND export_state = 1
+    #         ORDER BY uuid LIMIT 1
+    #         ''',
+    #         vars={'expiration_time': self.measurement_expiration_time},
+    #         return_dict=True
+    #     )
+    #     if not data:
+    #         return None
+    #     else:
+    #         return ExportAction(data[0]['uuid'], completed=True)
 
     def set_export_error(self, uuid, exception, code=99) -> None:
         if isinstance(exception, Exception):
@@ -261,26 +291,26 @@ class Exporter:
             {'export_state': code, 'export_errors': error_msg}
         )
 
-    def set_exported(self, measurement, ds_path, action_completed=False) -> None:
-        uuid = measurement.exp_uuid
-        start_time = measurement.run_timestamp
-        raw_final = measurement.completed or action_completed
+    # def set_exported(self, measurement, ds_path, action_completed=False) -> None:
+    #     uuid = measurement.exp_uuid
+    #     start_time = measurement.run_timestamp
+    #     raw_final = measurement.completed or action_completed
+    #
+    #     self.connection.insert_or_update(
+    #         'coretools_exported',
+    #         {'uuid': uuid},
+    #         {'measurement_start_time': start_time,
+    #          'path': ds_path,
+    #          'export_state': 1,
+    #          'raw_final': raw_final})
 
-        self.connection.insert_or_update(
-            'coretools_exported',
-            {'uuid': uuid},
-            {'measurement_start_time': start_time,
-             'path': ds_path,
-             'export_state': 1,
-             'raw_final': raw_final})
-
-    def delete_export_action(self, action: ExportAction) -> bool:
-        rowcount = self.connection.execute_statement(
-            f'''
-            DELETE FROM coretools_export_updates
-            WHERE id = {action.id} AND modify_count = {action.modify_count}
-            ''')
-        return rowcount > 0
+    # def delete_export_action(self, action: ExportAction) -> bool:
+    #     rowcount = self.connection.execute_statement(
+    #         f'''
+    #         DELETE FROM coretools_export_updates
+    #         WHERE id = {action.id} AND modify_count = {action.modify_count}
+    #         ''')
+    #     return rowcount > 0
 
     def get_wait_time_not_completed(self, start_timestamp: datetime) -> int:
         now = datetime.now()
@@ -292,47 +322,41 @@ class Exporter:
         else:
             return 4
 
-    def set_resume_after(self, action: ExportAction, wait_time: int) -> None:
-        now = datetime.now()
-        resume_after = now + timedelta(seconds=wait_time)
+    # def set_resume_after(self, action: ExportAction, wait_time: int) -> None:
+    #     now = datetime.now()
+    #     resume_after = now + timedelta(seconds=wait_time)
+    #
+    #     self.connection.execute_statement(
+    #         f'''
+    #         UPDATE coretools_export_updates
+    #         SET resume_after = %(resume_after)s
+    #         WHERE id = {action.id}
+    #         ''',
+    #         vars={"resume_after": resume_after}
+    #     )
 
-        self.connection.execute_statement(
-            f'''
-            UPDATE coretools_export_updates
-            SET resume_after = %(resume_after)s
-            WHERE id = {action.id}
-            ''',
-            vars={"resume_after": resume_after}
-        )
+    # def increment_fail_count(self, action: ExportAction):
+    #     self.connection.execute_statement(
+    #         f'''
+    #         UPDATE coretools_export_updates
+    #         SET fail_count = fail_count + 1
+    #         WHERE id = {action.id}
+    #         ''',
+    #     )
 
-    def increment_fail_count(self, action: ExportAction):
-        self.connection.execute_statement(
-            f'''
-            UPDATE coretools_export_updates
-            SET fail_count = fail_count + 1
-            WHERE id = {action.id}
-            ''',
-        )
-
-    def add_sqdl_update(self, conn: Connection, sqdl_update: SqdlUpdate, ds_path: str) -> None:
-        # ds_locator = DatasetLocator(sqdl_update.scope, uid=sqdl_update.uuid, path=ds_path)
+    def add_sqdl_update(self, cursor: export.Cursor, sqdl_update: SqdlUpdate, ds_path: str) -> None:
         ds_info = DatasetInfo(
             scope=sqdl_update.scope,
             uid=sqdl_update.uuid,
             path=ds_path
         )
 
-        with conn:
-            c = conn.cursor()
-            if sqdl_update.upload_dataset or sqdl_update.upload_raw_data:
-                # self.uploader_queue.update_dataset(ds_locator, final=sqdl_update.raw_final)
-                task_queue.update_dataset(c, dsi=ds_info, is_finished=sqdl_update.raw_final)
-            if sqdl_update.update_star:
-                # self.uploader_queue.update_rating(ds_locator)
-                task_queue.update_rating(c, dsi=ds_info)
-            if sqdl_update.update_name:
-                # self.uploader_queue.update_name(ds_locator)
-                task_queue.update_name(c, dsi=ds_info)
+        if sqdl_update.upload_dataset or sqdl_update.upload_raw_data:
+            task_queue.update_dataset(cursor, dsi=ds_info, is_finished=sqdl_update.raw_final)
+        if sqdl_update.update_star:
+            task_queue.update_rating(cursor, dsi=ds_info)
+        if sqdl_update.update_name:
+            task_queue.update_name(cursor, dsi=ds_info)
 
     @property
     def measurement_expiration_time(self):
@@ -381,21 +405,34 @@ class Exporter:
 
         return updates, ds_path
 
-    def retry_failed_exports(self) -> None:
-        data = self.connection.execute_query(
-            '''
-            SELECT uuid, raw_final FROM coretools_exported
-            WHERE export_state BETWEEN 10 AND 100
-            ORDER BY uuid
-            '''
-        )
-        if not data:
-            return None
-        logger.warning(f'Inserting {len(data)} datasets for retry')
-        for uuid, raw_final in data:
-            self.connection.insert_or_update(
-                'coretools_export_updates',
-                {'uuid': uuid},
-                {'data_changed': True,
-                 'completed': raw_final})
-            self.connection.commit()
+    # def retry_failed_exports(self) -> None:
+    #     data = self.connection.execute_query(
+    #         '''
+    #         SELECT uuid, raw_final FROM coretools_exported
+    #         WHERE export_state BETWEEN 10 AND 100
+    #         ORDER BY uuid
+    #         '''
+    #     )
+    #     if not data:
+    #         return None
+    #     logger.warning(f'Inserting {len(data)} datasets for retry')
+    #     for uuid, raw_final in data:
+    #         self.connection.insert_or_update(
+    #             'coretools_export_updates',
+    #             {'uuid': uuid},
+    #             {'data_changed': True,
+    #              'completed': raw_final})
+    #         self.connection.commit()
+
+    def retry_failed_exports(self):
+        with self.connection as conn:
+            cursor = conn.cursor()
+            records = export.get_failed_exports(cursor)
+
+            if len(records) == 0:
+                return None
+
+            logger.warning("Inserting {} datasets for export retry.".format(len(records)))
+            for uuid, is_complete in records:
+                export.set_retry_export(cursor, uuid, is_complete)
+                conn.commit()

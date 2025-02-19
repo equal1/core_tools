@@ -308,20 +308,14 @@ class SqdlUploader:
                     c = self.connection.cursor()
                     task_queue.release_task(c, task)
 
-    def poll(self, conn: Connection) -> None:
-        self.connection = conn
-        # NOTE: KeyboardInterrupt and SystemExit will not be caught.
-        try:
-            work_done = self.process_task()
-            if not work_done:
-                self.idle_cnt += 1
-                if self.idle_cnt % 300 == 0:
-                    logger.info('Nothing to upload')
-            else:
-                self.idle_cnt = 0
-        except Exception:
-            # anticipated causes: database connection failure when trying to get task.
-            logger.error('Task processing failed', exc_info=True)
+    def poll(self) -> None:
+        work_done = self.process_task()
+        if not work_done:
+            self.idle_cnt += 1
+            if self.idle_cnt % 300 == 0:
+                logger.info('Nothing to upload')
+        else:
+            self.idle_cnt = 0
 
 
 def fix_filename(filename):

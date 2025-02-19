@@ -40,12 +40,18 @@ class SQDLWriter():
         self.validate_version()
 
         # initialise
-        self.exporter = Exporter(config)
+        self.exporter = Exporter(
+            cfg=config,
+            conn=self.connection
+        )
+        dev_mode = config.get("sqdl.dev_mode", default=True)
+        if dev_mode:
+            logger.info("Initialising SQDL Writer/Client in developer mode...")
         self.uploader = Uploader(
-            config,
+            cfg=config,
             conn=self.connection,
             client=QDLClient(
-                dev_mode=config.get("sqdl.dev_mode", default=True)
+                dev_mode=dev_mode,
             )
         )
         self.tick_rate = datetime.timedelta(
@@ -66,6 +72,8 @@ class SQDLWriter():
 
             self.database._connect()
             self.connection = self.database.conn_local
+            self.exporter.connection = self.connection
+            self.uploader.connection = self.connection
 
             self.is_running = True
             self.next_tick = datetime.datetime.now() + self.tick_rate
@@ -73,8 +81,8 @@ class SQDLWriter():
             while self.is_running:
                 try:
                     self.queue_datasets_for_export()
-                    self.exporter.poll(self.connection)
-                    self.uploader.poll(self.connection)
+                    self.exporter.poll()
+                    self.uploader.poll()
 
                 except InterfaceError:
                     logger.warning("Connection to local database lost. Reconnecting...")
@@ -205,3 +213,6 @@ class SQDLWriter():
         self.database._connect()
         self.connection = self.database.conn_local
         assert self.connection.closed == 0, "failed to reconnect"
+
+        self.exporter.connection = self.connection
+        self.uploader.connection = self.connection
