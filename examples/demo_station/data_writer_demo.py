@@ -11,6 +11,11 @@ write_data(
     'Demo_WriteData',
     Axis('x', 'x-array', 'a.u.', [1, 2, 3, 4]),
     Data('y', 'y-array', 'a.u.', [3, 1, 4, 6]),
+    snapshot_data={
+        "model": "some arbitrary data",
+        "param_a": 100,
+        "param_b": 10,
+        }
 )
 
 write_data(
@@ -19,7 +24,9 @@ write_data(
     Axis('e12', 'detuning', 'mv', np.linspace(-10, 10, 5)),
     Data('SD1', 'Sensor 1', 'mV', np.linspace(10, 20, 55).reshape((11, 5))),
     Data('SD2', 'Sensor 2', 'mV', np.linspace(0, -20, 55).reshape((11, 5))),
+    snapshot_data={
+        "model": "linear numpy data",
+        "param_a": 100,
+        "param_b": 10,
+        }
 )
-
-
-#%%

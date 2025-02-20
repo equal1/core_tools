@@ -41,7 +41,7 @@ class _Action:
 
 
 class DataWriter:
-    def __init__(self, name, *args):
+    def __init__(self, name, *args, snapshot_data: dict[str, any] | None = None):
         self._measurement = Measurement(name, silent=True)
         self._actions = []
         self._set_params = []
@@ -55,7 +55,10 @@ class DataWriter:
                 self._add_data(arg)
             else:
                 raise TypeError(f"Unknown argument of type {type(arg)}")
-        self._measurement.add_snapshot('data_writer', {'message': 'Data written by data writer'})
+        if snapshot_data:
+            self._measurement.add_snapshot('data_writer', snapshot_data)
+        else:
+            self._measurement.add_snapshot('data_writer', {'message': 'Data written by data writer'})
 
     def _add_axis(self, axis):
         param = ManualParameter(axis.name, label=axis.label, unit=axis.unit)
@@ -100,13 +103,14 @@ class DataWriter:
             self._loop(iaction + 1, isetpoint)
 
 
-def write_data(name: str, *args):
+def write_data(name: str, *args, snapshot_data: dict[str, any] | None = None):
     '''
     Creates a dataset `name` using the specified Axis and Data.
 
     Args:
         name: name of the dataset.
         args: list of Axis and Data objects.
+        snapshot_data: Data to be added to the snapshot.
 
     Example:
         write_data(
@@ -131,7 +135,7 @@ def write_data(name: str, *args):
             Data('z', 'z', 'a.u., <array with shape(len(values_a), len(values_b), len(values_c)>),
         )
     '''
-    return DataWriter(name, *args).run()
+    return DataWriter(name, *args, snapshot_data=snapshot_data).run()
 
 
 if __name__ == "__main__":
