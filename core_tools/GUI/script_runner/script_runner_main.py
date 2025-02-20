@@ -2,17 +2,15 @@ import logging
 import inspect
 import os
 from enum import Enum
-from abc import ABC, abstractmethod
 
 from PyQt5 import QtCore, QtWidgets
-from core_tools.GUI.script_runner.script_runner_gui import Ui_MainWindow
-from core_tools.GUI.qt_util import qt_log_exception
-from core_tools.GUI.keysight_videomaps.liveplotting import liveplotting
 
-try:
-    from spyder_kernels.customize.spydercustomize import runcell
-except Exception:
-    runcell = None
+from core_tools.GUI.keysight_videomaps.liveplotting import liveplotting
+from core_tools.GUI.script_runner.script_runner_gui import Ui_MainWindow
+from core_tools.GUI.script_runner.commands import Function, Cell
+from core_tools.GUI.script_runner.web_server import run_web_server
+from core_tools.GUI.qt_util import qt_log_exception
+
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +43,7 @@ class ScriptRunner(QtWidgets.QMainWindow, Ui_MainWindow):
 
         super(QtWidgets.QMainWindow, self).__init__()
         self.setupUi(self)
+
         self.video_mode_running = False
         self.video_mode_label = QtWidgets.QLabel("VideoMode: <unknown")
         self.video_mode_label.setMargin(2)
@@ -96,9 +95,10 @@ class ScriptRunner(QtWidgets.QMainWindow, Ui_MainWindow):
             python_file: filename of Python file.
             command_name: Optional name to show for the command in ScriptRunner.
         '''
-        if runcell is None:
-            raise Exception('runcell not available. Upgrade to Spyder 4+ to use add_cell()')
         self._add_command(Cell(cell, python_file, command_name))
+
+    def run_server(self):
+        run_web_server(self.commands)
 
     @qt_log_exception
     def closeEvent(self, event):
@@ -213,112 +213,6 @@ class ScriptRunner(QtWidgets.QMainWindow, Ui_MainWindow):
             liveplotting.last_instance._2D_start_stop()
 
 
-class Command(ABC):
-    def __init__(self, name, parameters, defaults={}):
-        self.name = name
-        self.parameters = parameters
-        self.defaults = defaults
-
-    @abstractmethod
-    def __call__(self):
-        pass
-
-
-class Cell(Command):
-    '''
-    A reference to an IPython cell with Python code to be run as command in
-    ScriptRunner.
-
-    If command_name is not specified then cell+filename with be used as command name.
-
-    Args:
-        cell: name or number of cell to run.
-        python_file: filename of Python file.
-        command_name: Optional name to show for the command in ScriptRunner.
-    '''
-
-    def __init__(self, cell: str | int, python_file: str, command_name: str | None = None):
-        filename = os.path.basename(python_file)
-        name = f'{cell} ({filename})' if command_name is None else command_name
-        super().__init__(name, {})
-        self.cell = cell
-        self.python_file = python_file
-        if runcell is None:
-            raise Exception('runcell not available. Upgrade to Spyder 4+ to use Cell()')
-
-    def __call__(self):
-        command = f"runcell({self.cell}, '{self.python_file}')"
-        print(command)
-        logger.info(command)
-        runcell(self.cell, self.python_file)
-
-
-class Function(Command):
-    '''
-    A reference to a function to be run as command in ScriptRunner.
-
-    The argument types of the function are displayed in the GUI. The entered
-    data is converted to the specified type. Currently the types `str`, `int`, `float` and `bool`
-    are supported.
-    If the type of the argument is not specified, then a string will be passed to the function.
-
-    If command_name is not specified, then the name of func is used as
-    command name.
-
-    The additional keyword arguments will be entered as default values in the GUI.
-
-    Args:
-        func: function to execute.
-        command_name: Optional name to show for the command in ScriptRunner.
-        kwargs: default arguments to pass with function.
-    '''
-
-    def __init__(self, func: any, command_name: str | None = None, **kwargs):
-        if command_name is None:
-            command_name = func.__name__
-        signature = inspect.signature(func)
-        parameters = {p.name: p for p in signature.parameters.values()}
-        defaults = {}
-        for name, parameter in parameters.items():
-            if parameter.default is not inspect._empty:
-                defaults[name] = parameter.default
-            if parameter.annotation is inspect._empty:
-                logger.warning(f'No annotation for `{name}`, assuming string')
-        defaults.update(**kwargs)
-        super().__init__(command_name, parameters, defaults)
-        self.func = func
-
-    def _convert_arg(self, param_name, value):
-        annotation = self.parameters[param_name].annotation
-        if annotation is inspect._empty:
-            # no type specified. Pass string.
-            return value
-        if isinstance(annotation, str):
-            raise Exception('Cannot convert to type specified as a string')
-        if issubclass(annotation, bool):
-            return value in [True, 1, 'True', 'true', '1']
-        if issubclass(annotation, Enum):
-            return annotation[value]
-        return annotation(value)
-
-    def __call__(self, **kwargs):
-        call_args = {}
-        for name in self.parameters:
-            try:
-                call_args[name] = self.defaults[name]
-            except KeyError:
-                pass
-            try:
-                call_args[name] = self._convert_arg(name, kwargs[name])
-            except KeyError:
-                pass
-        args_list = [f'{name}={repr(value)}' for name, value in call_args.items()]
-        command = f'{self.func.__name__}({", ".join(args_list)})'
-        print(command)
-        logger.info(command)
-        return self.func(**call_args)
-
-
 if __name__ == "__main__":
 
     def sayHi(name: str, times: int = 1):
@@ -343,7 +237,11 @@ if __name__ == "__main__":
     ui.add_function(fit, 'Fit it', mode=Mode.CENTER, x=1.0)
     ui.add_function(fit, 'Fit it', mode='center', x=1.0)
     ui.add_function(fit, 'Fit it', mode='CENTER', x=1.0)
-    ui.add_cell('Say Hi', path+'/test_script.py')
-    ui.add_cell(2, path+'/test_script.py', 'Magic Button')
-    ui.add_cell('Oops', path+'/test_script.py')
-    ui.add_cell('Syntax Error', path+'/test_script.py')
+    # ui.add_cell('Say Hi', path+'/test_script.py')
+    # ui.add_cell(2, path+'/test_script.py', 'Magic Button')
+    # ui.add_cell('Oops', path+'/test_script.py')
+    # ui.add_cell('Syntax Error', path+'/test_script.py')
+
+    # NOTE:
+    # To start servicing http requests run:
+    ui.run_server()
