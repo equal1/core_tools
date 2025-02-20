@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[1.5.11] - 2025-02-20
+
+- Added snapshot data_writer
+- Added simple HTTP server to start scripts/functions based on ScriptRunner
+- Added example of live exporter writing json files
+
 ## \[1.5.10] - 2025-02-17
 
 - Removed unintended print statement.
