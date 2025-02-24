@@ -46,9 +46,7 @@ class SqdlUploader:
         # load scopes to fix them when not set during export
         self.scopes = cfg.get('sqdl.scopes', {})
         if cfg.get('sqdl.retry_failed_uploads', False):
-            with self.connection:
-                c = self.connection.cursor()
-                task_queue.retry_all_failed(c)
+            task_queue.retry_all_failed(self.connection)
         self.pid = os.getpid()
         self.cleanup_abandoned_tasks()
         logger.info(f"Started uploader, pid:{self.pid}")
@@ -57,12 +55,10 @@ class SqdlUploader:
 
     def process_task(self) -> bool:
         start = time.perf_counter()
-        with self.connection:
-            c = self.connection.cursor()
-            task = task_queue.claim_oldest_task(c, self.pid)
-            if task is None:
-                task = task_queue.claim_newest_retry_task(c, self.pid)
 
+        task = task_queue.claim_oldest_task(self.connection, self.pid)
+        if task is None:
+            task = task_queue.claim_newest_retry_task(self.connection, self.pid)
         if task is None:
             return False
 
@@ -79,9 +75,7 @@ class SqdlUploader:
             # get / create sQDL dataset
             sqdl_ds = self.get_create_sqdl_dataset(task.scope, desc)
             if task.update_dataset or task.is_ready:
-                with self.connection:
-                    c = self.connection.cursor()
-                    ds_upload_id = upload.create_dataset(c, task.scope, task.coretools_uid, sqdl_ds.uuid)
+                ds_upload_id = upload.create_dataset(self.connection, task.scope, task.coretools_uid, sqdl_ds.uuid)
 
                 files = self.sort_files(ds_scanner.get_files(), desc)
                 self.upload_files(task, ds_upload_id, files, sqdl_ds)
@@ -95,12 +89,10 @@ class SqdlUploader:
                     logger.info(f"update rating {task.coretools_uid} {sqdl_ds.rating} -> {new_rating}")
                     sqdl_ds.update_rating(new_rating)
 
-            with self.connection:
-                c = self.connection.cursor()
-                deleted = task_queue.delete_task(c, task)
-                if not deleted:
-                    logger.debug(f'Task {task.coretools_uid} has been modified during upload. Release task')
-                    task_queue.release_task(c, task)
+            deleted = task_queue.delete_task(self.connection, task)
+            if not deleted:
+                logger.debug(f'Task {task.coretools_uid} has been modified during upload. Release task')
+                task_queue.release_task(self.connection, task)
 
             # log success
             self.log(task, 'Uploaded')
@@ -109,26 +101,20 @@ class SqdlUploader:
 
         except DatasetError as ex:
             logger.error(f"Exception processing {task.coretools_uid} '{ex}' {task.dataset_path}")
-            with self.connection:
-                c = self.connection.cursor()
-                task_queue.set_failed(c, task)
+            task_queue.set_failed(self.connection, task)
             self.log(task, f'{type(ex)}: {ex}')
 
         except (ConnectionError, ReadTimeout) as ex:
             # server cannot be reached
             logger.error(f"Exception processing {task.coretools_uid} '{ex}'", exc_info=True)
-            with self.connection:
-                c = self.connection.cursor()
-                task_queue.release_task(c, task)
+            task_queue.release_task(self.connection, task)
             time.sleep(1.0)
 
         except RequestException as ex:
             logger.error(f'Exception processing {task.coretools_uid} {task.dataset_path}. Response:{ex.response}', exc_info=True)
             if ex.response is not None:
                 logger.info(f'Response: {ex.response.url}; {ex.response.headers}')
-            with self.connection:
-                c = self.connection.cursor()
-                task_queue.set_failed(c, task)
+            task_queue.set_failed(self.connection, task)
             self.log(task, f'{type(ex)}: {ex}')
             time.sleep(0.5)
 
@@ -137,17 +123,13 @@ class SqdlUploader:
             # database connection failures, sQDL connecton failures should be given a retry.
             # dataset errors should mark the task as failed.
             logger.error(f'Exception processing {task.coretools_uid} {task.dataset_path}', exc_info=True)
-            with self.connection:
-                c = self.connection.cursor()
-                task_queue.set_failed(c, task)
+            task_queue.set_failed(self.connection, task)
             self.log(task, f'{type(ex)}: {ex}')
             time.sleep(0.5)
         return True
 
     def log(self, task, message):
-        with self.connection:
-            c = self.connection.cursor()
-            log.log(c, task.scope, task.coretools_uid, message)
+        log.log(self.connection, task.scope, task.coretools_uid, message)
 
     def get_scope(self, desc):
         # is it in the json file?
@@ -230,10 +212,7 @@ class SqdlUploader:
         return sorted(files, key=lambda fi: fi.seq_number)
 
     def upload_files(self, task, ds_upload_id, file_entries: list[FileInfo], sqdl_ds: Dataset):
-        with self.connection:
-            c = self.connection.cursor()
-            uploaded_files_list = upload.get_files_for_dataset(c, parent_idx=ds_upload_id)
-
+        uploaded_files_list = upload.get_files_for_dataset(self.connection, parent_idx=ds_upload_id)
         uploaded_files = {uf.filename: uf for uf in uploaded_files_list}
         logger.debug(f"{len(uploaded_files)} different files in registry for {task.coretools_uid}: {[uploaded_files.keys()]}")
 
@@ -265,15 +244,13 @@ class SqdlUploader:
                 make_immutable = fi.file_type == 'raw' and task.is_ready
                 self.upload_file(fi, sqdl_file, make_immutable)
 
-                with self.connection:
-                    c = self.connection.cursor()
-                    upload.create_or_update_file(
-                        c,
-                        parent_idx=ds_upload_id,
-                        sqdl_uuid=sqdl_file.uuid,
-                        filename=fi.name,
-                        last_modified=fi.st_mtime_us
-                    )
+                upload.create_or_update_file(
+                    self.connection,
+                    parent_idx=ds_upload_id,
+                    sqdl_uuid=sqdl_file.uuid,
+                    filename=fi.name,
+                    last_modified=fi.st_mtime_us
+                )
             elif fi.name not in sqdl_files:
                 # Strange: it is registered as uploaded, but not there?
                 raise Exception(f'File {fi.name} of {task.scope}:{task.coretools_uid} missing in sQDL')
@@ -295,18 +272,13 @@ class SqdlUploader:
 
     def cleanup_abandoned_tasks(self):
         pids = psutil.pids()
-        with self.connection:
-            c = self.connection.cursor()
-            tasks = task_queue.get_claimed_tasks(c)
+        tasks = task_queue.get_claimed_tasks(self.connection)
 
         for task in tasks:
             alive = task.is_claimed_by in pids
             logger.info(f"task (uid:{task.coretools_uid}) is claimed by {task.is_claimed_by}, alive: {alive}")
             if not alive:
-                # todo: map more efficiently - collect all dead tasks, then release them all in one transaction, instead of doing a transaction per loop
-                with self.connection:
-                    c = self.connection.cursor()
-                    task_queue.release_task(c, task)
+                task_queue.release_task(self.connection, task)
 
     def poll(self) -> None:
         work_done = self.process_task()

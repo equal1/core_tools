@@ -8,17 +8,13 @@ from datetime import datetime, timedelta
 from typing import Optional, Tuple, Dict
 
 import numpy as np
-
 import psycopg2
 from psycopg2._psycopg import connection as Connection
 
 from core_tools.data.ds.data_set import load_by_uuid
-
-from core_tools.data.sqdl.export.psql_commands import SqlConnection
 from core_tools.data.utils.timer import Timer
 from core_tools.data.sqdl.export.data_export import export_data
 from core_tools.data.sqdl.export.data_preview import generate_previews
-
 from core_tools.data.sqdl.model import task_queue, export
 from core_tools.data.sqdl.model.task_queue import DatasetInfo
 from core_tools.data.sqdl.model.export import ExportAction
@@ -96,40 +92,38 @@ class Exporter:
 
         ds = None
         try:
-            with self.connection:
-                cursor = self.connection.cursor()
-                start_time = time.perf_counter()
-                uuid = action.uuid
-                self.timer.time('load')
-                ds = load_by_uuid(uuid)
-                logger.info(f'Exporting {action.uuid}, {ds.run_timestamp}, {ds.set_up}, {ds.project}')
-                action.completed = (
-                    action.completed
-                    or self.measurement_is_completed(ds)
-                    or ds.run_timestamp < self.measurement_expiration_time
-                )
-                sqdl_update, ds_path = self.export_measurement(ds, action)
+            start_time = time.perf_counter()
+            uuid = action.uuid
+            self.timer.time('load')
+            ds = load_by_uuid(uuid)
+            logger.info(f'Exporting {action.uuid}, {ds.run_timestamp}, {ds.set_up}, {ds.project}')
+            action.completed = (
+                action.completed
+                or self.measurement_is_completed(ds)
+                or ds.run_timestamp < self.measurement_expiration_time
+            )
+            sqdl_update, ds_path = self.export_measurement(ds, action)
 
-                sqdl_update.update_star |= action.update_star
-                sqdl_update.update_name |= action.update_name
+            sqdl_update.update_star |= action.update_star
+            sqdl_update.update_name |= action.update_name
 
-                self.add_sqdl_update(cursor, sqdl_update, ds_path)
-                # self.set_exported(ds, ds_path, action.completed)
-                export.set_exported(cursor, ds, ds_path, is_complete=action.completed)
+            self.add_sqdl_update(sqdl_update, ds_path)
+            # self.set_exported(ds, ds_path, action.completed)
+            export.set_exported(self.connection, ds, ds_path, is_complete=action.completed)
 
-                if action.id is not None:
-                    # id is None for expired measurements
+            if action.id is not None:
+                # id is None for expired measurements
 
-                    # deleted = self.delete_export_action(action)
-                    deleted = export.delete_export_action(cursor, action)
-                    if not deleted and not action.completed:
-                        # action is not deleted when dataset has been modified during export
-                        duration = int(time.perf_counter() - start_time)
-                        wait_time = duration + self.get_wait_time_not_completed(ds.run_timestamp)
-                        # self.set_resume_after(action, wait_time)
-                        export.set_resume_after(cursor, action, wait_time)
+                # deleted = self.delete_export_action(action)
+                deleted = export.delete_export_action(self.connection, action)
+                if not deleted and not action.completed:
+                    # action is not deleted when dataset has been modified during export
+                    duration = int(time.perf_counter() - start_time)
+                    wait_time = duration + self.get_wait_time_not_completed(ds.run_timestamp)
+                    # self.set_resume_after(action, wait_time)
+                    export.set_resume_after(self.connection, action, wait_time)
 
-                self.timer.log_times()
+            self.timer.log_times()
 
             logger.info(f'Exported {uuid}')
 
@@ -145,21 +139,19 @@ class Exporter:
             message = str(ex)
             sleep_time, error_code, retry_after = self.parse_exception(message, action)
 
-            with self.connection:
-                cursor = self.connection.cursor()
-                # self.set_export_error(uuid, ex, error_code)
-                export.set_export_error(cursor, uuid, message, error_code)
+            # self.set_export_error(uuid, ex, error_code)
+            export.set_export_error(self.connection, uuid, message, error_code)
 
-                if action.id is not None:
-                    # id is None for expired measurements
-                    if retry_after is not None:
-                        # self.increment_fail_count(action)
-                        export.increment_fail_count(cursor, action)
-                        # self.set_resume_after(action, retry_after + sleep_time)
-                        export.set_resume_after(cursor, action, retry_after + sleep_time)
-                    else:
-                        # self.delete_export_action(action)
-                        export.delete_export_action(cursor, action)
+            if action.id is not None:
+                # id is None for expired measurements
+                if retry_after is not None:
+                    # self.increment_fail_count(action)
+                    export.increment_fail_count(self.connection, action)
+                    # self.set_resume_after(action, retry_after + sleep_time)
+                    export.set_resume_after(self.connection, action, retry_after + sleep_time)
+                else:
+                    # self.delete_export_action(action)
+                    export.delete_export_action(self.connection, action)
 
             time.sleep(sleep_time)
 
@@ -189,12 +181,8 @@ class Exporter:
             logger.warning(message)
             error_code = 11
         elif message.startswith("Failed reading/writing file(s)"):
-            # todo: determine expected behaviour.
-            #   stop retrying after 30 failed attempts? remove retry-after = 5
-            #   have an ever growing wait time? remove condition
             logger.warning(message)
             error_code = 50
-            retry_after = 5.0
             sleep_time = 0.5
             if action.fail_count < 30:
                 retry_after = 1.0 * action.fail_count
@@ -223,19 +211,15 @@ class Exporter:
         return sleep_time, error_code, retry_after
 
     def get_action(self) -> Optional[ExportAction]:
-        action = None
-        with self.connection:
-            cursor = self.connection.cursor(cursor_factory=export.RealDictCursor)
-            action = export.get_export_action(cursor)
-            # action = self.get_export_action()
+        action = export.get_export_action(self.connection)
+        # action = self.get_export_action()
+        if action is not None:
+            return action
 
-            if action:
-                return action
-
-            action = export.get_expired_export_action(cursor, self.measurement_expiration_time)
-            # action = self.get_expired_measurement_action()
-            if action:
-                logger.info(f'Export raw data of expired incomplete measurement {action.uuid}')
+        action = export.get_expired_export_action(self.connection, self.measurement_expiration_time)
+        # action = self.get_expired_measurement_action()
+        if action is not None:
+            logger.info(f'Export raw data of expired incomplete measurement {action.uuid}')
         return action
 
     # def get_export_action(self) -> Optional[ExportAction]:
@@ -344,7 +328,7 @@ class Exporter:
     #         ''',
     #     )
 
-    def add_sqdl_update(self, cursor: export.Cursor, sqdl_update: SqdlUpdate, ds_path: str) -> None:
+    def add_sqdl_update(self, sqdl_update: SqdlUpdate, ds_path: str) -> None:
         ds_info = DatasetInfo(
             scope=sqdl_update.scope,
             uid=sqdl_update.uuid,
@@ -352,11 +336,11 @@ class Exporter:
         )
 
         if sqdl_update.upload_dataset or sqdl_update.upload_raw_data:
-            task_queue.update_dataset(cursor, dsi=ds_info, is_finished=sqdl_update.raw_final)
+            task_queue.update_dataset(self.connection, dsi=ds_info, is_finished=sqdl_update.raw_final)
         if sqdl_update.update_star:
-            task_queue.update_rating(cursor, dsi=ds_info)
+            task_queue.update_rating(self.connection, dsi=ds_info)
         if sqdl_update.update_name:
-            task_queue.update_name(cursor, dsi=ds_info)
+            task_queue.update_name(self.connection, dsi=ds_info)
 
     @property
     def measurement_expiration_time(self):
@@ -425,14 +409,11 @@ class Exporter:
     #         self.connection.commit()
 
     def retry_failed_exports(self):
-        with self.connection as conn:
-            cursor = conn.cursor()
-            records = export.get_failed_exports(cursor)
+        records = export.get_failed_exports(self.connection)
 
-            if len(records) == 0:
-                return None
+        if len(records) == 0:
+            return None
 
-            logger.warning("Inserting {} datasets for export retry.".format(len(records)))
-            for uuid, is_complete in records:
-                export.set_retry_export(cursor, uuid, is_complete)
-                conn.commit()
+        logger.warning("Inserting {} datasets for export retry.".format(len(records)))
+        for uuid, is_complete in records:
+            export.set_retry_export(self.connection, uuid, is_complete)

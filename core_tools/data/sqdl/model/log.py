@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from dataclasses import dataclass
 
-from psycopg2._psycopg import cursor as Cursor
+from psycopg2._psycopg import connection as Connection
 
 
 @dataclass
@@ -14,7 +14,7 @@ class UploadLog:
     message: str
 
 
-def log(c: Cursor, scope: str, ct_uid: int, message: str):
+def log(conn: Connection, scope: str, ct_uid: int, message: str):
     """
     Insert a message into the 'upload_log' table.
     """
@@ -37,4 +37,6 @@ def log(c: Cursor, scope: str, ct_uid: int, message: str):
         "ts": datetime.now(),
         "msg": message,
     }
-    c.execute(query=query, vars=values)
+    with conn:
+        c = conn.cursor()
+        c.execute(query=query, vars=values)

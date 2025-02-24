@@ -106,18 +106,16 @@ class SQDLWriter():
         Covers the behaviour that would originally be done by db-sync and the remote database triggers.
         Looks up measurement data that needs to be synchronized from the local database, and creates the appropriate ExportActions.
         """
-        with self.connection:
-            cursor = self.connection.cursor()
-            uids_for_data_to_update = core.get_data_to_sync(cursor)
+        uids_for_data_to_update = core.get_data_to_sync(self.connection)
 
-            for ct_uid in uids_for_data_to_update:
-                logger.debug("sync data for core-tools UID: '{}'".format(ct_uid))
-                export.export_changed_data(cursor, ct_uid)
-                core.set_data_as_synced(cursor, ct_uid)
+        for ct_uid in uids_for_data_to_update:
+            logger.debug("sync data for core-tools UID: '{}'".format(ct_uid))
 
-        with self.connection:
-            cursor = self.connection.cursor()
-            uids_for_meta_to_update = core.get_table_to_sync(cursor)
+            # todo: these two belong together, right?
+            export.export_changed_data(self.connection, ct_uid)
+            core.set_data_as_synced(self.connection, ct_uid)
+
+        uids_for_meta_to_update = core.get_table_to_sync(self.connection)
 
         # cover behaviour that would usually be handled by triggers
         for ct_uid in uids_for_meta_to_update:
@@ -125,13 +123,11 @@ class SQDLWriter():
             if sync_status is None:
                 continue
 
-            with self.connection:
-                cursor = self.connection.cursor()
-                if sync_status.is_new:
-                    export.export_new_measurement(cursor, ct_uid, sync_status.is_complete)
-                else:
-                    export.export_changed_measurement(cursor, ct_uid, sync_status)
-                core.set_table_as_synced(cursor, ct_uid)
+            if sync_status.is_new:
+                export.export_new_measurement(self.connection, ct_uid, sync_status.is_complete)
+            else:
+                export.export_changed_measurement(self.connection, ct_uid, sync_status)
+            core.set_table_as_synced(self.connection, ct_uid)
 
     def collect_measurement_sync_status(self, uuid: str) -> Optional[SyncStatus]:
         """
@@ -195,9 +191,7 @@ class SQDLWriter():
         """
         Assert that the local database version matches requirements.
         """
-        with self.connection as conn:
-            cursor = conn.cursor()
-            database_version = version.read(cursor)
+        database_version = version.read(self.connection)
 
         assert database_version == __database_version__, "Database is not up to date: expected '{}', found '{}'".format(__database_version__, database_version)
 
