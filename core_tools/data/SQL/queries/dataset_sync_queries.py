@@ -112,7 +112,7 @@ class sync_mgr_queries:
 
             # test for presence of optional "scope" column, if missing, drop it from sync data
             #  added as a patch for pre-database-versioning issues
-            dest_content = select_elements_in_table(conn_dest, "global_measurement_overview", ('*', ), where=("uuid", uuid), dict_cursor=True)[0]
+            dest_content = select_elements_in_table(conn_dest, "global_measurement_overview", ('*', ), dict_cursor=True, limit=1)[0]
             if "scope" not in dest_content:
                 _ = source_content.pop("scope")
 

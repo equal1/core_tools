@@ -66,7 +66,7 @@ def claim_oldest_task(conn: Connection, pid: int) -> Optional[UploadTask]:
         return None
 
     task = UploadTask(*result)
-    if not claim_task(c, task, pid):
+    if not claim_task(conn, task, pid):
         return None
     return task
 
@@ -92,7 +92,7 @@ def claim_newest_retry_task(conn: Connection, pid: int) -> Optional[UploadTask]:
         return None
 
     task = UploadTask(*result)
-    if not claim_task(c, task, pid):
+    if not claim_task(conn, task, pid):
         return None
 
     return task

@@ -164,6 +164,10 @@ class SQDLWriter():
 
         ct_uid, scope_name, ct_name, ct_star, ct_complete, sqdl_uuid = result
 
+        if scope_name is None:
+            logger.warning("No Scope parameter for CoreTools UID '{}'. Skipping SQDL Sync.".format(ct_uid))
+            return None
+
         # do not use 'login' functionality when doing local development
         if not self.dev_mode:
             self.uploader.client.login()
