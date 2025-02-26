@@ -1,6 +1,27 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[Unreleased\]
+
+### Added
+- Added optional functionality for synchronising data with a remote instance of SQDL. Note that this functionality depends on the internally developed ```sqdl_client``` package, and is therefor only accessible by users associated with QuTech.
+    - Added the ```SQDLWriter``` class, responsible for managing the data synchronisation process.
+    - Added the ```.../sqdl/export/``` sub-module, responsible for exporting core-tools data into an SQDL-compatible format.
+    - Added the ```.../sqdl/uploader/``` sub-module, responsible for uploading the exported datasets to a remote SQDL instance.
+    - Added the ```.../sqdl/model/``` sub-module, which defines the local database operations associated with the ```export``` and ```uploader``` sub-modules.
+    - Added ```.../startup/sqdl_sync.py``` and ```.../startup/launch_sqdl_sync.py```, which fill the role of ```.../startup/db_sync.py``` and ```.../startup/launch_db_sync.py``` for the purpose of synchronising data to SQDL.
+
+- Added local database versioning.
+    - ...
+
+### Changed
+- Added a ```scope``` attribute to sample info.
+    - Updated ```sample_info``` class and functionality to include the optional ```scope``` parameter.
+    - Updated ```sample_info_overview``` table with a new "Scope" column for *local* database.
+    - Updated ```global_measurement_overview``` table with a new "Scope" column *local* database.
+    - Added a warning about setting the ```scope``` config parameter to the core-tools start-up configuration method.
+    - Note that updating your remote database to include these columns is not require at this stage. The synchronisation process as defined by ```db_sync``` allows for this descrepancy between databases, facilitating a non-breaking upgrade. 
+
 ## \[1.5.18] - 2025-05-26
 
 - Fixed loading of dataset from remote server when local database is configured as well.

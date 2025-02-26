@@ -34,8 +34,9 @@ class SQDLWriter():
 
         # local database
         self.database = DatabaseInit()
-        # todo: validate that this is actually a local database
         self.database._connect()
+        if not self.database.local_conn_active:
+            raise ValueError("database not configured to a local database instance")
         self.connection = self.database.conn_local
         self.validate_version()
 
@@ -44,14 +45,14 @@ class SQDLWriter():
             cfg=config,
             conn=self.connection
         )
-        dev_mode = config.get("sqdl.dev_mode", default=True)
-        if dev_mode:
+        self.dev_mode = config.get("sqdl.dev_mode", default=True)
+        if self.dev_mode:
             logger.info("Initialising SQDL Writer/Client in developer mode...")
         self.uploader = Uploader(
             cfg=config,
             conn=self.connection,
             client=QDLClient(
-                dev_mode=dev_mode,
+                dev_mode=self.dev_mode,
             )
         )
         self.tick_rate = datetime.timedelta(
@@ -84,9 +85,11 @@ class SQDLWriter():
                     self.exporter.poll()
                     self.uploader.poll()
 
-                except InterfaceError:
-                    logger.warning("Connection to local database lost. Reconnecting...")
-                    self.reconnect()
+                except InterfaceError as error:
+                    logger.warning("Connection to local database lost.")
+                    raise error
+                    # logger.warning("Connection to local database lost. Reconnecting...")
+                    # self.reconnect()
 
                 except ConnectionError:
                     logger.warning("Failed to connect to SQDL. ")
@@ -137,7 +140,7 @@ class SQDLWriter():
         # todo: revise how changes in name and rating are handled, because without the intermediary remote database, we lose our method for tracking changes
         #   in the current solution, 'local' becomes the authority on name and rating, which is not what we want
         statement = """
-            SELECT overview.uuid, overview.set_up, overview.project, overview.exp_name, overview.starred, overview.completed, datasets.sqdl_uuid
+            SELECT overview.uuid, overview.scope, overview.exp_name, overview.starred, overview.completed, datasets.sqdl_uuid
             FROM global_measurement_overview AS overview
             JOIN sqdl_dataset AS datasets
             ON overview.uuid = datasets.coretools_uid
@@ -159,14 +162,13 @@ class SQDLWriter():
             logger.error("Failed to fetch data, or no entry exists with uuid '{}'".format(uuid))
             return None
 
-        ct_uid, setup, project, ct_name, ct_star, ct_complete, sqdl_uuid = result
+        ct_uid, scope_name, ct_name, ct_star, ct_complete, sqdl_uuid = result
 
-        # # do not use 'login' functionality when doing local development
-        # self.uploader.client.login()
+        # do not use 'login' functionality when doing local development
+        if not self.dev_mode:
+            self.uploader.client.login()
 
         scope_api: sqdl_client.api.v1.scope.ScopeAPI = self.uploader.client.api.scope
-
-        scope_name = self.exporter.get_scope(project, setup)
         scope = scope_api.retrieve_from_name(scope_name)
 
         try:
@@ -196,6 +198,10 @@ class SQDLWriter():
         assert database_version == __database_version__, "Database is not up to date: expected '{}', found '{}'".format(__database_version__, database_version)
 
     def sleep_to_limit_rate(self) -> None:
+        """
+        Calculate if and how long the program should sleep at the end of an event loop.
+        Limits the event loop frequency to at most one iteration per ```self.tick_rate``` seconds.
+        """
         now = datetime.datetime.now()
         if self.next_tick > now:
             seconds = (self.next_tick - now).total_seconds()
