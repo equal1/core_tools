@@ -1,4 +1,5 @@
-CREATE TABLE IF NOT EXISTS global_measurement_overview 
+--- Global Measurement Overview
+CREATE TABLE IF NOT EXISTS global_measurement_overview (
     id SERIAL,
     uuid BIGINT NOT NULL unique,
 
@@ -24,12 +25,47 @@ CREATE TABLE IF NOT EXISTS global_measurement_overview
 
     data_synchronized BOOL DEFAULT False,  -- data + param table sync'd
     table_synchronized BOOL DEFAULT False, -- global_measurements_overview sync'd
-    sync_location text);                   -- Note [SdS]: Column is abused for migration to new measurement_parameters table
+    sync_location text  -- Note [SdS]: Column is abused for migration to new measurement_parameters table
+);                   
 
-    CREATE INDEX IF NOT EXISTS id_indexed ON global_measurement_overview USING BTREE (id);
-    CREATE INDEX IF NOT EXISTS uuid_indexed ON global_measurement_overview USING BTREE (uuid);
-    CREATE INDEX IF NOT EXISTS starred_indexed ON global_measurement_overview USING BTREE (starred);
-    CREATE INDEX IF NOT EXISTS date_day_index ON global_measurement_overview USING BTREE (project, set_up, sample);
+CREATE INDEX IF NOT EXISTS id_indexed ON global_measurement_overview USING BTREE (id);
 
-    CREATE INDEX IF NOT EXISTS data_synced_index ON global_measurement_overview USING BTREE (data_synchronized);
-    CREATE INDEX IF NOT EXISTS table_synced_index ON global_measurement_overview USING BTREE (table_synchronized);
+CREATE INDEX IF NOT EXISTS uuid_indexed ON global_measurement_overview USING BTREE (uuid);
+CREATE INDEX IF NOT EXISTS starred_indexed ON global_measurement_overview USING BTREE (starred);
+CREATE INDEX IF NOT EXISTS date_day_index ON global_measurement_overview USING BTREE (project, set_up, sample);
+
+CREATE INDEX IF NOT EXISTS data_synced_index ON global_measurement_overview USING BTREE (data_synchronized);
+CREATE INDEX IF NOT EXISTS table_synced_index ON global_measurement_overview USING BTREE (table_synchronized);
+
+--- Measurement Parameters
+CREATE TABLE IF NOT EXISTS measurement_parameters (
+        id SERIAL primary key, 
+        exp_uuid BIGINT NOT NULL,
+        param_index INT NOT NULL,
+        param_id BIGINT, 
+        nth_set INT, 
+        nth_dim INT, 
+        param_id_m_param BIGINT, 
+        setpoint BOOL, 
+        setpoint_local BOOL, 
+        name_gobal text, 
+        name text NOT NULL,
+        label text NOT NULL,
+        unit text NOT NULL,
+        depencies jsonb, 
+        shape jsonb, 
+        write_cursor INT, 
+        total_size INT, 
+        oid INT
+);
+
+CREATE INDEX IF NOT EXISTS exp_uuid_index ON measurement_parameters USING BTREE (exp_uuid);
+CREATE INDEX IF NOT EXISTS oid_index ON measurement_parameters USING BTREE (oid);
+
+--- Sample Info Overview
+CREATE TABLE IF NOT EXISTS sample_info_overview (
+    sample_info_hash TEXT NOT NULL UNIQUE,
+    set_up TEXT NOT NULL,
+    project TEXT NOT NULL,
+    sample TEXT NOT NULL
+);

@@ -110,6 +110,12 @@ class sync_mgr_queries:
                     sample_info_queries.add_sample(conn_dest, *sample_info)
                     sample_info_list.append(sample_info)
 
+            # test for presence of optional "scope" column, if missing, drop it from sync data
+            #  added as a patch for pre-database-versioning issues
+            dest_content = select_elements_in_table(conn_dest, "global_measurement_overview", ('*', ), where=("uuid", uuid), dict_cursor=True)[0]
+            if "scope" not in dest_content:
+                _ = source_content.pop("scope")
+
             insert_row_in_table(
                 conn_dest, 'global_measurement_overview',
                 tuple(source_content.keys()), tuple(source_content.values()))
