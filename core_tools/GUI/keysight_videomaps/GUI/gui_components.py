@@ -179,7 +179,7 @@ class CheckboxList(GuiElement):
         self._value_changed(sorted(self._checked))
 
     def set_value(self, value: list[str]):
-        self._checked = set(value)
+        self._checked = set([v for v in value if v in self._check_boxes])
         for name, check_box in self._check_boxes.items():
             check_box.setChecked(name in self._checked)
 

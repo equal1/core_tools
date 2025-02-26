@@ -156,7 +156,7 @@ class Favorites:
         if self._ui_check_2D.isChecked():
             settings["2D"] = self._parse_settings_text(self._ui_settings_2D, "2D")
         if self._ui_check_gen.isChecked():
-            settings["3D"] = self._parse_settings_text(self._ui_settings_gen, "gen")
+            settings["gen"] = self._parse_settings_text(self._ui_settings_gen, "gen")
         return settings
 
     def load_selected(self, active_settings: dict[str, any]):
