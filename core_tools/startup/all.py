@@ -5,9 +5,9 @@ from datetime import datetime, timedelta
 
 from .config import load_configuration
 from .db_connection import (
-        connect_local_db,
-        connect_remote_db,
-        connect_local_and_remote_db)
+    connect_local_db,
+    connect_remote_db,
+    connect_local_and_remote_db)
 from .sample_info import set_sample_info
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,12 @@ def _configure_sample(cfg):
     project = cfg['project']
     setup = cfg['setup']
     sample = cfg['sample']
-    set_sample_info(project, setup, sample)
+    try:
+        scope = cfg['scope']
+    except KeyError:
+        logger.warning("Configuration warning: newer versions of core-tools expect the 'scope' config parameter for compatibility with SQDL. Either specify your setup's scope value, or to surpress this warning, add 'scope: ~' to your config file.")
+        scope = None
+    set_sample_info(project, setup, sample, scope)
 
 
 def _connect_to_db(cfg):

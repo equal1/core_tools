@@ -126,22 +126,29 @@ class measurement_overview_queries:
                 or not is_valid_info(sample_info.sample)):
             raise Exception(f'Sample info not valid: {sample_info}')
 
+        scope_value = sample_info.scope
+        if not is_valid_info(scope_value):
+            scope_value = None
+
         uuid = generate_uuid()
         username = getpass.getuser()
         # NOTE: column sync_location is abused for migration to new format
         var_names = (
-            'uuid', 'set_up', 'project', 'sample',
+            'uuid', 'set_up', 'scope', 'project', 'sample',
             'creasted_by', 'exp_name', 'sync_location', 'exp_data_location',
             'start_time')
         var_values = (
-            uuid, str(sample_info.set_up), str(sample_info.project), str(sample_info.sample),
-            username, exp_name, 'New measurement_parameters', '',
+            uuid, str(sample_info.set_up), scope_value, str(sample_info.project),
+            str(sample_info.sample), username, exp_name,
+            'New measurement_parameters', '',
             psycopg2.sql.SQL("TO_TIMESTAMP({})").format(psycopg2.sql.Literal(start_time))
         )
 
         returning = ('id', 'uuid')
-        query_outcome = insert_row_in_table(conn, measurement_overview_queries.table_name,
-                                            var_names, var_values, returning)
+        query_outcome = insert_row_in_table(
+            conn, measurement_overview_queries.table_name, var_names,
+            var_values, returning
+        )
 
         # NOTE: SQL_datatable name is not used anymore for new measurements
 
