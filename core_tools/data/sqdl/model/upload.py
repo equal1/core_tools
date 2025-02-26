@@ -113,7 +113,6 @@ def create_or_update_file(conn: Connection, parent_idx: int, sqdl_uuid: UUID, fi
     """
     Create new SQDLFile entry. If entry with UUID already exists, update the last-modified timestamp instead.
     """
-    # todo: original uploader registry also updates uuid on conflict, but uuid is at all times the conflicting column, so that should do nothing.
     with conn:
         c = conn.cursor()
         c.execute(

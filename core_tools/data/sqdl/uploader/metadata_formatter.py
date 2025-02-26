@@ -44,7 +44,6 @@ class MetadataFormatter:
             'variables_measured': self.validate(desc['vars']),
             'dimensions': self.validate(desc['dims']),
             # TODO more metadata ?
-            "fridge": "test-parameter",  # todo: 
         }
         if "project" in desc:
             metadata["project"] = desc["project"]

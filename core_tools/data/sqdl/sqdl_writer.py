@@ -113,8 +113,6 @@ class SQDLWriter():
 
         for ct_uid in uids_for_data_to_update:
             logger.debug("sync data for core-tools UID: '{}'".format(ct_uid))
-
-            # todo: these two belong together, right?
             export.export_changed_data(self.connection, ct_uid)
             core.set_data_as_synced(self.connection, ct_uid)
 
@@ -136,36 +134,17 @@ class SQDLWriter():
         """
         Select relevant data from 'global_measurement_overview' to use in data syncronisation.
         """
-        # todo: check local data agains SQDL remote data
         # todo: revise how changes in name and rating are handled, because without the intermediary remote database, we lose our method for tracking changes
         #   in the current solution, 'local' becomes the authority on name and rating, which is not what we want
-        statement = """
-            SELECT overview.uuid, overview.scope, overview.exp_name, overview.starred, overview.completed, datasets.sqdl_uuid
-            FROM global_measurement_overview AS overview
-            JOIN sqdl_dataset AS datasets
-            ON overview.uuid = datasets.coretools_uid
-            WHERE overview.uuid = %(ct-uid)s;
-        """
-        parameters = {
-            "ct-uid": uuid
-        }
 
-        result = None
-        with self.connection:
-            cur = self.connection.cursor()
-            cur.execute(
-                query=statement,
-                vars=parameters,
-            )
-            result = cur.fetchone()
-        if result is None:
+        info = core.get_measurement_info(self.connection, uuid)
+
+        if info is None:
             logger.error("Failed to fetch data, or no entry exists with uuid '{}'".format(uuid))
             return None
 
-        ct_uid, scope_name, ct_name, ct_star, ct_complete, sqdl_uuid = result
-
-        if scope_name is None:
-            logger.warning("No Scope parameter for CoreTools UID '{}'. Skipping SQDL Sync.".format(ct_uid))
+        if info.scope is None:
+            logger.warning("No Scope parameter for CoreTools UID '{}'. Skipping SQDL Sync.".format(info.coretools_uid))
             return None
 
         # do not use 'login' functionality when doing local development
@@ -173,25 +152,25 @@ class SQDLWriter():
             self.uploader.client.login()
 
         scope_api: sqdl_client.api.v1.scope.ScopeAPI = self.uploader.client.api.scope
-        scope = scope_api.retrieve_from_name(scope_name)
+        scope = scope_api.retrieve_from_name(info.scope)
 
         try:
-            dataset: sqdl_client.api.v1.dataset.Dataset = scope.retrieve_dataset_from_uid(str(ct_uid))
+            dataset: sqdl_client.api.v1.dataset.Dataset = scope.retrieve_dataset_from_uid(str(info.coretools_uid))
         except sqdl_client.exceptions.ObjectNotFoundException:
-            logger.info("No dataset with CoreTools UID '{}'. Creating new export.".format(ct_uid))
-            metadata = SyncStatus(
+            logger.info("No dataset with CoreTools UID '{}'. Creating new export.".format(info.coretools_uid))
+            sync_status = SyncStatus(
                 is_new=True,
-                is_complete=ct_complete,
+                is_complete=info.completed,
             )
-            return metadata
+            return sync_status
 
-        metadata = SyncStatus(
+        sync_status = SyncStatus(
             is_new=False,
-            is_complete=ct_complete,
-            changed_name=ct_name != dataset.name,
-            changed_rating=ct_star != (dataset.rating > 0)
+            is_complete=info.completed,
+            changed_name=info.experiment_name != dataset.name,
+            changed_rating=info.starred != (dataset.rating > 0)
         )
-        return metadata
+        return sync_status
 
     def validate_version(self) -> None:
         """

@@ -1,6 +1,18 @@
-from typing import List
+from dataclasses import dataclass
+from typing import List, Optional
 
 from psycopg2._psycopg import connection as Connection
+
+
+@dataclass
+class MeasurementInfo:
+    coretools_uid: int
+    sqdl_uuid: str
+
+    scope: str
+    experiment_name: str
+    starred: bool
+    completed: bool
 
 
 def get_data_to_sync(conn: Connection) -> List[int]:
@@ -65,3 +77,28 @@ def set_table_as_synced(conn: Connection, ct_uid: int) -> bool:
         )
         synced = c.rowcount == 1
     return synced
+
+
+def get_measurement_info(conn: Connection, coretools_uid: int) -> Optional[MeasurementInfo]:
+    statement = """
+        SELECT overview.uuid, datasets.sqdl_uuid, overview.scope, overview.exp_name, overview.starred, overview.completed
+        FROM global_measurement_overview AS overview
+        JOIN sqdl_dataset AS datasets
+        ON overview.uuid = datasets.coretools_uid
+        WHERE overview.uuid = %(ct-uid)s;
+    """
+    parameters = {
+        "ct-uid": coretools_uid
+    }
+
+    with conn:
+        cur = conn.cursor()
+        cur.execute(
+            query=statement,
+            vars=parameters,
+        )
+        result = cur.fetchone()
+
+    if result is not None:
+        return MeasurementInfo(*result)
+    return None
