@@ -2,6 +2,7 @@ import logging
 import os
 import re
 from io import StringIO
+from typing import Any
 
 from PyQt5 import QtWidgets
 from ruamel.yaml import YAML
@@ -51,7 +52,7 @@ C:\Users\&lt;user&gt;\.core_tools\videomode on Windows.
 """
 
 
-def yaml_string(data: dict[str, any]) -> str:
+def yaml_string(data: dict[str, Any]) -> str:
     if data in [{}, ""]:
         return ""
     yaml = YAML()
@@ -159,7 +160,7 @@ class Favorites:
             settings["gen"] = self._parse_settings_text(self._ui_settings_gen, "gen")
         return settings
 
-    def load_selected(self, active_settings: dict[str, any]):
+    def load_selected(self, active_settings: dict[str, Any]):
         currentItem = self._ui_name_list.currentItem()
         name = currentItem.text() if currentItem is not None else ""
         if name == "":

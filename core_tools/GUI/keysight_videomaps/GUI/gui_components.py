@@ -1,7 +1,8 @@
-from abc import abstractmethod
 import copy
-from functools import partial
 import logging
+from abc import abstractmethod
+from functools import partial
+from typing import Any
 
 from PyQt5 import QtCore, QtWidgets
 
@@ -16,7 +17,7 @@ class Settings:
         self._group_name = group_name
         self._update_plot = update_plot
         self._gui_elements: dict[str, GuiElement] = {}
-        self._values: dict[str, any] = {}
+        self._values: dict[str, Any] = {}
 
     def add(self, name: str, widget, plot_setting: bool = False):
         if isinstance(widget, QtWidgets.QCheckBox):
@@ -34,7 +35,7 @@ class Settings:
         self._gui_elements[name] = gui_element
         self._values[name] = gui_element.get_value()
 
-    def update_value(self, name: str, value: any):
+    def update_value(self, name: str, value: Any):
         self._values[name] = value
         if self._gui_elements[name].plot_setting:
             self._update_plot()
@@ -44,10 +45,10 @@ class Settings:
     def __getitem__(self, name: str):
         return self._values[name]
 
-    def set_value(self, name: str, value: any):
+    def set_value(self, name: str, value: Any):
         self._gui_elements[name].set_value(value)
 
-    def update(self, values: dict[str, any]):
+    def update(self, values: dict[str, Any]):
         for name, value in values.items():
             if name not in self._values:
                 logger.warning(f"Setting {self._group_name}:{name} does not exist")
@@ -55,7 +56,7 @@ class Settings:
             if self._values[name] != value:
                 self.set_value(name, value)
 
-    def to_dict(self) -> dict[str, any]:
+    def to_dict(self) -> dict[str, Any]:
         return copy.deepcopy(self._values)
 
 

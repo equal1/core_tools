@@ -1,4 +1,5 @@
 from collections import defaultdict
+from typing import Any
 import time
 import logging
 import numpy as np
@@ -42,7 +43,7 @@ class KeysightFastScanParameter(FastScanParameterBase):
 
         # Create dict with digitizers and used channel numbers.
         # dict[digitizer, List[channel_numbers]]
-        self.dig_channel_nums: dict[any, list[int]] = defaultdict(set)
+        self.dig_channel_nums: dict[Any, list[int]] = defaultdict(set)
         channels = [ch for ch, _, _ in scan_config.channel_map.values()]
         if digitizer is not None:
             for ch in channels:
@@ -450,12 +451,12 @@ class FastScanGenerator(FastScanGeneratorBase):
         else:
             for ch_num in dig_channels:
                 hvi_dig_channels[self.digitizer.name].add(ch_num)
-        video_mode_channels = {name:list(channels) for name, channels in hvi_dig_channels.items()}
+        video_mode_channels = {name: list(channels) for name, channels in hvi_dig_channels.items()}
 
         if not hasattr(my_seq, 'schedule_params'):
             raise Exception('Update pulse-lib to v1.7.11+')
 
-        my_seq.schedule_params["acquisition_period"]= acquisition_period
+        my_seq.schedule_params["acquisition_period"] = acquisition_period
         my_seq.schedule_params["number_of_points"] = n_pts
         my_seq.schedule_params["number_of_lines"] = n_lines
         my_seq.schedule_params["start_delay"] = start_delay

@@ -1,3 +1,4 @@
+from typing import Any
 from core_tools.GUI.param_viewer.param_viewer_GUI_window import Ui_MainWindow
 from PyQt5 import QtCore, QtWidgets
 import qcodes as qc
@@ -11,9 +12,9 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class param_data_obj:
-    param_parameter: any
-    gui_input_param: any
-    division: any
+    param_parameter: Any
+    gui_input_param: Any
+    division: Any
     name: str
 
 

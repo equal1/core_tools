@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 
 from pulse_lib.base_pulse import pulselib
 
@@ -9,8 +10,8 @@ logger = logging.getLogger(__name__)
 class PulselibSettings:
     def __init__(self, pulse_lib: pulselib):
         self._pulse_lib = pulse_lib
-        self._attenuations: dict[str, any] = None
-        self._v_gate_projection: dict[str, any] = None
+        self._attenuations: dict[str, Any] = None
+        self._v_gate_projection: dict[str, Any] = None
 
         # TODO change this check in a required update to 1.7.31+
         if hasattr(pulselib, "get_virtual_gate_projection"):
@@ -37,4 +38,3 @@ class PulselibSettings:
             self._attenuations != attenuations
             or self._v_gate_projection != v_gate_projection
             )
-

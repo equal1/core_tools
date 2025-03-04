@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import Any, Callable
 
 import numpy as np
 from qcodes import MultiParameter
@@ -214,7 +214,7 @@ class FastScanParameterBase(MultiParameter):
     def snapshot_base(self,
                       update: bool | None = True,
                       params_to_skip_update: Sequence[str] | None = None
-                      ) -> dict[any, any]:
+                      ) -> dict[Any, Any]:
         snapshot = super().snapshot_base(update, params_to_skip_update)
         snapshot.update({"parameters": self.config.snapshot()})
         return snapshot

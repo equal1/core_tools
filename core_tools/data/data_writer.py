@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from numpy import ndarray
@@ -41,7 +42,7 @@ class _Action:
 
 
 class DataWriter:
-    def __init__(self, name, *args, snapshot_data: dict[str, any] | None = None):
+    def __init__(self, name, *args, snapshot_data: dict[str, Any] | None = None):
         self._measurement = Measurement(name, silent=True)
         self._actions = []
         self._set_params = []
@@ -103,7 +104,7 @@ class DataWriter:
             self._loop(iaction + 1, isetpoint)
 
 
-def write_data(name: str, *args, snapshot_data: dict[str, any] | None = None):
+def write_data(name: str, *args, snapshot_data: dict[str, Any] | None = None):
     '''
     Creates a dataset `name` using the specified Axis and Data.
 

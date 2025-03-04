@@ -2,6 +2,7 @@ import logging
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 from qcodes import Parameter
@@ -239,7 +240,7 @@ class _MParam:
 class _Block:
     setter: Setter | None = None
     value: float | None = None
-    actions: list[any] = field(default_factory=list)
+    actions: list[Any] = field(default_factory=list)
 
     @property
     def loop_length(self):

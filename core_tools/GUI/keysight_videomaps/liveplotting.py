@@ -1,7 +1,7 @@
 import logging
 import os
 from collections.abc import Sequence
-from typing import Callable
+from typing import Any, Callable
 
 import numpy as np
 import pyqtgraph as pg
@@ -1154,7 +1154,7 @@ class vm_data_param(MultiParameter):
     def snapshot_base(self,
                       update: bool | None = True,
                       params_to_skip_update: Sequence[str] | None = None
-                      ) -> dict[any, any]:
+                      ) -> dict[Any, Any]:
         snapshot = super().snapshot_base(update, params_to_skip_update)
         snapshot["parameters"] = self.param.snapshot().get("parameters", {})
         return snapshot

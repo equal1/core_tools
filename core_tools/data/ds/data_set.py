@@ -1,5 +1,6 @@
 import json
 import logging
+from typing import Any
 
 import qcodes as qc
 from qcodes.utils.helpers import NumpyJSONEncoder
@@ -100,7 +101,7 @@ def create_new_data_set(experiment_name, measurement_snapshot, *m_params):
     return data_set(ds)
 
 
-def _reduce_snapshot(snapshot: dict[str, any]):
+def _reduce_snapshot(snapshot: dict[str, Any]):
     if "__class__" in snapshot:
         exclude_keys = [
             "__class__",

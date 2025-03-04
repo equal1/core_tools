@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from functools import partial
+from typing import Any
 from PyQt5.QtCore import QThread
 from PyQt5 import QtWidgets, QtGui
 from PyQt5 import QtCore
@@ -15,14 +16,16 @@ logger = logging.getLogger(__name__)
 
 colormap = colormaps["viridis"]
 colormap._init()
-lut = np.array(colormap.colors)*255 # Convert matplotlib colormap from 0-1 to 0-255 for Qt
+lut = np.array(colormap.colors)*255  # Convert matplotlib colormap from 0-1 to 0-255 for Qt
+
 
 @dataclass
 class plot_widget_data:
-    plot_widget: pg.PlotWidget # widget.
-    plot_items: list # line in the plot.
-    color_bar: any = None
-    cross: tuple[any] = None
+    plot_widget: pg.PlotWidget  # widget.
+    plot_items: list  # line in the plot.
+    color_bar: Any = None
+    cross: tuple[Any] = None
+
 
 class plot_param:
     def __init__(self, multi_parameter, i):
@@ -54,7 +57,7 @@ class plot_param:
 
     def get_index(self, *values):
         indices = []
-        for i,value in enumerate(values):
+        for i, value in enumerate(values):
             xrange = self.xrange(i)
             index = int((value-xrange[0]) / (xrange[1]-xrange[0]) * self.shape[i])
             if index < 0 or index >= self.shape[i]:
@@ -99,7 +102,7 @@ class live_plot(QThread):
         # getter for the scan.
         self.parameter_getter = parameter_getter
         self.plot_params = [plot_param(parameter_getter, i) for i in range(self.n_plots)]
-        self.shape = parameter_getter.shapes[0] #assume all the shapes are the same.
+        self.shape = parameter_getter.shapes[0]  # assume all the shapes are the same.
         self.plot_widgets = []
 
         # plot properties
@@ -184,8 +187,8 @@ class live_plot(QThread):
         self.active = False
         self.set_busy(False)
 
-        while self.plt_finished != True:
-            time.sleep(0.01) # 10 ms interval to make sure gil releases.
+        while not self.plt_finished:
+            time.sleep(0.01)  # 10 ms interval to make sure gil releases.
         self.timer.stop()
         self.update_plot()
 
@@ -257,7 +260,7 @@ class _1D_live_plot(live_plot):
             xrange = param.xrange(0)[1]
             self.x_data = np.linspace(-xrange, xrange, self.plot_data[i].size)
 
-            curve = plot_1D.plot(self.x_data, self.plot_data[i], pen=(255,0,0))
+            curve = plot_1D.plot(self.x_data, self.plot_data[i], pen=(255, 0, 0))
             plot_data = plot_widget_data(plot_1D, [curve])
             plot_data.proxy = pg.SignalProxy(plot_1D.scene().sigMouseMoved, rateLimit=10,
                                              slot=partial(self.mouse_moved, plot_1D, i))
@@ -293,7 +296,7 @@ class _1D_live_plot(live_plot):
             x, ix = self._get_plot_coords(plot, index, event[0])
             if ix is None:
                 return
-            v = self.plot_data[index][ix] # TODO @@@ check with diff ...
+            v = self.plot_data[index][ix]  # TODO @@@ check with diff ...
             if self._on_mouse_moved:
                 plot_param = self.plot_params[index]
                 self._on_mouse_moved(x, plot_param.name, v)
@@ -317,7 +320,7 @@ class _1D_live_plot(live_plot):
                 x_voltage_str = self._format_dc_voltage(self.gate_x_voltage)
                 self.gate_values_label.setText(
                         f'DC {gate_x}:{x_voltage_str}')
-        except:
+        except Exception:
             logger.error('Plotting failed', exc_info=True)
             # slow down to reduce error burst
             time.sleep(1.0)
@@ -338,7 +341,7 @@ class _1D_live_plot(live_plot):
                 for i in range(self.n_plots):
                     buffer_data = self.buffer_data[i]
                     y = input_data[i]
-                    buffer_data = np.roll(buffer_data,1,0)
+                    buffer_data = np.roll(buffer_data, 1, 0)
                     buffer_data[0] = y
                     self.buffer_data[i] = buffer_data
                     self.plot_data[i] = np.sum(buffer_data[:self.average_scans], 0)/self.average_scans
@@ -384,15 +387,15 @@ class _2D_live_plot(live_plot):
             plot_2D.setTitle(param.label, size='10pt')
 
             min_max = pg.LabelItem(parent=plot_2D.graphicsItem())
-            min_max.anchor(itemPos=(1,0), parentPos=(1,0))
+            min_max.anchor(itemPos=(1, 0), parentPos=(1, 0))
             self.min_max.append(min_max)
 
             icol = i % n_col
             irow = i // n_col
             self.top_layout.addWidget(plot_2D, irow, icol, 1, 1)
 
-            range0 = param.xrange(0)[1] # y value
-            range1 = param.xrange(1)[1] # x value
+            range0 = param.xrange(0)[1]  # y value
+            range1 = param.xrange(1)[1]  # x value
             shape = param.shape
             tr = QtGui.QTransform()
             tr.translate(-range1, -range0)
@@ -445,8 +448,8 @@ class _2D_live_plot(live_plot):
         if plot.sceneBoundingRect().contains(coordinates):
             # filter on min/max
             mouse_point = plot.plotItem.vb.mapSceneToView(coordinates)
-            x,y = mouse_point.x(), mouse_point.y()
-            iy,ix = self.plot_params[index].get_index(y,x)
+            x, y = mouse_point.x(), mouse_point.y()
+            iy, ix = self.plot_params[index].get_index(y, x)
             if iy is not None and ix is not None:
                 return x, y, ix, iy
         return None, None, None, None
@@ -466,7 +469,7 @@ class _2D_live_plot(live_plot):
             x, y, ix, iy = self._get_plot_coords(plot, index, event[0])
             if iy is None or ix is None:
                 return
-            v = self.plot_data[index][ix,iy]
+            v = self.plot_data[index][ix, iy]
             if self._on_mouse_moved:
                 plot_param = self.plot_params[index]
                 self._on_mouse_moved(x, y, plot_param.name, v)
@@ -498,16 +501,16 @@ class _2D_live_plot(live_plot):
                 plot_data = self.plot_data[i]
                 if self._filter_background:
                     sigma = self.plot_params[i].shape[0] * self._background_rel_sigma
-                    plot_data = plot_data - ndimage.gaussian_filter(plot_data, sigma, mode = 'nearest')
+                    plot_data = plot_data - ndimage.gaussian_filter(plot_data, sigma, mode='nearest')
                 if self._filter_noise:
-                    plot_data = ndimage.gaussian_filter(plot_data, self._noise_sigma, mode = 'nearest')
+                    plot_data = ndimage.gaussian_filter(plot_data, self._noise_sigma, mode='nearest')
                 if self.gradient == 'Off':
                     if self.enhanced_contrast:
                         plot_data = compress_range(plot_data, upper=99.5, lower=0.5)
                     mn, mx = np.min(plot_data), np.max(plot_data)
                     self.min_max[i].setText(f"min:{mn:4.0f} mV<br/>max:{mx:4.0f} mV")
                     if color_bar:
-                        color_bar.setLevels(values=(mn,mx))
+                        color_bar.setLevels(values=(mn, mx))
                         if img_item.lut is None:
                             img_item.setLookupTable(color_bar.colorMap().getLookupTable())
                     else:
@@ -521,7 +524,7 @@ class _2D_live_plot(live_plot):
                     mn, mx = np.min(plot_data), np.max(plot_data)
                     self.min_max[i].setText(f"min:{mn:4.0f} a.u.<br/>max:{mx:4.0f} a.u.")
                     if color_bar:
-                        color_bar.setLevels(values=(mn,mx))
+                        color_bar.setLevels(values=(mn, mx))
                         if img_item.lut is None:
                             img_item.setLookupTable(color_bar.colorMap().getLookupTable())
                     else:
@@ -571,7 +574,7 @@ class _2D_live_plot(live_plot):
                 for i in range(self.n_plots):
                     buffer_data = self.buffer_data[i]
                     xy = input_data[i][:, :].T
-                    buffer_data = np.roll(buffer_data,1,0)
+                    buffer_data = np.roll(buffer_data, 1, 0)
                     buffer_data[0] = xy
                     self.buffer_data[i] = buffer_data
                     self.plot_data[i] = np.sum(buffer_data[:self.average_scans], 0)/self.average_scans
@@ -587,5 +590,3 @@ class _2D_live_plot(live_plot):
                 time.sleep(1.0)
 
         self.plt_finished = True
-
-

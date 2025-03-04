@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Any
 import time
 
 import threading
@@ -8,7 +9,7 @@ from queue import PriorityQueue
 @dataclass(order=True)
 class ExperimentJob:
     priority: float
-    job: any = field(compare=False)
+    job: Any = field(compare=False)
     seq_nr: int = 0
 
     def __post_init__(self):
