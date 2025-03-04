@@ -15,6 +15,7 @@ class gates(qc.Instrument):
     gates class, generate qcodes parameters for the real gates and the virtual gates
     It also manages the virtual gate matrix.
     """
+
     def __init__(self, name, hardware, dac_sources, dc_gain={}):
         '''
         gates object
@@ -52,9 +53,9 @@ class gates(qc.Instrument):
             self._dac_params[gate_name] = dac_sources[source_index].parameters[f'dac{int(ch_num)}']
             self._all_gate_names.append(gate_name)
             self._real_gates.append(gate_name)
-            self.add_parameter(gate_name, set_cmd = partial(self._set_voltage,  gate_name),
+            self.add_parameter(gate_name, set_cmd=partial(self._set_voltage,  gate_name),
                                get_cmd=partial(self._get_voltage,  gate_name),
-                               unit = "mV")
+                               unit="mV")
 
         # make virtual gates:
         for virt_gate_set in self.hardware.virtual_gates:
@@ -135,7 +136,7 @@ class gates(qc.Instrument):
                 self.parameters[real_gate].set(old_voltages[real_gate] + ratio * delta)
         except Exception as ex:
             logger.warning(f'Failed to set virtual gate voltage to {voltage:.1f} mV; Reverting all voltages. '
-                            f'Exception: {ex}')
+                           f'Exception: {ex}')
             for real_gate, ratio in projection[gate_name].items():
                 self.set(real_gate, old_voltages[real_gate])
             raise
@@ -199,7 +200,7 @@ class gates(qc.Instrument):
 
         for virt_gate_convertor in self._virt_gate_convertors:
             real_voltages = [v[name] for name in virt_gate_convertor.real_gates]
-            virtual_voltages =  np.matmul(virt_gate_convertor.r2v_matrix, real_voltages)
+            virtual_voltages = np.matmul(virt_gate_convertor.r2v_matrix, real_voltages)
             for vg_name, vg_voltage in zip(virt_gate_convertor.virtual_gates, virtual_voltages):
                 v[vg_name] = vg_voltage
                 self.parameters[vg_name].cache.set(vg_voltage)
