@@ -2,6 +2,7 @@ import logging
 import inspect
 import os
 from enum import Enum
+from typing import Any
 
 from PyQt5 import QtCore, QtWidgets
 
@@ -63,7 +64,7 @@ class ScriptRunner(QtWidgets.QMainWindow, Ui_MainWindow):
         if not instance_ready:
             self.app.exec()
 
-    def add_function(self, func: any, command_name: str | None = None, **kwargs):
+    def add_function(self, func: Any, command_name: str | None = None, **kwargs):
         '''
         Adds a function to be run as command in ScriptRunner.
 
@@ -228,7 +229,7 @@ if __name__ == "__main__":
     def fit(x: float, mode: Mode):
         print(f'fit {x}, {mode}')
 
-    path = os.path.dirname(__file__)
+    path = os.path.dirname(__file__).replace('\\', '/')
 
     ui = ScriptRunner()
     ui.add_function(sayHi)
@@ -237,11 +238,11 @@ if __name__ == "__main__":
     ui.add_function(fit, 'Fit it', mode=Mode.CENTER, x=1.0)
     ui.add_function(fit, 'Fit it', mode='center', x=1.0)
     ui.add_function(fit, 'Fit it', mode='CENTER', x=1.0)
-    # ui.add_cell('Say Hi', path+'/test_script.py')
-    # ui.add_cell(2, path+'/test_script.py', 'Magic Button')
-    # ui.add_cell('Oops', path+'/test_script.py')
-    # ui.add_cell('Syntax Error', path+'/test_script.py')
+    ui.add_cell('Say Hi', path+'/test_script.py')
+    ui.add_cell(2, path+'/test_script.py', 'Magic Button')
+    ui.add_cell('Oops', path+'/test_script.py')
+    ui.add_cell('Syntax Error', path+'/test_script.py')
 
     # NOTE:
     # To start servicing http requests run:
-    ui.run_server()
+    # ui.run_server()

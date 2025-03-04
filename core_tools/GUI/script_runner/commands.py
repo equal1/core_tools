@@ -2,13 +2,26 @@ import inspect
 import logging
 import os
 from enum import Enum
+from typing import Any
 
 from abc import ABC, abstractmethod
 
 try:
     from spyder_kernels.customize.spydercustomize import runcell
+    runcell_version = 5
 except Exception:
     runcell = None
+
+try:
+    from IPython import get_ipython  # pyright: ignore
+
+    ipython = get_ipython()
+    if ipython is not None:
+        runcell = ipython.magics_manager.magics['line']['runcell']
+        runcell_version = 6
+except KeyError:
+    # no runcell magic
+    pass
 
 
 logger = logging.getLogger(__name__)
@@ -48,10 +61,20 @@ class Cell(Command):
             raise Exception('runcell not available. Upgrade to Spyder 4+ to use Cell()')
 
     def __call__(self):
-        command = f"runcell({self.cell}, '{self.python_file}')"
-        # print(command)
-        logger.info(command)
-        runcell(self.cell, self.python_file)
+        if runcell_version == 5:
+            command = f"runcell({self.cell}, '{self.python_file}')"
+            print(command)
+            logger.info(command)
+            runcell(self.cell, self.python_file)
+        elif runcell_version == 6:
+            if isinstance(self.cell, int):
+                command = f"-i {self.cell} {self.python_file}"
+            else:
+                command = f"-n '{self.cell}' {self.python_file}"
+            print("runcell", command)
+            logger.info(f"runcell {command}")
+            result = runcell(command)
+            print(result)
 
 
 class Function(Command):
@@ -74,7 +97,7 @@ class Function(Command):
         kwargs: default arguments to pass with function.
     '''
 
-    def __init__(self, func: any, command_name: str | None = None, **kwargs):
+    def __init__(self, func: Any, command_name: str | None = None, **kwargs):
         if command_name is None:
             command_name = func.__name__
         signature = inspect.signature(func)
