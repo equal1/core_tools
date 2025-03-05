@@ -2,7 +2,6 @@ import logging
 import os
 import re
 import time
-from collections.abc import Mapping
 from datetime import datetime
 from typing import Dict
 
@@ -14,7 +13,7 @@ from core_tools.data.sqdl.model import log, upload, task_queue
 
 import psutil
 import core_tools as ct
-from core_tools.startup.config import get_configuration
+
 from sqdl_client.api.v1.dataset import Dataset
 from sqdl_client.api.v1.file import File
 from sqdl_client.client import QDLClient
@@ -36,17 +35,15 @@ class SqdlUploader:
             self.client = QDLClient()
         else:
             self.client = client
-
-        api_key = cfg.get('sqdl.api_key')
-        if api_key:
-            self.client.use_api_key(api_key)
         self.connection = conn
 
         self.metadata_formatter = MetadataFormatter()
-        # load scopes to fix them when not set during export
-        self.scopes = cfg.get('sqdl.scopes', {})
+
+        # load scope to fix them when not set during export
+        self.local_scope = cfg.get('scope', None)
         if cfg.get('sqdl.retry_failed_uploads', False):
             task_queue.retry_all_failed(self.connection)
+
         self.pid = os.getpid()
         self.cleanup_abandoned_tasks()
         logger.info(f"Started uploader, pid:{self.pid}")
@@ -133,13 +130,15 @@ class SqdlUploader:
 
     def get_scope(self, desc):
         # is it in the json file?
-        scope = desc.get('scope')
-        if not scope:
-            scope = self.scopes.get(desc['project'])
-            if isinstance(scope, Mapping):
-                scope = scope.get(desc['setup'])
-        if not scope:
-            raise NoScopeError(desc['project'])
+        scope = desc.get('scope', None)
+        if scope is None:
+            scope = self.local_scope
+        # if not scope:
+        #     scope = self.scopes.get(desc['project'])
+        #     if isinstance(scope, Mapping):
+        #         scope = scope.get(desc['setup'])
+        if scope is None:
+            raise NoScopeError(desc['uid'])
         return scope
 
     def get_create_sqdl_dataset(self, scope_name, desc) -> Dataset:

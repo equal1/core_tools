@@ -12,7 +12,11 @@ All notable changes to core_tools will be documented in this file.
     - Added ```.../startup/sqdl_sync.py``` and ```.../startup/launch_sqdl_sync.py```, which fill the role of ```.../startup/db_sync.py``` and ```.../startup/launch_db_sync.py``` for the purpose of synchronising data to SQDL.
 
 - Added local database versioning.
-    - ...
+    - Added a ```database_version``` table to the database schema. 
+    - Added a routine that checks the currently available local database version agains the expectations of the current coretools version. If new database versions are available, the modifications are applied automatically when connecting to the local database.
+        - These additions are still compatible with older coretools version, whether users are syncing their local database to remote using ```db_sync``` or using a direct remote connection. (See Changed section below)
+    - Added a definition for coretools database v1.0.0 (replication of the current schema)
+    - Added a definition for coretools database v1.1.0 (includes the SQDL functionality, as well as a new Scope column, see Changed section below)
 
 ### Changed
 - Added a ```scope``` attribute to sample info.
@@ -21,6 +25,13 @@ All notable changes to core_tools will be documented in this file.
     - Updated ```global_measurement_overview``` table with a new "Scope" column *local* database.
     - Added a warning about setting the ```scope``` config parameter to the core-tools start-up configuration method.
     - Note that updating your remote database to include these columns is not require at this stage. The synchronisation process as defined by ```db_sync``` allows for this descrepancy between databases, facilitating a non-breaking upgrade. 
+
+- Replaced the generate-table section of the DatabaseManager (see ```SQL_database_manager``` class in ```core_tools.data.SQL.SQL_database_mgr.py```) responsible for creating tables if they did not already exist, with the new versioning routine (see the Added section above).
+
+- Added optional configuration ```address``` for local database as well, allowing for non-default PostgreSQL installations. If not specified, the config parameter defaults to ```localhost:5432```, which used to the fixed value.
+    - Note that the connection manager uses the value ```localhost``` to distinguish between local and remote connections. In order to guarentee this funcionality, misconfiguration of local and/or remote database ```address``` values will result in a ```RuntimeError``` when running ```core_tools.configure("...")```.
+
+- Updated some examples in the DemoStation to use modern Mocks.
 
 ## \[1.5.18] - 2025-05-26
 

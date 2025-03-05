@@ -2,7 +2,6 @@ import gc
 import logging
 import psutil
 import time
-from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional, Tuple, Dict
@@ -15,7 +14,7 @@ from core_tools.data.ds.data_set import load_by_uuid
 from core_tools.data.utils.timer import Timer
 from core_tools.data.sqdl.export.data_export import export_data
 from core_tools.data.sqdl.export.data_preview import generate_previews
-from core_tools.data.sqdl.model import task_queue, export
+from core_tools.data.sqdl.model import core, task_queue, export
 from core_tools.data.sqdl.model.task_queue import DatasetInfo
 from core_tools.data.sqdl.model.export import ExportAction
 
@@ -36,8 +35,7 @@ class SqdlUpdate:
 
 class Exporter:
     def __init__(self, cfg: Dict, conn: Connection):
-        self.export_path = cfg.get('sqdl.export_path')
-        # self.connection = SqlConnection()
+        self.export_path = "{}/export".format(cfg.get('sqdl.base_path', "~/.sqdl"))
         self.connection = conn
 
         if cfg.get("sqdl.retry_failed_exports", default=False):
@@ -356,20 +354,26 @@ class Exporter:
                     return False
         return True
 
-    def get_scope(self, project: str, set_up: str) -> str:
-        try:
-            scope = self.scopes[project]
-            if isinstance(scope, Mapping):
-                scope = scope[set_up]
-            return scope
-        except KeyError:
-            raise Exception(f"No scope for project '{project}'")
+    def get_scope(self, coretools_uid: int) -> str:
+        # Info is never None here, because otherwise it wouldn't be listed for export
+        info = core.get_measurement_info(self.connection, coretools_uid)
+        if info is None:
+            raise Exception("Failed to extract information for measurement with id '{}'".format(coretools_uid))
+        # try:
+        #     scope = self.scopes[project]
+        #     if isinstance(scope, Mapping):
+        #         scope = scope[set_up]
+        #     return scope
+        # except KeyError:
+        if info.scope is None:
+            raise Exception(f"No scope for measurement with ID '{coretools_uid}'")
+        return info.scope
 
     def fix_setup_name(self, setup):
         return self.setup_name_corrections.get(setup, setup)
 
     def export_measurement(self, measurement, action: ExportAction) -> Tuple[SqdlUpdate, str]:
-        scope = self.get_scope(measurement.project, measurement.set_up)
+        scope = self.get_scope(int(measurement.exp_uuid))
         measurement.set_up = self.fix_setup_name(measurement.set_up)
         updates = SqdlUpdate(measurement.exp_uuid, scope, raw_final=action.completed)
         try:

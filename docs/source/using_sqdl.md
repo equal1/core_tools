@@ -29,14 +29,20 @@ Configuration for SQDL functionality is specified in the ```sqdl``` section of y
 
 ```yaml
 sqdl:
-    tick_rate: 6                    # (int) Minimal period of the event loop in seconds
-    dev_mode: false                 # (bool) Whether or not to use the sqdl-client developer mode for local testing
+    tick_rate: 6                    # (int) Minimum period of the event loop in seconds
     retry_failed_exports: false     # (bool) Whether or not to retry exporting previously failed exports when re-initialising the SQDL Writer
     retry_failed_uploads: false     # (bool) Whether or not to retry uploading previously failed uploads when re-initialising the SQDL Writer
-    export_path: ~/.sqdl-export     # (str) Local (absolute) path where the exported data files will be saved before uploading
-    api_key: None                   # (str) API key used to authenticate with
+    base_path: ~/.sqdl              # (str) Local path where the exported data files will be saved before uploading
+    use_personal_login: false       # (bool) Whether or not to use personal credentials for singing into SQDL
+    dev_mode: false                 # (bool) Whether or not to use the sqdl-client developer mode for local testing
     setup_name_correction:          # (section) Section used for renaming setups
         from: to                    # (str) Represent local setup 'from' as 'to' in storage
 ```
 
 Additionally, the ```scope``` parameter is checked for at the top level, just like ```project```, ```setup``` and ```sample```.
+
+### SQDL Login
+By default, the SQDL Writer is configured to be authenticated through the use of an API key. This key has to be provided by your local administrator, and should be unique to your setup.
+This means that every measurement tool has it's own API key, and it should not by copied between systems.
+
+If you are not using the SQDL Writer from a shared system, it is possible to use your personal credentials to log into SQDL. To do so, set the ```use_personal_login``` parameter to true.

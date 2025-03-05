@@ -37,6 +37,7 @@ CREATE INDEX IF NOT EXISTS date_day_index ON global_measurement_overview USING B
 CREATE INDEX IF NOT EXISTS data_synced_index ON global_measurement_overview USING BTREE (data_synchronized);
 CREATE INDEX IF NOT EXISTS table_synced_index ON global_measurement_overview USING BTREE (table_synchronized);
 
+ALTER TABLE global_measurement_overview ADD COLUMN IF NOT EXISTS data_update_count INT DEFAULT 0;
 --- Measurement Parameters
 CREATE TABLE IF NOT EXISTS measurement_parameters (
         id SERIAL primary key, 

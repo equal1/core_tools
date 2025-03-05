@@ -39,9 +39,10 @@ def _config_remote_db(readonly):
     except KeyError:
         raise Exception("Remote database not configured") from None
     host, port = address.split(':')
-    SQL_conn_info_remote(host, int(port),
-                         user, passwd, dbname,
-                         readonly)
+    assert host != "localhost", "Illegal host name 'localhost' for remote database."
+    SQL_conn_info_remote(
+        host, int(port), user, passwd, dbname, readonly
+    )
 
 
 def _config_local_db(readonly):
@@ -60,9 +61,7 @@ def _config_local_db(readonly):
     except KeyError:
         raise Exception("Local database not configured") from None
     SQL_conn_info_local(
-        host, int(port),
-        user, passwd, dbname,
-        readonly
+        host, int(port), user, passwd, dbname, readonly
     )
 
 

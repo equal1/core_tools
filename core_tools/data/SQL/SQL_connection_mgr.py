@@ -1,11 +1,15 @@
+
 import logging
+
+from core_tools.data.SQL.versioning import local_database_update_routine
 
 from .connect import SQL_conn_info_local, SQL_conn_info_remote
 from .db_connections import connect_local_db, connect_remote_db
 from .queries.dataset_creation_queries import (
     sample_info_queries,
     measurement_overview_queries,
-    measurement_parameters_queries)
+    measurement_parameters_queries
+)
 
 # import for backwards campatibility of old scripts.
 from core_tools.data.SQL.SQL_sync_manager import SQL_sync_manager
@@ -77,12 +81,8 @@ class SQL_database_manager():
     @classmethod
     def _configure_local_db(cls):
         conn = cls._connection
-        sample_info_queries.generate_table(conn)
+        local_database_update_routine(conn)
         sample_info_queries.add_sample(conn)
-
-        measurement_overview_queries.generate_table(conn)
-        measurement_overview_queries.update_local_table(conn)
-        measurement_parameters_queries.generate_table(conn)
         conn.commit()
 
     @classmethod

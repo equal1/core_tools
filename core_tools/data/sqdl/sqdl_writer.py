@@ -1,3 +1,4 @@
+import os
 import time
 import logging
 from typing import Optional
@@ -8,7 +9,9 @@ from core_tools.data.SQL.SQL_connection_mgr import SQL_database_init as Database
 from core_tools.data.sqdl.export.coretools_export import Exporter
 from core_tools.data.sqdl.uploader.sqdl_uploader import SqdlUploader as Uploader
 
-from core_tools.data.sqdl.model import core, export, version
+from core_tools.data.SQL.versioning import get_database_version, __REQUIRED_DATABASE_VERSION__
+
+from core_tools.data.sqdl.model import core, export
 from core_tools.data.sqdl.model.export import SyncStatus
 
 import sqdl_client
@@ -36,18 +39,28 @@ class SQDLWriter():
         self.database = DatabaseInit()
         self.database._connect()
         if not self.database.local_conn_active:
-            raise ValueError("database not configured to a local database instance")
+            raise ValueError("Only remote database configured. Setup not compatible with SQDL sync.")
+
         self.connection = self.database.conn_local
         self.validate_version()
+
+        base_path = config.get("sqdl.base_path", "~/.sqdl")
+        self.base_path = os.path.expanduser(base_path)
+        os.makedirs(self.base_path, exist_ok=True)
+        os.makedirs("{}/export".format(base_path), exist_ok=True)
 
         # initialise
         self.exporter = Exporter(
             cfg=config,
             conn=self.connection
         )
+
         self.dev_mode = config.get("sqdl.dev_mode", default=True)
+        self.use_personal_login = config.get("sqdl.use_personal_login", default=False)
+
         if self.dev_mode:
             logger.info("Initialising SQDL Writer/Client in developer mode...")
+
         self.uploader = Uploader(
             cfg=config,
             conn=self.connection,
@@ -76,6 +89,13 @@ class SQDLWriter():
             self.exporter.connection = self.connection
             self.uploader.connection = self.connection
 
+            # do not use 'login' functionality when doing local development
+            if self.use_personal_login and not self.dev_mode:
+                self.uploader.client.login()
+            elif not self.use_personal_login and not self.dev_mode:
+                key = self.read_local_api_key()
+                self.uploader.client.use_api_key(key)
+
             self.is_running = True
             self.next_tick = datetime.datetime.now() + self.tick_rate
 
@@ -102,6 +122,7 @@ class SQDLWriter():
 
         finally:
             self.database._disconnect()
+            self.uploader.client.logout()
             logger.info("Stopping SQDL Writer event loop...")
 
     def queue_datasets_for_export(self) -> None:
@@ -147,10 +168,6 @@ class SQDLWriter():
             logger.warning("No Scope parameter for CoreTools UID '{}'. Skipping SQDL Sync.".format(info.coretools_uid))
             return None
 
-        # do not use 'login' functionality when doing local development
-        if not self.dev_mode:
-            self.uploader.client.login()
-
         scope_api: sqdl_client.api.v1.scope.ScopeAPI = self.uploader.client.api.scope
         scope = scope_api.retrieve_from_name(info.scope)
 
@@ -176,9 +193,8 @@ class SQDLWriter():
         """
         Assert that the local database version matches requirements.
         """
-        database_version = version.read(self.connection)
-
-        assert database_version == __database_version__, "Database is not up to date: expected '{}', found '{}'".format(__database_version__, database_version)
+        version = get_database_version(self.connection)
+        assert version == __REQUIRED_DATABASE_VERSION__, "Local database is not up to date (expected '{}', found '{}'). Cannot sync to SQDL.".format(__REQUIRED_DATABASE_VERSION__, version)
 
     def sleep_to_limit_rate(self) -> None:
         """
@@ -190,6 +206,26 @@ class SQDLWriter():
             seconds = (self.next_tick - now).total_seconds()
             time.sleep(seconds)
         self.next_tick = datetime.datetime.now() + self.tick_rate
+
+    def read_local_api_key(self) -> Optional[str]:
+        env_file = "{}/.env".format(self.base_path)
+
+        if not os.path.exists(env_file):
+            logger.warning("No .env file found. Check the 'Using SQDL' section of the documentation, or ask your local Admin for the right credentials.")
+            return
+
+        with open(env_file) as file:
+            lines = file.readlines()
+
+        for line in lines:
+            if line.startswith("#"):
+                continue
+            key, value = line.strip().split(set="=", maxsplit=1)
+            if key == "API_KEY":
+                return value
+
+        logger.warning("Found .env file, but unable to extract parameter 'API_KEY'. Check the 'Using SQDL' section of the documentation for more details.")
+        return
 
     def reconnect(self):
         self.database._disconnect()

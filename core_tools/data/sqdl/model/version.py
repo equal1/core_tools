@@ -6,7 +6,7 @@ def read(conn: Connection) -> str:
     """
     query = """
         SELECT major, minor, patch
-        FROM coretools_version;
+        FROM database_version;
     """
     with conn:
         c = conn.cursor()

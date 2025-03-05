@@ -86,15 +86,6 @@ def get_files_for_dataset(conn: Connection, parent_idx: int) -> List[SQDLFile]:
     """
     Get all the SQDLFile entries associated with the SQDLDataset that has the provided index.
     """
-    def parse_row(row: Tuple) -> SQDLFile:
-        return SQDLFile(
-            index=row[0],
-            dataset_index=row[1],
-            sqdl_uuid=row[2],
-            filename=row[3],
-            last_modified=[4]
-        )
-
     with conn:
         c = conn.cursor()
         c.execute(
@@ -106,7 +97,7 @@ def get_files_for_dataset(conn: Connection, parent_idx: int) -> List[SQDLFile]:
             vars={"parent": parent_idx}
         )
         records = c.fetchall()
-    return [parse_row(r) for r in records]
+    return [SQDLFile(*r) for r in records]
 
 
 def create_or_update_file(conn: Connection, parent_idx: int, sqdl_uuid: UUID, filename: str, last_modified: int) -> None:

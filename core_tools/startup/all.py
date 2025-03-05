@@ -55,7 +55,7 @@ def _generate_log_file_name():
 def _configure_logging(cfg):
     if cfg.get('logging.disabled', False):
         return
-    path = cfg.get('logging.file_location', '~/.core_tools')
+    path = cfg.get('logging.file_location', '~/.core_tools/logs')
     file_level = cfg.get('logging.file_level', 'INFO')
     console_level = cfg.get('logging.console_level', 'WARNING')
     logger_levels = cfg.get('logging.logger_levels', {})
