@@ -108,8 +108,9 @@ class WebRequestHandler(BaseHTTPRequestHandler):
         )
 
 
-def run_web_server(command_list: list[Command]):
-    server_address = ('127.0.0.1', 8001)
+def run_web_server(command_list: list[Command], server_address: tuple[str, int] | None = None):
+    if server_address is None:
+        server_address = ('0.0.0.0', 8001)
     httpd = HTTPServer(server_address, WebRequestHandler)
     httpd.commands = command_list
     try:
