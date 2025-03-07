@@ -1,32 +1,27 @@
 import logging
-from qcodes.instrument.specialized_parameters import ElapsedTimeParameter
-from core_tools.data.measurement import Measurement, AbortMeasurement
-from pulse_lib.sequencer import sequencer
+import time
 
+from core_tools.data.measurement import Measurement, AbortMeasurement
 from core_tools.sweeps.sweep_utility import (
         SequenceStartAction,
-        pulselib_2_qcodes, sweep_info
+        get_pulselib_sweeps, sweep_info
         )
 from core_tools.job_mgnt.job_meta import job_meta
 from core_tools.job_mgnt.job_mgmt import queue_mgr, ExperimentJob
-
-import numpy as np
-import time
+from qcodes.instrument.specialized_parameters import ElapsedTimeParameter
+from pulse_lib.sequencer import sequencer
 
 
 logger = logging.getLogger(__name__)
 
 
 class scan_generic(metaclass=job_meta):
-    '''
-    function that handeles the loop action and defines the run class.
-    '''
+
     def __init__(self, *args, name='', reset_param=False, silent=False):
         '''
-        init of the scan function
 
         Args:
-            args (*list) :  provide here the sweep info and meaurment parameters
+            args (list) :  sweep info and meaurment parameters
             reset_param (bool) : reset the setpoint parametes to their original value after the meaurement
             silent (bool) : If True do not print dataset id and progress bar
         '''
@@ -46,16 +41,16 @@ class scan_generic(metaclass=job_meta):
                 self.set_vars.append(arg)
                 set_points.append(arg.param)
             elif isinstance(arg, sequencer):
-                if arg.shape != (1, ):
-                    set_vars_pulse_lib = pulselib_2_qcodes(arg)
-                    for var in set_vars_pulse_lib:
-                        self.meas.register_set_parameter(var.param, var.n_points)
-                        self.set_vars.append(var)
-                        set_points.append(var.param)
-                else:
-                    # Sequence without looping parameters. Only upload, no setpoints
-                    self.actions.append(SequenceStartAction(arg))
-                self.meas.add_snapshot('sequence', arg.metadata)
+                sequence = arg
+                if hasattr(sequence, 'starting_lambda'):
+                    raise Exception("starting_lambda is not supported anymore")
+                sweeps_pulse_lib = get_pulselib_sweeps(sequence)
+                for var in sweeps_pulse_lib:
+                    self.meas.register_set_parameter(var.param, var.n_points)
+                    self.set_vars.append(var)
+                    set_points.append(var.param)
+                self.actions.append(SequenceStartAction(sequence))
+                self.meas.add_snapshot('sequence', sequence.metadata)
             elif arg is None:
                 continue
             else:
@@ -104,12 +99,12 @@ class scan_generic(metaclass=job_meta):
                 for param in self.set_vars:
                     try:
                         param.reset_param()
-                    except:
+                    except Exception:
                         logger.error(f'Failed to reset parameter {param.param.name}')
 
         return self.meas.dataset
 
-    def put(self, priority = 1):
+    def put(self, priority=1):
         '''
         put the job in a queue.
         '''
@@ -120,8 +115,8 @@ class scan_generic(metaclass=job_meta):
     def abort_measurement(self):
         self.meas.abort()
 
-    def _loop(self, set_param, to_save, dataset):
-        if len(set_param) == 0:
+    def _loop(self, set_params, to_save, dataset):
+        if len(set_params) == 0:
             for action in self.actions:
                 action()
             m_data = []
@@ -131,12 +126,13 @@ class scan_generic(metaclass=job_meta):
             dataset.add_result(*to_save, *m_data)
             self.n += 1
         else:
-            param_info = set_param[0]
+            param_info = set_params[0]
             for value in param_info.values():
-                if not isinstance(param_info.param, ElapsedTimeParameter):
-                    param_info.param(value)
+                param = param_info.param
+                if not isinstance(param, ElapsedTimeParameter):
+                    param(value)
                 time.sleep(param_info.delay)
-                self._loop(set_param[1:], to_save + ((param_info.param, param_info.param()),), dataset)
+                self._loop(set_params[1:], to_save + ((param, param()),), dataset)
 
 
 def do0D(*m_instr, name='', silent=False):
@@ -163,12 +159,12 @@ def do1D(param, start, stop, n_points, delay, *m_instr, name='', reset_param=Fal
         silent (bool) : If True do not print dataset id and progress bar
     '''
     m_param = sweep_info(param, start, stop, n_points, delay)
-    return scan_generic(m_param, *m_instr,name=name, reset_param=reset_param, silent=silent)
+    return scan_generic(m_param, *m_instr, name=name, reset_param=reset_param, silent=silent)
 
 
 def do2D(param_1, start_1, stop_1, n_points_1, delay_1,
-            param_2, start_2, stop_2, n_points_2, delay_2, *m_instr, name='',
-            reset_param=False, silent=False):
+         param_2, start_2, stop_2, n_points_2, delay_2, *m_instr, name='',
+         reset_param=False, silent=False):
     '''
     do a 2D scan
 
