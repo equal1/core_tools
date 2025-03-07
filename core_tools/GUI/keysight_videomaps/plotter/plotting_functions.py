@@ -314,6 +314,22 @@ class _1D_live_plot(live_plot):
     def update_plot(self):
         if not self.plot_data_valid:
             return
+        
+        # It wasn't clear if the following code was working 
+        # Slow down the plot update rate to prevent excessive buffering of video frames
+        # which seems to be causing long delays between changes in voltage settings with the pamameter viewer 
+        # and the plotting of the updated results.
+    
+        # Don't plot a new display if it is less than 0.5s after the previous plot
+        #current_time_seconds = time.time()
+        # try:
+        #     if current_time_seconds - self.previous_time_seconds < 1.0:
+        #         self.previous_time_seconds = current_time_seconds
+        #         return
+        # except:
+        #     self.previous_time_seconds = current_time_seconds
+        #print('CURRENT TIME', current_time_seconds)
+
         self.set_busy(False)
         try:
             for i in range(len(self.plot_widgets)):
