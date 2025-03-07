@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[1.5.12] - 2025-03-07
+
+- Video mode: Fix general settings in favorites
+- "gates" object now uses virtual matrix as shown in GUI and not the normalized matrix.
+
 ## \[1.5.11] - 2025-02-20
 
 - Added snapshot data_writer
