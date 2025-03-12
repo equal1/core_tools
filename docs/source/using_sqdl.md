@@ -25,10 +25,10 @@ python -m pip install -U git+https://gitlab.tudelft.nl/sqdl/client.git
 ...
 
 ## Configuration
-Configuration for SQDL functionality is specified in the ```sqdl``` section of your ```config.yaml``` file. This section accepts the following parameters (default values are specified):
+Configuration for SQDL functionality is specified in the ```sqdl_sync``` section of your ```config.yaml``` file. This section accepts the following parameters (default values are specified):
 
 ```yaml
-sqdl:
+sqdl_sync:
     tick_rate: 6                    # (int) Minimum period of the event loop in seconds
     retry_failed_exports: false     # (bool) Whether or not to retry exporting previously failed exports when re-initialising the SQDL Writer
     retry_failed_uploads: false     # (bool) Whether or not to retry uploading previously failed uploads when re-initialising the SQDL Writer
@@ -40,6 +40,18 @@ sqdl:
 ```
 
 Additionally, the ```scope``` parameter is checked for at the top level, just like ```project```, ```setup``` and ```sample```.
+
+### Logging
+The process started by ```core_tools.startup.launch_sqdl_sync.py``` inherrits some logging configuration from the ```launch_app(...)``` functionality.
+
+As a result, you can configure your SQDL logging settings by adding the following ```logging``` section to your SQDL config (displayed values are defaults):
+```yaml
+sqdl_sync:
+    logging:
+        file_location: ~/.core_tools/logs
+        file_name: sqdl_sync.log
+        file_level: INFO
+```
 
 ### SQDL Login
 By default, the SQDL Writer is configured to be authenticated through the use of an API key. This key has to be provided by your local administrator, and should be unique to your setup.

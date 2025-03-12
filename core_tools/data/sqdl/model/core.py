@@ -79,11 +79,29 @@ def set_table_as_synced(conn: Connection, ct_uid: int) -> bool:
     return synced
 
 
+def get_scope(conn: Connection, coretools_uid: int) -> Optional[str]:
+    statement = """
+        SELECT scope FROM global_measurement_overview WHERE uuid = %(ct-uid)s;
+    """
+    parameters = {
+        "ct-uid": coretools_uid
+    }
+
+    with conn:
+        cur = conn.cursor()
+        cur.execute(
+            query=statement,
+            vars=parameters
+        )
+        result = cur.fetchone()
+    return result
+
+
 def get_measurement_info(conn: Connection, coretools_uid: int) -> Optional[MeasurementInfo]:
     statement = """
         SELECT overview.uuid, datasets.sqdl_uuid, overview.scope, overview.exp_name, overview.starred, overview.completed
         FROM global_measurement_overview AS overview
-        JOIN sqdl_dataset AS datasets
+        LEFT JOIN sqdl_dataset AS datasets
         ON overview.uuid = datasets.coretools_uid
         WHERE overview.uuid = %(ct-uid)s;
     """

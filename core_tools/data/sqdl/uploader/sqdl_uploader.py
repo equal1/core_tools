@@ -41,7 +41,7 @@ class SqdlUploader:
 
         # load scope to fix them when not set during export
         self.local_scope = cfg.get('scope', None)
-        if cfg.get('sqdl.retry_failed_uploads', False):
+        if cfg.get('sqdl_sync.retry_failed_uploads', False):
             task_queue.retry_all_failed(self.connection)
 
         self.pid = os.getpid()

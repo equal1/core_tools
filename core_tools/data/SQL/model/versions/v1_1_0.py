@@ -123,7 +123,7 @@ def update_to_v1_1_0(c: Cursor) -> None:
                 dataset_index INT REFERENCES sqdl_dataset (idx),
                 sqdl_uuid UUID UNIQUE NOT NULL,
                 filename TEXT NOT NULL,
-                last_modified INT NOT NULL
+                last_modified BIGINT NOT NULL
             );
         """
     )

@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import logging
 from typing import Optional
@@ -44,10 +45,10 @@ class SQDLWriter():
         self.connection = self.database.conn_local
         self.validate_version()
 
-        base_path = config.get("sqdl.base_path", "~/.sqdl")
+        base_path = config.get("sqdl_sync.base_path", "~/.sqdl")
         self.base_path = os.path.expanduser(base_path)
         os.makedirs(self.base_path, exist_ok=True)
-        os.makedirs("{}/export".format(base_path), exist_ok=True)
+        os.makedirs("{}/export".format(self.base_path), exist_ok=True)
 
         # initialise
         self.exporter = Exporter(
@@ -55,8 +56,8 @@ class SQDLWriter():
             conn=self.connection
         )
 
-        self.dev_mode = config.get("sqdl.dev_mode", default=True)
-        self.use_personal_login = config.get("sqdl.use_personal_login", default=False)
+        self.dev_mode = config.get("sqdl_sync.dev_mode", default=False)
+        self.use_personal_login = config.get("sqdl_sync.use_personal_login", default=False)
 
         if self.dev_mode:
             logger.info("Initialising SQDL Writer/Client in developer mode...")
@@ -69,7 +70,7 @@ class SQDLWriter():
             )
         )
         self.tick_rate = datetime.timedelta(
-            seconds=config.get("sqdl.tick_rate", default=6)
+            seconds=config.get("sqdl_sync.tick_rate", default=6)
         )
 
         # prepare for run
@@ -89,11 +90,13 @@ class SQDLWriter():
             self.exporter.connection = self.connection
             self.uploader.connection = self.connection
 
-            # do not use 'login' functionality when doing local development
             if self.use_personal_login and not self.dev_mode:
                 self.uploader.client.login()
-            elif not self.use_personal_login and not self.dev_mode:
+            elif (not self.use_personal_login and not self.dev_mode) or (self.use_personal_login is None):
+                # added personal-login as none option as a hack to force API key usage in developer mode
                 key = self.read_local_api_key()
+                if key is None:
+                    sys.exit(1)
                 self.uploader.client.use_api_key(key)
 
             self.is_running = True
@@ -159,9 +162,8 @@ class SQDLWriter():
         #   in the current solution, 'local' becomes the authority on name and rating, which is not what we want
 
         info = core.get_measurement_info(self.connection, uuid)
-
         if info is None:
-            logger.error("Failed to fetch data, or no entry exists with uuid '{}'".format(uuid))
+            logger.error("No local entry exists with uuid '{}'.".format(uuid))
             return None
 
         if info.scope is None:
@@ -211,7 +213,7 @@ class SQDLWriter():
         env_file = "{}/.env".format(self.base_path)
 
         if not os.path.exists(env_file):
-            logger.warning("No .env file found. Check the 'Using SQDL' section of the documentation, or ask your local Admin for the right credentials.")
+            logger.error("No .env file found. Check the 'Using SQDL' section of the documentation, or ask your local Admin for the right credentials.")
             return
 
         with open(env_file) as file:
@@ -220,7 +222,7 @@ class SQDLWriter():
         for line in lines:
             if line.startswith("#"):
                 continue
-            key, value = line.strip().split(set="=", maxsplit=1)
+            key, value = line.strip().split(sep="=", maxsplit=1)
             if key == "API_KEY":
                 return value
 

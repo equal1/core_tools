@@ -35,14 +35,13 @@ class SqdlUpdate:
 
 class Exporter:
     def __init__(self, cfg: Dict, conn: Connection):
-        self.export_path = "{}/export".format(cfg.get('sqdl.base_path', "~/.sqdl"))
+        self.export_path = "{}/export".format(cfg.get('sqdl_sync.base_path', "~/.sqdl"))
         self.connection = conn
 
-        if cfg.get("sqdl.retry_failed_exports", default=False):
+        if cfg.get("sqdl_sync.retry_failed_exports", default=False):
             self.retry_failed_exports()
 
-        self.scopes = cfg.get('sqdl.scopes', {})
-        self.setup_name_corrections = cfg.get('sqdl.setup_name_corrections', {})
+        self.setup_name_corrections = cfg.get('sqdl_sync.setup_name_corrections', {})
 
         self.no_action_count = 0
         self.loop_count = 0
@@ -220,47 +219,6 @@ class Exporter:
             logger.info(f'Export raw data of expired incomplete measurement {action.uuid}')
         return action
 
-    # def get_export_action(self) -> Optional[ExportAction]:
-    #     now = datetime.now()
-    #     action_data = self.connection.execute_query(
-    #         '''
-    #         SELECT * FROM coretools_export_updates
-    #         WHERE resume_after < %(now)s
-    #         ORDER BY uuid LIMIT 1
-    #         ''',
-    #         return_dict=True,
-    #         vars={"now": now},
-    #     )
-    #     if action_data:
-    #         return ExportAction(**action_data[0])
-    #     else:
-    #         return None
-
-    # def uuid_exists(self, uuid):
-    #     res = self.connection.execute_query(
-    #         f'''
-    #         SELECT uuid FROM global_measurement_overview WHERE uuid = {uuid}
-    #         '''
-    #     )
-    #     return len(res) > 0 and res[0][0] is not None
-
-    # def get_expired_measurement_action(self) -> Optional[ExportAction]:
-    #     data = self.connection.execute_query(
-    #         '''
-    #         SELECT uuid FROM coretools_exported
-    #         WHERE raw_final = False
-    #         AND measurement_start_time < %(expiration_time)s
-    #         AND export_state = 1
-    #         ORDER BY uuid LIMIT 1
-    #         ''',
-    #         vars={'expiration_time': self.measurement_expiration_time},
-    #         return_dict=True
-    #     )
-    #     if not data:
-    #         return None
-    #     else:
-    #         return ExportAction(data[0]['uuid'], completed=True)
-
     def set_export_error(self, uuid, exception, code=99) -> None:
         if isinstance(exception, Exception):
             error_msg = str(exception)
@@ -273,27 +231,6 @@ class Exporter:
             {'export_state': code, 'export_errors': error_msg}
         )
 
-    # def set_exported(self, measurement, ds_path, action_completed=False) -> None:
-    #     uuid = measurement.exp_uuid
-    #     start_time = measurement.run_timestamp
-    #     raw_final = measurement.completed or action_completed
-    #
-    #     self.connection.insert_or_update(
-    #         'coretools_exported',
-    #         {'uuid': uuid},
-    #         {'measurement_start_time': start_time,
-    #          'path': ds_path,
-    #          'export_state': 1,
-    #          'raw_final': raw_final})
-
-    # def delete_export_action(self, action: ExportAction) -> bool:
-    #     rowcount = self.connection.execute_statement(
-    #         f'''
-    #         DELETE FROM coretools_export_updates
-    #         WHERE id = {action.id} AND modify_count = {action.modify_count}
-    #         ''')
-    #     return rowcount > 0
-
     def get_wait_time_not_completed(self, start_timestamp: datetime) -> int:
         now = datetime.now()
         measurement_duration = now - start_timestamp
@@ -303,28 +240,6 @@ class Exporter:
             return 2
         else:
             return 4
-
-    # def set_resume_after(self, action: ExportAction, wait_time: int) -> None:
-    #     now = datetime.now()
-    #     resume_after = now + timedelta(seconds=wait_time)
-    #
-    #     self.connection.execute_statement(
-    #         f'''
-    #         UPDATE coretools_export_updates
-    #         SET resume_after = %(resume_after)s
-    #         WHERE id = {action.id}
-    #         ''',
-    #         vars={"resume_after": resume_after}
-    #     )
-
-    # def increment_fail_count(self, action: ExportAction):
-    #     self.connection.execute_statement(
-    #         f'''
-    #         UPDATE coretools_export_updates
-    #         SET fail_count = fail_count + 1
-    #         WHERE id = {action.id}
-    #         ''',
-    #     )
 
     def add_sqdl_update(self, sqdl_update: SqdlUpdate, ds_path: str) -> None:
         ds_info = DatasetInfo(
@@ -355,19 +270,10 @@ class Exporter:
         return True
 
     def get_scope(self, coretools_uid: int) -> str:
-        # Info is never None here, because otherwise it wouldn't be listed for export
-        info = core.get_measurement_info(self.connection, coretools_uid)
-        if info is None:
-            raise Exception("Failed to extract information for measurement with id '{}'".format(coretools_uid))
-        # try:
-        #     scope = self.scopes[project]
-        #     if isinstance(scope, Mapping):
-        #         scope = scope[set_up]
-        #     return scope
-        # except KeyError:
-        if info.scope is None:
+        scope = core.get_scope(self.connection, coretools_uid)
+        if scope is None:
             raise Exception(f"No scope for measurement with ID '{coretools_uid}'")
-        return info.scope
+        return scope
 
     def fix_setup_name(self, setup):
         return self.setup_name_corrections.get(setup, setup)
@@ -392,25 +298,6 @@ class Exporter:
             generate_previews(dsx, ds_path, var_descr, self.timer)
 
         return updates, ds_path
-
-    # def retry_failed_exports(self) -> None:
-    #     data = self.connection.execute_query(
-    #         '''
-    #         SELECT uuid, raw_final FROM coretools_exported
-    #         WHERE export_state BETWEEN 10 AND 100
-    #         ORDER BY uuid
-    #         '''
-    #     )
-    #     if not data:
-    #         return None
-    #     logger.warning(f'Inserting {len(data)} datasets for retry')
-    #     for uuid, raw_final in data:
-    #         self.connection.insert_or_update(
-    #             'coretools_export_updates',
-    #             {'uuid': uuid},
-    #             {'data_changed': True,
-    #              'completed': raw_final})
-    #         self.connection.commit()
 
     def retry_failed_exports(self):
         records = export.get_failed_exports(self.connection)
