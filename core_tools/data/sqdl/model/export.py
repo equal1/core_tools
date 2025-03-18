@@ -218,6 +218,7 @@ def set_export_error(conn: Connection, uuid, message, code=99) -> None:
                 VALUES
                     ( %(uuid)s, %(export_state)s, %(export_errors)s )
                 ON CONFLICT (uuid) DO UPDATE
+                SET
                     uuid = %(uuid)s,
                     export_state = %(export_state)s,
                     export_errors = %(export_errors)s
