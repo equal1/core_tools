@@ -4,7 +4,7 @@ import psutil
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Optional, Tuple, Dict
+from typing import Any
 
 import numpy as np
 import psycopg2
@@ -34,13 +34,16 @@ class SqdlUpdate:
 
 
 class Exporter:
-    def __init__(self, cfg: Dict, conn: Connection):
-        self.export_path = "{}/export".format(cfg.get('sqdl_sync.base_path', "~/.sqdl"))
+    def __init__(self, cfg: dict[str, Any], conn: Connection):
+        base_path = cfg.get('sqdl_sync.base_path', "~/.sqdl")
+        self.export_path = f"{base_path}/export"
         self.connection = conn
 
+        # REVIEW SdS: retry mechanism not needed anymore
         if cfg.get("sqdl_sync.retry_failed_exports", default=False):
             self.retry_failed_exports()
 
+        # REVIEW SdS: old server functionality
         self.setup_name_corrections = cfg.get('sqdl_sync.setup_name_corrections', {})
 
         self.no_action_count = 0
@@ -77,8 +80,8 @@ class Exporter:
         self.timer.time('query actions')
 
         # NOTE:
-        # New measurement locally first adds the dataset to the global_measurmeent_overview,
-        # but the sync script first adds the measurement parameters and then creates the entry
+        # New measurement on PC (local) first adds the dataset to the global_measurmeent_overview,
+        # but the sync to server script first adds the measurement parameters and then creates the entry
         # in global_measurement_overview.
         # So, an update of the data may be written before the measurement with UUID is added to the
         # global measurement overview.
@@ -161,40 +164,40 @@ class Exporter:
 
         return True
 
-    def parse_exception(self, message: str, action: ExportAction) -> Tuple[float, int, float]:
+    def parse_exception(self, message: str, action: ExportAction) -> tuple[float, int, float]:
         """
         Parse exception message to extract error code and establish retry delay.
 
         code 10 - 49: known error and (possibly) recoverable
         code 50 - 90: known error and retry
         code 99: unspecified error
-        code > 100: know error and not recoverable, e.g. corrupt dataset.
+        code > 100: known error and not recoverable, e.g. corrupt dataset.
         """
         sleep_time = 0.001
         error_code = 99
         retry_after = None
 
-        if message.startswith("No scope for project"):
+        if message.startswith("No scope for project"):  # REVIEW SdS: no scope -> Export shouldn't have started.
             logger.warning(message)
             error_code = 11
-        elif message.startswith("Failed reading/writing file(s)"):
+        elif message.startswith("Failed reading/writing file(s)"):  # REVIEW SdS: Cannot write to local disk? Fail completely.
             logger.warning(message)
             error_code = 50
             sleep_time = 0.5
             if action.fail_count < 30:
                 retry_after = 1.0 * action.fail_count
-        elif message.startswith("No data in dataset"):
+        elif message.startswith("No data in dataset"):  # REVIEW SdS: can be ignored -> Set sync = True.
             # NOTE: new action will be created when data is written
             logger.warning(message)
             error_code = 101
-        elif message.startswith("m_param with id"):
+        elif message.startswith("m_param with id"):  # REVIEW SdS: parameters not completely written. can be ignored. sync = True
             # NOTE: new action will be created when data is written
             logger.warning(message)
             error_code = 102
-        elif message.startswith("Dataset ") and 'too big' in message:
+        elif message.startswith("Dataset ") and 'too big' in message:  # REVIEW SdS: shouldn't happen anymore. If so: Fail completely.
             logger.warning(message)
             error_code = 103
-        elif "does not exist in the local/remote database" in message:
+        elif "does not exist in the local/remote database" in message:  # REVIEW SdS: can only happen on server. Not locally. Ignore.
             # The synchronization process has not yet finished the sync.
             logger.warning(message)
             error_code = 104
@@ -207,14 +210,12 @@ class Exporter:
 
         return sleep_time, error_code, retry_after
 
-    def get_action(self) -> Optional[ExportAction]:
+    def get_action(self) -> ExportAction | None:
         action = export.get_export_action(self.connection)
-        # action = self.get_export_action()
         if action is not None:
             return action
 
         action = export.get_expired_export_action(self.connection, self.measurement_expiration_time)
-        # action = self.get_expired_measurement_action()
         if action is not None:
             logger.info(f'Export raw data of expired incomplete measurement {action.uuid}')
         return action
@@ -275,10 +276,11 @@ class Exporter:
             raise Exception(f"No scope for measurement with ID '{coretools_uid}'")
         return scope
 
+    # REVIEW SdS: can be removed.
     def fix_setup_name(self, setup):
         return self.setup_name_corrections.get(setup, setup)
 
-    def export_measurement(self, measurement, action: ExportAction) -> Tuple[SqdlUpdate, str]:
+    def export_measurement(self, measurement, action: ExportAction) -> tuple[SqdlUpdate, str]:
         scope = self.get_scope(int(measurement.exp_uuid))
         measurement.set_up = self.fix_setup_name(measurement.set_up)
         updates = SqdlUpdate(measurement.exp_uuid, scope, raw_final=action.completed)
@@ -305,6 +307,6 @@ class Exporter:
         if len(records) == 0:
             return None
 
-        logger.warning("Inserting {} datasets for export retry.".format(len(records)))
+        logger.warning(f"Inserting {len(records)} datasets for export retry.")
         for uuid, is_complete in records:
             export.set_retry_export(self.connection, uuid, is_complete)

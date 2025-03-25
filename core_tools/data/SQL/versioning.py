@@ -1,5 +1,5 @@
 import logging
-from typing import Callable, Tuple, Dict
+from typing import Callable
 
 from core_tools.data.SQL.model.versions.v1_0_0 import initialise_v1_0_0
 from core_tools.data.SQL.model.versions.v1_1_0 import update_to_v1_1_0
@@ -33,7 +33,11 @@ class DatabaseVersion:
         return (self.major == other.major) and (self.minor == other.minor) and (self.patch == other.patch)
 
     def __lt__(self, other):
-        return (self.major < other.major) or (self.major == other.major and self.minor < other.minor) or (self.major == other.major and self.minor == other.minor and self.patch < other.patch)
+        return (
+            (self.major < other.major)
+            or (self.major == other.major and self.minor < other.minor)
+            or (self.major == other.major and self.minor == other.minor and self.patch < other.patch)
+            )
 
     def __ne__(self, other):
         return not self.__eq__(other)
@@ -48,7 +52,7 @@ class DatabaseVersion:
         return not self.__lt__(other)
 
     def __repr__(self) -> str:
-        return "{}.{}.{}".format(self.major, self.minor, self.patch)
+        return f"{self.major}.{self.minor}.{self.patch}"
 
     def __hash__(self):
         return hash((self.major, self.minor, self.patch))
@@ -56,7 +60,7 @@ class DatabaseVersion:
 
 __REQUIRED_DATABASE_VERSION__ = DatabaseVersion(1, 1, 0)
 
-__UPDATE_PATH__: Dict[DatabaseVersion, UpdateOperation] = {
+__UPDATE_PATH__: dict[DatabaseVersion, UpdateOperation] = {
     DatabaseVersion(1, 1, 0): update_to_v1_1_0,
 }
 
@@ -72,7 +76,8 @@ def local_database_update_routine(conn: Connection):
 
     if version < __REQUIRED_DATABASE_VERSION__:
         logger.warning(
-            "Expected local database version {}, but found {}. Performing updates. This can take a while, depeninding on the setup.".format(__REQUIRED_DATABASE_VERSION__, version)
+            f"Expected local database version {__REQUIRED_DATABASE_VERSION__}, "
+            f"but found {version}. Performing updates. This can take a while, depending on the setup."
         )
 
     while version < __REQUIRED_DATABASE_VERSION__:
@@ -100,13 +105,13 @@ def get_database_version(conn: Connection) -> DatabaseVersion:
 
 def _update_database(conn: Connection, current: DatabaseVersion) -> DatabaseVersion:
     next_version, update_operation = _check_for_database_updates(current)
-    logger.info("Attempting local database upgrade from version {} to {}".format(current, next_version))
+    logger.info(f"Attempting local database upgrade from version {current} to {next_version}")
     _apply_database_update(conn, update_operation)
     logger.info("Update successful.")
     return next_version
 
 
-def _check_for_database_updates(current: DatabaseVersion) -> Tuple[DatabaseVersion, UpdateOperation]:
+def _check_for_database_updates(current: DatabaseVersion) -> tuple[DatabaseVersion, UpdateOperation]:
     if current.next_patch() in __UPDATE_PATH__:
         next_version = current.next_patch()
     elif current.next_minor() in __UPDATE_PATH__:
@@ -114,7 +119,9 @@ def _check_for_database_updates(current: DatabaseVersion) -> Tuple[DatabaseVersi
     elif current.next_major() in __UPDATE_PATH__:
         next_version = current.next_major()
     else:
-        raise NotImplementedError("Unable to find a update path to version {}. Stuck at {}.".format(__REQUIRED_DATABASE_VERSION__, current))
+        raise NotImplementedError(
+            f"Unable to find a update path to version {__REQUIRED_DATABASE_VERSION__}. "
+            f"Stuck at {current}.")
     return next_version, __UPDATE_PATH__[next_version]
 
 
@@ -125,6 +132,7 @@ def _apply_database_update(conn: Connection, update: UpdateOperation):
             update(c)
     except Exception as err:
         logger.exception(
-            "Error during update. Changes are automatically rolled back to previous successful update. Quiting with the following error: {}".format(err)
+            "Error during update. Changes are automatically rolled back to previous successful update. "
+            f"Quiting with the following error: {err}"
         )
         raise err

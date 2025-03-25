@@ -1,6 +1,5 @@
 import logging
 from dataclasses import dataclass
-from typing import List, Dict, Tuple
 from uuid import UUID
 
 from psycopg2._psycopg import connection as Connection, IntegrityError
@@ -23,12 +22,13 @@ class SQDLDataset:
     index: int  # defined by database (generated index)
     scope: str
     sqdl_uuid: int
-    files: List[SQDLFile]
+    files: list[SQDLFile]
 
 
 def create_dataset(conn: Connection, scope: str, ct_uid: int, sqdl_uuid: UUID) -> int:
     """
-    Create new dataset entry in the 'sqdl_dataset' table. Return the row index of th new entry. If an entry with the specified UUID already exists, return the row index of the existing entry instead.
+    Create new dataset entry in the 'sqdl_dataset' table. Return the row index of th new entry.
+    If an entry with the specified UUID already exists, return the row index of the existing entry instead.
     """
     try:
         with conn:
@@ -64,11 +64,11 @@ def create_dataset(conn: Connection, scope: str, ct_uid: int, sqdl_uuid: UUID) -
                 }
             )
             index = c.fetchone()[0]
-        logger.warning("Dataset with UUID '{}' already exists in table 'sqdl_dataset' at index '{}'.".format(sqdl_uuid, index))
+        logger.warning(f"Dataset with UUID '{sqdl_uuid}' already exists in table 'sqdl_dataset' at index '{index}'.")
         return index
 
 
-def get_counts(conn: Connection) -> Dict[str, int]:
+def get_counts(conn: Connection) -> dict[str, int]:
     """
     """
     counts = {}
@@ -82,7 +82,7 @@ def get_counts(conn: Connection) -> Dict[str, int]:
     return counts
 
 
-def get_files_for_dataset(conn: Connection, parent_idx: int) -> List[SQDLFile]:
+def get_files_for_dataset(conn: Connection, parent_idx: int) -> list[SQDLFile]:
     """
     Get all the SQDLFile entries associated with the SQDLDataset that has the provided index.
     """

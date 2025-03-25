@@ -34,13 +34,6 @@ def init_station():
         ]
     )
 
-    # load the digitizer
-    dig = MockM3202A(
-            name="Dig1",
-            chassis=1,
-            slot=11
-    )
-    station.add_component(dig)
 
     station.load_instrument('AWG1')
     station.load_instrument('AWG2')
@@ -50,5 +43,7 @@ def init_station():
     station.load_instrument('AWG6')
     station.load_instrument('AWG7')
     station.load_instrument('AWG8')
+
+    station.load_instrument('Dig1')
 
     return station

@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Optional, Tuple, List
 from datetime import datetime, timedelta
 
 from psycopg2._psycopg import connection as Connection
@@ -17,7 +16,8 @@ class SyncStatus:
 @dataclass
 class ExportAction:
     uuid: int
-    id: Optional[int] = None
+    id: int | None = None
+    # REVIEW SdS: optimistic locking. Rename to version and start at 1.
     modify_count: int = 0
     new_measurement: bool = False
     data_changed: bool = False
@@ -27,7 +27,7 @@ class ExportAction:
     fail_count: int = 0
     resume_after: datetime = None
 
-
+# REVIEW SdS: original code is clearer about the changes being made to database.
 def export_new_measurement(conn: Connection, ct_uid: int, is_complete: bool):
     with conn:
         c = conn.cursor()
@@ -94,7 +94,7 @@ def export_changed_data(conn: Connection, ct_uid: int):
         )
 
 
-def get_export_action(conn: Connection) -> Optional[ExportAction]:
+def get_export_action(conn: Connection) -> ExportAction | None:
     with conn:
         c = conn.cursor(cursor_factory=RealDictCursor)
         c.execute(
@@ -115,7 +115,7 @@ def get_export_action(conn: Connection) -> Optional[ExportAction]:
         return None
 
 
-def get_expired_export_action(conn: Connection, expiration_time: datetime) -> Optional[ExportAction]:
+def get_expired_export_action(conn: Connection, expiration_time: datetime) -> ExportAction | None:
     with conn:
         c = conn.cursor(cursor_factory=RealDictCursor)
         c.execute(
@@ -247,7 +247,7 @@ def increment_fail_count(conn: Connection, action: ExportAction) -> None:
         )
 
 
-def get_failed_exports(conn: Connection) -> List[Tuple[int, bool]]:
+def get_failed_exports(conn: Connection) -> list[tuple[int, bool]]:
     with conn:
         c = conn.cursor()
         c.execute(

@@ -71,7 +71,7 @@ def export_data(ds, scope, path, timer, updates, write_raw=True):
         for var in var_descr
         for dim in var['dims']
     )
-
+    # REVIEW SdS: change for better match with sqdl: title, description, rating
     info = {
         'name': fix_dataset_name(ds.name),
         'uid': ds.exp_uuid,
@@ -121,6 +121,7 @@ def export_data(ds, scope, path, timer, updates, write_raw=True):
             updates.update_star = True
             old_info['starred'] = ds.starred
         if info != old_info:
+            # REVIEW SdS: This happens when dataset has got more data. Useless logging.
             logger.info('metadata changed')
             updates.upload_dataset = True
     else:

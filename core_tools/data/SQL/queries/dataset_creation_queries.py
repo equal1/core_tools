@@ -21,11 +21,10 @@ class sample_info_queries:
     """
     small table that holds a overview of which samples have been measured on the current system.
     """
-    table_name = 'sample_info_overview'
 
     @staticmethod
     def generate_table(conn):
-        statement = "CREATE TABLE if not EXISTS {} (".format(sample_info_queries.table_name)
+        statement = "CREATE TABLE if not EXISTS sample_info_overview ("
         statement += "sample_info_hash text NOT NULL UNIQUE,"
         statement += "set_up text NOT NULL,"
         statement += "project text NOT NULL,"
@@ -42,8 +41,9 @@ class sample_info_queries:
             var_names = ('sample_info_hash', 'sample', 'set_up', 'project')
             var_values = (set_up+project+sample, sample, set_up, project)
             insert_row_in_table(
-                conn, sample_info_queries.table_name, var_names, var_values,
-                custom_statement='ON CONFLICT DO NOTHING')
+                conn, "sample_info_overview", var_names, var_values,
+                custom_statement='ON CONFLICT DO NOTHING'
+            )
             conn.commit()
 
 
@@ -53,11 +53,10 @@ class measurement_overview_queries:
 
     The raw data is saved in table measurement_parameters (Old version: data_table_queries)
     """
-    table_name = "global_measurement_overview"
 
     @staticmethod
     def generate_table(conn):
-        statement = "CREATE TABLE if not EXISTS {} (".format(measurement_overview_queries.table_name)
+        statement = "CREATE TABLE if not EXISTS global_measurement_overview ("
         statement += "id SERIAL,"
         statement += "uuid BIGINT NOT NULL unique,"
 
@@ -86,28 +85,14 @@ class measurement_overview_queries:
         # Note [SdS]: Column is abused for migration to new measurement_parameters table
         statement += "sync_location text); "
 
-        statement += "CREATE INDEX IF NOT EXISTS id_indexed ON {} USING BTREE (id) ;".format(
-            measurement_overview_queries.table_name)
-        statement += "CREATE INDEX IF NOT EXISTS uuid_indexed ON {} USING BTREE (uuid) ;".format(
-            measurement_overview_queries.table_name)
-        statement += "CREATE INDEX IF NOT EXISTS starred_indexed ON {} USING BTREE (starred) ;".format(
-            measurement_overview_queries.table_name)
-        statement += "CREATE INDEX IF NOT EXISTS date_day_index ON {} USING BTREE (project, set_up, sample) ;".format(
-            measurement_overview_queries.table_name)
+        statement += "CREATE INDEX IF NOT EXISTS id_indexed ON global_measurement_overview USING BTREE (id) ;"
+        statement += "CREATE INDEX IF NOT EXISTS uuid_indexed ON global_measurement_overview USING BTREE (uuid) ;"
+        statement += "CREATE INDEX IF NOT EXISTS starred_indexed ON global_measurement_overview USING BTREE (starred) ;"
+        statement += "CREATE INDEX IF NOT EXISTS date_day_index ON global_measurement_overview USING BTREE (project, set_up, sample) ;"
 
-        statement += "CREATE INDEX IF NOT EXISTS data_synced_index ON {} USING BTREE (data_synchronized);".format(
-            measurement_overview_queries.table_name)
-        statement += "CREATE INDEX IF NOT EXISTS table_synced_index ON {} USING BTREE (table_synchronized);".format(
-            measurement_overview_queries.table_name)
+        statement += "CREATE INDEX IF NOT EXISTS data_synced_index ON global_measurement_overview USING BTREE (data_synchronized);"
+        statement += "CREATE INDEX IF NOT EXISTS table_synced_index ON global_measurement_overview USING BTREE (table_synchronized);"
 
-        execute_statement(conn, statement)
-        conn.commit()
-
-    @staticmethod
-    def update_local_table(conn):
-        # Only do this on local database.
-        # The updating remote database makes it incompatible with old client software.
-        statement = "ALTER TABLE global_measurement_overview ADD COLUMN IF NOT EXISTS data_update_count int DEFAULT 0;"
         execute_statement(conn, statement)
         conn.commit()
 
@@ -123,7 +108,7 @@ class measurement_overview_queries:
             id, uuid, SQL_datatable : id and uuid of the new measurement and the tablename for raw data storage
         """
         if (not is_valid_info(sample_info.project)
-            or not is_valid_info(sample_info.set_up)
+                or not is_valid_info(sample_info.set_up)
                 or not is_valid_info(sample_info.sample)):
             raise Exception(f'Sample info not valid: {sample_info}')
 
@@ -162,12 +147,11 @@ class measurement_overview_queries:
         # NOTE: column sync_location is abused for migration to new format
         returning = ('id', 'uuid')
         query_outcome = insert_row_in_table(
-            conn, measurement_overview_queries.table_name, var_names,
-            var_values, returning
+            conn, "global_measurement_overview",
+            var_names, var_values, returning
         )
 
         # NOTE: SQL_datatable name is not used anymore for new measurements
-
         return query_outcome[0][0], query_outcome[0][1]
 
     def update_measurement(conn, meas_uuid,
@@ -216,7 +200,7 @@ class measurement_overview_queries:
         var_values = [value for name, value in var_pairs]
 
         condition = ('uuid', meas_uuid)
-        update_table(conn, measurement_overview_queries.table_name, var_names, var_values, condition)
+        update_table(conn, "global_measurement_overview", var_names, var_values, condition)
 
     @staticmethod
     def is_completed(conn, uuid):
@@ -230,7 +214,7 @@ class data_table_queries:
     """
     @staticmethod
     def generate_table(conn, table_name):
-        statement = "CREATE TABLE if not EXISTS {} ( ".format(table_name)
+        statement = f"CREATE TABLE if not EXISTS {table_name} ( "
         statement += "id SERIAL primary key, "
         statement += "param_id BIGINT, "
         statement += "nth_set INT, "
@@ -279,8 +263,11 @@ class data_table_queries:
     def update_cursors_in_meas_tab(conn, table_name, data_items):
         statement = ""
         for i in range(len(data_items)):
-            statement += "UPDATE {} SET write_cursor = {} WHERE id = {}; ".format(
-                table_name, data_items[i].data_buffer.cursor, i+1)
+            statement += f"""
+                UPDATE {table_name}
+                SET write_cursor = {data_items[i].data_buffer.cursor}
+                WHERE id = {i+1};
+            """
 
         execute_statement(conn, statement)
 

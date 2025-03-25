@@ -27,7 +27,7 @@ def fix_dataset_name(name):
 
 
 def fix_filename(filename):
-    # filename = filename.replace("'", '')
+    # no fixes needed
     return filename
 
 
@@ -40,6 +40,7 @@ class DatasetScanner:
     def get_description(self) -> dict[str, Any]:
         with open(f'{self.path}/{self.uid}.json', 'r') as f:
             result = json.load(f)
+        # REVIEW SdS: was only needed on server.
         # Fix version 0.0.1 export
         if 'uid' not in result:
             result['uid'] = result['uuid']

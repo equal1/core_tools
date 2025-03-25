@@ -9,6 +9,7 @@ from .utils import atomic_write
 
 logger = logging.getLogger(__name__)
 
+# TODO SdS: test other backend: cairo; test mpl.rcParams['path.simplify_threshold'] = 1.0
 # use headless backend
 matplotlib.use('agg')
 

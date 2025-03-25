@@ -3,7 +3,7 @@ import os
 import re
 import time
 from datetime import datetime
-from typing import Dict
+from typing import Any
 
 from .dataset_scanner import DatasetScanner, FileInfo
 from .exceptions import InvalidNameError, NoScopeError, DatasetError
@@ -16,6 +16,7 @@ import core_tools as ct
 
 from sqdl_client.api.v1.dataset import Dataset
 from sqdl_client.api.v1.file import File
+from sqdl_client.api.v1.scope import Scope
 from sqdl_client.client import QDLClient
 from sqdl_client.exceptions import (
     ObjectNotFoundException,
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 class SqdlUploader:
-    def __init__(self, cfg: Dict, conn: Connection, client=None):
+    def __init__(self, cfg: dict[str, Any], conn: Connection, client=None):
         if client is None:
             self.client = QDLClient()
         else:
@@ -39,11 +40,14 @@ class SqdlUploader:
 
         self.metadata_formatter = MetadataFormatter()
 
+        # REVIEW SdS: Scope should be in json file created by exporter.
         # load scope to fix them when not set during export
         self.local_scope = cfg.get('scope', None)
+        # Review SdS: check if this is needed
         if cfg.get('sqdl_sync.retry_failed_uploads', False):
             task_queue.retry_all_failed(self.connection)
 
+        # REVIEW SdS: store pid in database Check if process with pid in db is still running. Kill? pid can also be stored in database.
         self.pid = os.getpid()
         self.cleanup_abandoned_tasks()
         logger.info(f"Started uploader, pid:{self.pid}")
@@ -53,6 +57,7 @@ class SqdlUploader:
     def process_task(self) -> bool:
         start = time.perf_counter()
 
+        # REVIEW SdS: This was needed on server because there were multiple upload processes active...
         task = task_queue.claim_oldest_task(self.connection, self.pid)
         if task is None:
             task = task_queue.claim_newest_retry_task(self.connection, self.pid)
@@ -108,7 +113,8 @@ class SqdlUploader:
             time.sleep(1.0)
 
         except RequestException as ex:
-            logger.error(f'Exception processing {task.coretools_uid} {task.dataset_path}. Response:{ex.response}', exc_info=True)
+            logger.error(f'Exception processing {task.coretools_uid} {task.dataset_path}. Response:{ex.response}',
+                         exc_info=True)
             if ex.response is not None:
                 logger.info(f'Response: {ex.response.url}; {ex.response.headers}')
             task_queue.set_failed(self.connection, task)
@@ -116,6 +122,7 @@ class SqdlUploader:
             time.sleep(0.5)
 
         except Exception as ex:
+            # REVIEW SdS: reconsider exception handling.
             # TODO: Catch all should be split in dataset related errors and connection errors @@@
             # database connection failures, sQDL connecton failures should be given a retry.
             # dataset errors should mark the task as failed.
@@ -129,6 +136,8 @@ class SqdlUploader:
         log.log(self.connection, task.scope, task.coretools_uid, message)
 
     def get_scope(self, desc):
+        # REVIEW SdS: check this. On server datasets could be exported without scope set.
+        #             Proposed solution: scope must be in desc. Responsibility of exporter to add desc.
         # is it in the json file?
         scope = desc.get('scope', None)
         if scope is None:
@@ -146,13 +155,16 @@ class SqdlUploader:
         metadata = self.metadata_formatter.format(desc)
         sqdl_api = self.client.api
 
+        # Review SdS: Improve performance by caching scopes.
         try:
-            logger.info("retrieving scope by name: '{}'".format(scope_name))
-            scope = sqdl_api.scope.retrieve_from_name(scope_name)
+            logger.info(f"retrieving scope by name: '{scope_name}'")
+            scope: Scope = sqdl_api.scope.retrieve_from_name(scope_name)
         except ObjectNotFoundException:
+            # REVIEW SdS: raise UnknownScope(scope_name)
             logger.warning("no scope of corresponding name")
             scope = None
 
+        # REVIEW SdS: This will fail. Only admin has right to create scope.
         if scope is None:
             scope = sqdl_api.scope.create(
                 name=scope_name,
@@ -174,6 +186,7 @@ class SqdlUploader:
             logger.debug(f"Created dataset with uid {uid}")
         except UniqueConstraintViolationException:
             sqdl_ds = None
+        # Note: retrieve after except clause to avoid nested exceptions.
         if sqdl_ds is None:
             sqdl_ds = scope.retrieve_dataset_from_uid(uid)
             logger.debug(f"Retrieved dataset with uid {uid}")

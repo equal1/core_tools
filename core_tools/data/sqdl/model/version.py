@@ -1,6 +1,7 @@
 from psycopg2._psycopg import connection as Connection
 
-
+# REVIEW SdS: do we want more than just database version in the table? Other configuration..
+# Proposal: rename table to settings with key/value pairs. Store version as string.
 def read(conn: Connection) -> str:
     """
     """
@@ -13,4 +14,5 @@ def read(conn: Connection) -> str:
         c.execute(query=query)
         record = c.fetchall()
     assert len(record) == 1, "Either no or more that one database version exists"
-    return "{}.{}.{}".format(*record[0])
+    major, minor, patch = record[0]
+    return f"{major}.{minor}.{patch}"

@@ -1,14 +1,15 @@
 from datetime import datetime
-from typing import Optional
 from dataclasses import dataclass
 
 from psycopg2._psycopg import connection as Connection
 
-
+# REVIEW SdS: Remove this? I've never really used it. Rely on file logger. This table gets really big.
 @dataclass
 class UploadLog:
     index: int  # defined by database (generated index)
-    scope: Optional[str]
+    # REVIEW SdS: scope cannot be none
+    scope: str | None
+    # REVIEW SdS: uid
     ct_uid: int
     upload_time: datetime
     message: str

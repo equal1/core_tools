@@ -1,6 +1,7 @@
 from psycopg2._psycopg import cursor as Cursor
 
 
+# REVIEW SdS: Why in .sql and python code?
 def initialise_v1_0_0(c: Cursor) -> None:
     c.execute(
         query="""
@@ -35,6 +36,7 @@ def initialise_v1_0_0(c: Cursor) -> None:
         """
     )
 
+    # REVIEW SdS: why multiple execute?
     c.execute(
         query="""
             CREATE INDEX IF NOT EXISTS id_indexed ON global_measurement_overview USING BTREE (id);

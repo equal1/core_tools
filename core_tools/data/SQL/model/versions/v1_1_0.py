@@ -156,6 +156,7 @@ def update_to_v1_1_0(c: Cursor) -> None:
     )
 
     c.execute(
+        # REVIEW SdS: I think sample_info_overview.scope is never used.
         query="""
             ALTER TABLE global_measurement_overview ADD COLUMN IF NOT EXISTS scope TEXT DEFAULT NULL;
             ALTER TABLE sample_info_overview ADD COLUMN IF NOT EXISTS scope TEXT DEFAULT NULL;

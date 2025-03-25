@@ -27,7 +27,9 @@ def _configure_sample(cfg):
     try:
         scope = cfg['scope']
     except KeyError:
-        logger.warning("Configuration warning: newer versions of core-tools expect the 'scope' config parameter for compatibility with SQDL. Either specify your setup's scope value, or to surpress this warning, add 'scope: ~' to your config file.")
+        logger.warning("Configuration warning: newer versions of core-tools expect the 'scope' config parameter "
+                       "for compatibility with SQDL. Either specify the scope for your project, or suppress "
+                       "this warning by adding 'scope: ~' to your config file.")
         scope = None
     set_sample_info(project, setup, sample, scope)
 
@@ -55,6 +57,7 @@ def _generate_log_file_name():
 def _configure_logging(cfg):
     if cfg.get('logging.disabled', False):
         return
+    # REVIEW SdS: unexpected change of default.
     path = cfg.get('logging.file_location', '~/.core_tools/logs')
     file_level = cfg.get('logging.file_level', 'INFO')
     console_level = cfg.get('logging.console_level', 'WARNING')
@@ -96,9 +99,9 @@ def _configure_logging(cfg):
     expiry_time = (datetime.now() - timedelta(max_age)).timestamp()
     for entry in os.scandir(path):
         if (entry.is_file()
-            and pattern.match(entry.name)
-            and entry.stat().st_mtime < expiry_time):
-                old_files.append(entry.name)
+                and pattern.match(entry.name)
+                and entry.stat().st_mtime < expiry_time):
+            old_files.append(entry.name)
 
     if old_files:
         print(f"Deleting {len(old_files)} log files older than {max_age} days")

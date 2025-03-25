@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import List, Optional
 
 from psycopg2._psycopg import connection as Connection
 
@@ -15,7 +14,7 @@ class MeasurementInfo:
     completed: bool
 
 
-def get_data_to_sync(conn: Connection) -> List[int]:
+def get_data_to_sync(conn: Connection) -> list[int]:
     with conn:
         c = conn.cursor()
         c.execute(
@@ -30,7 +29,7 @@ def get_data_to_sync(conn: Connection) -> List[int]:
     return [r[0] for r in records]
 
 
-def get_table_to_sync(conn: Connection) -> List[int]:
+def get_table_to_sync(conn: Connection) -> list[int]:
     with conn:
         c = conn.cursor()
         c.execute(
@@ -47,15 +46,17 @@ def get_table_to_sync(conn: Connection) -> List[int]:
 
 def set_data_as_synced(conn: Connection, ct_uid: int) -> bool:
     with conn:
+        # REVIEW SdS: Only if data_update_count not changed! This is a bug.
         c = conn.cursor()
         c.execute(
             query="""
                 UPDATE global_measurement_overview
                 SET data_synchronized = TRUE
-                WHERE uuid = %(uid)s;
+                WHERE uuid = %(uid)s and data_update_count = %(data_update_count)s;
             """,
             vars={
-                "uid": ct_uid
+                "uid": ct_uid,
+                "data_update_count": data_update_count,
             }
         )
         synced = c.rowcount == 1
@@ -63,6 +64,7 @@ def set_data_as_synced(conn: Connection, ct_uid: int) -> bool:
 
 
 def set_table_as_synced(conn: Connection, ct_uid: int) -> bool:
+    # REVIEW SdS: Maybe always set table and data sync = True.
     with conn:
         c = conn.cursor()
         c.execute(
@@ -79,7 +81,7 @@ def set_table_as_synced(conn: Connection, ct_uid: int) -> bool:
     return synced
 
 
-def get_scope(conn: Connection, coretools_uid: int) -> Optional[str]:
+def get_scope(conn: Connection, coretools_uid: int) -> str | None:
     statement = """
         SELECT scope FROM global_measurement_overview WHERE uuid = %(ct-uid)s;
     """
@@ -97,7 +99,7 @@ def get_scope(conn: Connection, coretools_uid: int) -> Optional[str]:
     return result
 
 
-def get_measurement_info(conn: Connection, coretools_uid: int) -> Optional[MeasurementInfo]:
+def get_measurement_info(conn: Connection, coretools_uid: int) -> MeasurementInfo | None:
     statement = """
         SELECT overview.uuid, datasets.sqdl_uuid, overview.scope, overview.exp_name, overview.starred, overview.completed
         FROM global_measurement_overview AS overview

@@ -50,7 +50,7 @@ class SQL_conn_info_local:
         return (
             f'{self.__class__}: host {self.host}, port {self.port}, user {self.user}, passwd *, '
             f'dbname {self.dbname}, readonly {self.readonly}'
-            )
+        )
 
 
 class SQL_conn_info_remote:
@@ -73,7 +73,7 @@ class SQL_conn_info_remote:
         return (
             f'{self.__class__}: host {self.host}, port {self.port}, user {self.user}, passwd *, '
             f'dbname {self.dbname}, readonly {self.readonly}'
-            )
+        )
 
 
 def set_up_local_storage(
@@ -86,7 +86,7 @@ def set_up_local_storage(
         scope=None,
         readonly=False
 ):
-    '''
+    """
     Set up the specification for the datastorage needed to store/retrieve measurements.
 
     Args:
@@ -98,7 +98,7 @@ def set_up_local_storage(
         set_up (str) : set up at which the data has been measured
         sample (str) : sample name
         scope (str|None) : SQDL scope name, can be None for setups that do not use SQDL.
-    '''
+    """
     SQL_conn_info_local('localhost', 5432, user, passwd, dbname, readonly)
     sample_info(project, set_up, sample, scope)
 
@@ -115,7 +115,7 @@ def set_up_remote_storage(
     scope=None,
     readonly=False
 ):
-    '''
+    """
     Set up the specification for the datastorage needed to store/retrieve measurements.
 
     Args:
@@ -129,7 +129,7 @@ def set_up_remote_storage(
         set_up (str) : set up at which the data has been measured
         sample (str) : sample name
         scope (str|None) : SQDL scope name, can be None for setups that do not use SQDL.
-    '''
+    """
     SQL_conn_info_remote(host, port, user, passwd, dbname, readonly)
     sample_info(project, set_up, sample, scope)
 

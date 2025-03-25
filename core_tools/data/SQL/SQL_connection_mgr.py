@@ -1,4 +1,3 @@
-
 import logging
 
 from core_tools.data.SQL.versioning import local_database_update_routine
@@ -60,7 +59,6 @@ class SQL_database_manager():
         sample_info_queries.generate_table(conn)
 
         measurement_overview_queries.generate_table(conn)
-        # measurement_overview_queries.update_local_table(conn)
         measurement_parameters_queries.generate_table(conn)
         conn.commit()
 

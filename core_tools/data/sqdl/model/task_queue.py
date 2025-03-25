@@ -1,5 +1,4 @@
 import logging
-from typing import Optional, List, Dict
 from dataclasses import dataclass
 
 from psycopg2._psycopg import connection as Connection
@@ -18,8 +17,10 @@ class DatasetInfo:
 @dataclass
 class UploadTask:
     idx: int  # defined by database (generated index)
+    # REVIEW SdS: version or version_id (sqlalchemy) is the common name when using optimistic locking.
     task_iteration: int
-    scope: Optional[str]
+    scope: str | None
+    # REVIEW SdS: uid as used in sQDL. If component outside of core-tools it should not call it core-tools.
     coretools_uid: int
     dataset_path: str
 
@@ -27,18 +28,22 @@ class UploadTask:
     update_name: bool = False
     update_rating: bool = False
 
+    # REVIEW SdS: is_ready is as bad as set_raw_final. Rename to make_raw_data_immutable ?
     is_ready: bool = False
     has_failed: bool = False
     should_retry: bool = False
-    is_claimed_by: Optional[int] = None
+    is_claimed_by: int | None = None
 
 
-def get_tasks(conn: Connection) -> List[UploadTask]:
+def get_tasks(conn: Connection) -> list[UploadTask]:
     with conn:
         c = conn.cursor()
+        # REVIEW SdS: Define UploadTask.Columns = "idx, task_iteration, ..."
+        # or use * and dict_cursor.
         c.execute(
             query="""
-                SELECT  idx, task_iteration, scope, coretools_uid, dataset_path, update_dataset, update_name, update_rating, is_ready, has_failed, should_retry, is_claimed_by
+                SELECT  idx, task_iteration, scope, coretools_uid, dataset_path, update_dataset, update_name,
+                        update_rating, is_ready, has_failed, should_retry, is_claimed_by
                 FROM    upload_task_queue
                 ;
             """
@@ -47,12 +52,13 @@ def get_tasks(conn: Connection) -> List[UploadTask]:
     return [UploadTask(*r) for r in results]
 
 
-def claim_oldest_task(conn: Connection, pid: int) -> Optional[UploadTask]:
+def claim_oldest_task(conn: Connection, pid: int) -> UploadTask | None:
     with conn:
         c = conn.cursor()
         c.execute(
             query="""
-                SELECT      idx, task_iteration, scope, coretools_uid, dataset_path, update_dataset, update_name, update_rating, is_ready, has_failed, should_retry, is_claimed_by
+                SELECT      idx, task_iteration, scope, coretools_uid, dataset_path, update_dataset, update_name,
+                            update_rating, is_ready, has_failed, should_retry, is_claimed_by
                 FROM        upload_task_queue
                 WHERE       NOT has_failed AND is_claimed_by IS NULL
                 ORDER BY    idx
@@ -71,12 +77,13 @@ def claim_oldest_task(conn: Connection, pid: int) -> Optional[UploadTask]:
     return task
 
 
-def claim_newest_retry_task(conn: Connection, pid: int) -> Optional[UploadTask]:
+def claim_newest_retry_task(conn: Connection, pid: int) -> UploadTask | None:
     with conn:
         c = conn.cursor()
         c.execute(
             query="""
-                SELECT      idx, task_iteration, scope, coretools_uid, dataset_path, update_dataset, update_name, update_rating, is_ready, has_failed, should_retry, is_claimed_by
+                SELECT      idx, task_iteration, scope, coretools_uid, dataset_path, update_dataset, update_name,
+                            update_rating, is_ready, has_failed, should_retry, is_claimed_by
                 FROM        upload_task_queue
                 WHERE       should_retry AND is_claimed_by IS NULL
                 ORDER BY    idx DESC
@@ -121,7 +128,7 @@ def claim_task(conn: Connection, task: UploadTask, pid: int) -> bool:
         )
 
     if c.rowcount != 1:
-        logger.warning("Failed to claim task with uid '{}'".format(task.coretools_uid))
+        logger.warning(f"Failed to claim task with uid '{task.coretools_uid}'")
         return False
     task.task_iteration += 1
     return True
@@ -144,15 +151,16 @@ def release_task(conn: Connection, task: UploadTask) -> None:
         released = c.rowcount == 1
 
     if not released:
-        logger.warning("Failed to release task with uid '{}'".format(task.coretools_uid))
+        logger.warning(f"Failed to release task with uid '{task.coretools_uid}'")
 
 
-def get_claimed_tasks(conn: Connection) -> List[UploadTask]:
+def get_claimed_tasks(conn: Connection) -> list[UploadTask]:
     with conn:
         c = conn.cursor()
         c.execute(
             query="""
-                SELECT  idx, task_iteration, scope, coretools_uid, dataset_path, update_dataset, update_name, update_rating, is_ready, has_failed, should_retry, is_claimed_by
+                SELECT  idx, task_iteration, scope, coretools_uid, dataset_path, update_dataset, update_name,
+                        update_rating, is_ready, has_failed, should_retry, is_claimed_by
                 FROM    upload_task_queue
                 WHERE is_claimed_by IS NOT NULL
                 ORDER BY idx
@@ -307,7 +315,7 @@ def delete_task(conn: Connection, task: UploadTask) -> bool:
     return deleted
 
 
-def get_all_failed_tasks(conn: Connection) -> List[UploadTask]:
+def get_all_failed_tasks(conn: Connection) -> list[UploadTask]:
     with conn:
         c = conn.cursor()
         c.execute(
@@ -367,7 +375,7 @@ def retry_all_failed(conn: Connection) -> None:
         )
 
 
-def get_counts(conn: Connection) -> Dict[str, int]:
+def get_counts(conn: Connection) -> dict[str, int]:
     with conn:
         c = conn.cursor()
         c.execute(
