@@ -4,8 +4,7 @@ import time
 import logging
 import datetime
 
-from core_tools.startup.config import get_configuration
-from core_tools.data.SQL.SQL_connection_mgr import SQL_database_init as DatabaseInit
+from core_tools.data.SQL.SQL_connection_mgr import SQL_database_init as DatabaseInit, SQL_database_manager as DatabaseManager
 from core_tools.data.sqdl.export.coretools_export import Exporter
 from core_tools.data.sqdl.uploader.sqdl_uploader import SqdlUploader as Uploader
 
@@ -33,16 +32,15 @@ class SQDLWriter():
     Start the loop using the 'run' method.
     """
 
-    def __init__(self):
-        # REVIEW SdS: module in data should not import from startup. Reconsider cnofiguration.
-        config = get_configuration()
+    def __init__(self, config):
+        # [x] REVIEW SdS: could also use local database SQL_database_manager()
+        self.database = DatabaseManager()
 
-        # REVIEW SdS: could also use local database SQL_database_manager()
-        self.database = DatabaseInit()
-        self.database._connect()
         if not self.database.local_conn_active:
-            # REVIEW SdS: or no database configured?
-            raise ValueError("Only remote database configured. Setup not compatible with SQDL sync.")
+            # [x] REVIEW SdS: or no database configured?
+            raise Exception(
+                "Local database setup is a requirement for SQDL Sync, but no local configuration has been found."
+            )
 
         self.connection = self.database.conn_local
         self.validate_version()
@@ -55,7 +53,6 @@ class SQDLWriter():
         # initialise
         self.exporter = Exporter(
             cfg=config,
-            conn=self.connection
         )
 
         self.dev_mode = config.get("sqdl_sync.dev_mode", default=False)
@@ -66,21 +63,16 @@ class SQDLWriter():
 
         self.uploader = Uploader(
             cfg=config,
-            conn=self.connection,
             client=QDLClient(
                 dev_mode=self.dev_mode,
             )
         )
         self.tick_rate = datetime.timedelta(
-            seconds=config.get("sqdl_sync.tick_rate", default=6)
+            seconds=config.get("sqdl_sync.tick_rate", default=0.1)
         )
 
         # prepare for run
-        # REVIEW SdS: run sets it to True and it is never set to False.
-        self.is_running = False
         self.next_tick = None
-        # REVIEW SdS: disconnect?
-        self.database._disconnect()
 
     def run(self):
         """
@@ -89,11 +81,9 @@ class SQDLWriter():
         try:
             logger.info("Starting SQDL Writer event loop...")
 
-            # REVIEW SdS: This is not clean.
-            self.database._connect()
+            # [x] REVIEW SdS: This is not clean.
+            self.database = DatabaseManager()
             self.connection = self.database.conn_local
-            self.exporter.connection = self.connection
-            self.uploader.connection = self.connection
 
             # REVIEW SdS: Move login to init part to give feedback to user when log-in fails.
             if self.use_personal_login and not self.dev_mode:
@@ -129,10 +119,9 @@ class SQDLWriter():
                     sys.exit(1)
                 self.uploader.client.use_api_key(key)
 
-            self.is_running = True
             self.next_tick = datetime.datetime.now() + self.tick_rate
 
-            while self.is_running:
+            while True:
                 try:
                     self.queue_datasets_for_export()
                     self.exporter.poll()
@@ -194,11 +183,11 @@ class SQDLWriter():
         """
         Select relevant data from 'global_measurement_overview' to use in data synchronisation.
         """
-        # REVIEW SdS: TODO
+        # [ ] REVIEW SdS: TODO
         # todo: revise how changes in name and rating are handled, because without the intermediary remote database, we lose our method for tracking changes
         #   in the current solution, 'local' becomes the authority on name and rating, which is not what we want
 
-        # REVIEW SdS: See sqdl_uploader...
+        # [ ] REVIEW SdS: See sqdl_uploader...
         info = core.get_measurement_info(self.connection, uuid)
         if info is None:
             logger.error(f"No local entry exists with uuid '{uuid}'.")
@@ -208,7 +197,7 @@ class SQDLWriter():
             logger.warning(f"No Scope parameter for CoreTools UID '{info.coretools_uid}'. Skipping SQDL Sync.")
             return None
 
-        # REVIEW SdS: The requests below are expensive!
+        # [ ] REVIEW SdS: The requests below are expensive!
         scope_api: sqdl_client.api.v1.scope.ScopeAPI = self.uploader.client.api.scope
         scope = scope_api.retrieve_from_name(info.scope)
 
@@ -238,7 +227,7 @@ class SQDLWriter():
         assert version == __REQUIRED_DATABASE_VERSION__, (
             f"Local database is not up to date (expected '{__REQUIRED_DATABASE_VERSION__}', found '{version}'). "
             "Cannot sync to SQDL."
-            )
+        )
 
     def sleep_to_limit_rate(self) -> None:
         """
@@ -257,7 +246,6 @@ class SQDLWriter():
         if not os.path.exists(env_file):
             logger.error("No .env file found. Check the 'Using SQDL' section of the documentation, "
                          "or ask your local Admin for the right credentials.")
-            # REVIEW SdS: explicitly return None when method could also return not None.
             return None
 
         with open(env_file) as file:
@@ -273,12 +261,3 @@ class SQDLWriter():
         logger.error("Found .env file, but unable to extract parameter 'API_KEY'. "
                      "Check the 'Using SQDL' section of the documentation for more details.")
         return None
-
-    def reconnect(self):
-        self.database._disconnect()
-        self.database._connect()
-        self.connection = self.database.conn_local
-        assert self.connection.closed == 0, "failed to reconnect"
-
-        self.exporter.connection = self.connection
-        self.uploader.connection = self.connection

@@ -12,6 +12,7 @@ from psycopg2._psycopg import connection as Connection
 
 from core_tools.data.ds.data_set import load_by_uuid
 from core_tools.data.utils.timer import Timer
+from core_tools.data.SQL.SQL_connection_mgr import SQL_database_manager as DatabaseManager
 from core_tools.data.sqdl.export.data_export import export_data
 from core_tools.data.sqdl.export.data_preview import generate_previews
 from core_tools.data.sqdl.model import core, task_queue, export
@@ -34,10 +35,10 @@ class SqdlUpdate:
 
 
 class Exporter:
-    def __init__(self, cfg: dict[str, Any], conn: Connection):
+    def __init__(self, cfg: dict[str, Any]):
         base_path = cfg.get('sqdl_sync.base_path', "~/.sqdl")
         self.export_path = f"{base_path}/export"
-        self.connection = conn
+        self.connection = DatabaseManager().conn_local
 
         # REVIEW SdS: retry mechanism not needed anymore
         if cfg.get("sqdl_sync.retry_failed_exports", default=False):

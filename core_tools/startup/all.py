@@ -57,8 +57,7 @@ def _generate_log_file_name():
 def _configure_logging(cfg):
     if cfg.get('logging.disabled', False):
         return
-    # REVIEW SdS: unexpected change of default.
-    path = cfg.get('logging.file_location', '~/.core_tools/logs')
+    path = cfg.get('logging.file_location', '~/.core_tools')
     file_level = cfg.get('logging.file_level', 'INFO')
     console_level = cfg.get('logging.console_level', 'WARNING')
     logger_levels = cfg.get('logging.logger_levels', {})

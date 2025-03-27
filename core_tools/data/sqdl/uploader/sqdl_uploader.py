@@ -9,6 +9,7 @@ from .dataset_scanner import DatasetScanner, FileInfo
 from .exceptions import InvalidNameError, NoScopeError, DatasetError
 from .metadata_formatter import MetadataFormatter
 
+from core_tools.data.SQL.SQL_connection_mgr import SQL_database_manager as DatabaseManager
 from core_tools.data.sqdl.model import log, upload, task_queue
 
 import psutil
@@ -31,12 +32,12 @@ logger = logging.getLogger(__name__)
 
 
 class SqdlUploader:
-    def __init__(self, cfg: dict[str, Any], conn: Connection, client=None):
+    def __init__(self, cfg: dict[str, Any], client=None):
         if client is None:
             self.client = QDLClient()
         else:
             self.client = client
-        self.connection = conn
+        self.connection = DatabaseManager().conn_local
 
         self.metadata_formatter = MetadataFormatter()
 
