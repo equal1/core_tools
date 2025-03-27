@@ -114,7 +114,7 @@ class measurement_overview_queries:
 
         uuid = generate_uuid()
         username = getpass.getuser()
-        if get_database_version(conn) >= DatabaseVersion(1, 1, 0):
+        if get_database_version(conn) >= DatabaseVersion("1.1.0"):
             # Scope column is introduced in v1.1.0, all Local databases automatically update.
             #  However, if only a Remote database is configured, then that one is not automatically updated
             #  for safety/compatibility reasons, which means we still need the 'no scope' variant of the query.
@@ -266,7 +266,7 @@ class data_table_queries:
             statement += f"""
                 UPDATE {table_name}
                 SET write_cursor = {data_items[i].data_buffer.cursor}
-                WHERE id = {i+1};
+                WHERE id = {i + 1};
             """
 
         execute_statement(conn, statement)

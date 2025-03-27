@@ -1,11 +1,12 @@
 import logging
 from typing import Callable
+from packaging.version import Version
 
 from core_tools.data.SQL.model.versions.v1_0_0 import initialise_v1_0_0
 from core_tools.data.SQL.model.versions.v1_1_0 import update_to_v1_1_0
 
 from psycopg2._psycopg import connection as Connection, cursor as Cursor, Error as PGError
-from psycopg2.extras import RealDictCursor
+from psycopg2.extras import NamedTupleCursor
 
 
 logger = logging.getLogger(__name__)
@@ -14,54 +15,26 @@ logger = logging.getLogger(__name__)
 UpdateOperation = Callable[[Cursor], None]
 
 
-class DatabaseVersion:
-    def __init__(self, major: int, minor: int, patch: int):
-        self.major = major
-        self.minor = minor
-        self.patch = patch
+class DatabaseVersion(Version):
+    def __init__(self, version: str):
+        super().__init__(version)
+        self.patch = self.micro  # staying consistent with Semantic Versioning naming convention
 
     def next_patch(self):
-        return DatabaseVersion(self.major, self.minor, self.patch + 1)
+        return DatabaseVersion(f"{self.major}.{self.minor}.{self.patch + 1}")
 
     def next_minor(self):
-        return DatabaseVersion(self.major, self.minor + 1, 0)
+        return DatabaseVersion(f"{self.major}.{self.minor + 1}.0")
 
     def next_major(self):
-        return DatabaseVersion(self.major + 1, 0, 0)
-
-    def __eq__(self, other):
-        return (self.major == other.major) and (self.minor == other.minor) and (self.patch == other.patch)
-
-    def __lt__(self, other):
-        return (
-            (self.major < other.major)
-            or (self.major == other.major and self.minor < other.minor)
-            or (self.major == other.major and self.minor == other.minor and self.patch < other.patch)
-            )
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
-    def __gt__(self, other):
-        return not (self.__eq__(other) or self.__lt__(other))
-
-    def __le__(self, other):
-        return self.__eq__(other) or self.__lt__(other)
-
-    def __ge__(self, other):
-        return not self.__lt__(other)
-
-    def __repr__(self) -> str:
-        return f"{self.major}.{self.minor}.{self.patch}"
-
-    def __hash__(self):
-        return hash((self.major, self.minor, self.patch))
+        return DatabaseVersion(f"{self.major + 1}.0.0")
 
 
-__REQUIRED_DATABASE_VERSION__ = DatabaseVersion(1, 1, 0)
+__REQUIRED_DATABASE_VERSION__ = DatabaseVersion("1.1.0")
+
 
 __UPDATE_PATH__: dict[DatabaseVersion, UpdateOperation] = {
-    DatabaseVersion(1, 1, 0): update_to_v1_1_0,
+    DatabaseVersion("1.1.0"): update_to_v1_1_0,
 }
 
 
@@ -72,7 +45,7 @@ def local_database_update_routine(conn: Connection):
         with conn:
             cursor = conn.cursor()
             initialise_v1_0_0(cursor)
-        version = DatabaseVersion(1, 0, 0)
+        version = DatabaseVersion("1.0.0")
 
     if version < __REQUIRED_DATABASE_VERSION__:
         logger.warning(
@@ -86,20 +59,21 @@ def local_database_update_routine(conn: Connection):
 
 def get_database_version(conn: Connection) -> DatabaseVersion:
     try:
+        # Note [DB]: Context manager does automatic rollback on error, no further transaction handing needed.
         with conn:
-            c = conn.cursor(cursor_factory=RealDictCursor)
+            c = conn.cursor(cursor_factory=NamedTupleCursor)
             c.execute(
                 query="SELECT major, minor, patch FROM database_version",
             )
             records = c.fetchall()
         assert len(records) == 1, "Either no or more than one entries in database_version table"
         record = records[0]
-        return DatabaseVersion(major=record["major"], minor=record["minor"], patch=record["patch"])
+        return DatabaseVersion(f"{record.major}.{record.minor}.{record.patch}")
     except PGError as err:
         if err.pgcode == "42P01":
             # 42P01 is the psycopg2 error code for UndefinedTable
             logger.debug("No table 'database_version' found, returning v0.0.0")
-            return DatabaseVersion(0, 0, 0)
+            return DatabaseVersion("0.0.0")
         raise err
 
 
@@ -121,7 +95,8 @@ def _check_for_database_updates(current: DatabaseVersion) -> tuple[DatabaseVersi
     else:
         raise NotImplementedError(
             f"Unable to find a update path to version {__REQUIRED_DATABASE_VERSION__}. "
-            f"Stuck at {current}.")
+            f"Stuck at {current}."
+        )
     return next_version, __UPDATE_PATH__[next_version]
 
 
