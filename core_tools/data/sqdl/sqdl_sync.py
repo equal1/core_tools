@@ -6,7 +6,6 @@ import datetime
 
 from core_tools.data.SQL.SQL_connection_mgr import SQL_database_init as DatabaseInit, SQL_database_manager as DatabaseManager
 from core_tools.data.sqdl.export.coretools_export import Exporter
-from core_tools.data.sqdl.uploader.sqdl_uploader import SqdlUploader as Uploader
 
 from core_tools.data.SQL.versioning import get_database_version, __REQUIRED_DATABASE_VERSION__
 
@@ -14,7 +13,7 @@ from core_tools.data.sqdl.model import core, export
 from core_tools.data.sqdl.model.export import SyncStatus
 
 import sqdl_client
-from sqdl_client.client import QDLClient
+import sqdl_uploader
 
 from psycopg2 import InterfaceError
 from requests.exceptions import ConnectionError
@@ -24,8 +23,8 @@ __database_version__ = "1.1.0"
 logger = logging.getLogger(__name__)
 
 
-# Review SdS: sqdl_writer is not the counterpart of sqdl_reader. sqdl_data_sync?
-class SQDLWriter():
+# [x] Review SdS: sqdl_writer is not the counterpart of sqdl_reader. sqdl_data_sync?
+class SQDLSync():
     """
     Event loop that polls for measurement data to be uploaded to SQDL.
     Expects the core-tools configurations to be initialised (see core-tools/startup/config.py).
@@ -34,15 +33,14 @@ class SQDLWriter():
 
     def __init__(self, config):
         # [x] REVIEW SdS: could also use local database SQL_database_manager()
-        self.database = DatabaseManager()
+        database = DatabaseManager()
 
-        if not self.database.local_conn_active:
+        if not database.local_conn_active:
             # [x] REVIEW SdS: or no database configured?
             raise Exception(
                 "Local database setup is a requirement for SQDL Sync, but no local configuration has been found."
             )
 
-        self.connection = self.database.conn_local
         self.validate_version()
 
         base_path = config.get("sqdl_sync.base_path", "~/.sqdl")
@@ -61,11 +59,8 @@ class SQDLWriter():
         if self.dev_mode:
             logger.info("Initialising SQDL Writer/Client in developer mode...")
 
-        self.uploader = Uploader(
+        self.uploader = sqdl_uploader.SqdlUploader(
             cfg=config,
-            client=QDLClient(
-                dev_mode=self.dev_mode,
-            )
         )
         self.tick_rate = datetime.timedelta(
             seconds=config.get("sqdl_sync.tick_rate", default=0.1)
@@ -82,12 +77,10 @@ class SQDLWriter():
             logger.info("Starting SQDL Writer event loop...")
 
             # [x] REVIEW SdS: This is not clean.
-            self.database = DatabaseManager()
-            self.connection = self.database.conn_local
 
-            # REVIEW SdS: Move login to init part to give feedback to user when log-in fails.
+            # [ ] REVIEW SdS: Move login to init part to give feedback to user when log-in fails.
             if self.use_personal_login and not self.dev_mode:
-                # REVIEW SdS: delegate functionality to uploader. "Don't grab my wallet. Ask me to pay."
+                # [ ] REVIEW SdS: delegate functionality to uploader. "Don't grab my wallet. Ask me to pay."
                 self.uploader.client.login()
 
                 # TODO SdS: do this in a clean way in uploader
@@ -106,7 +99,7 @@ class SQDLWriter():
 
 
             elif (not self.use_personal_login and not self.dev_mode) or (self.use_personal_login is None):
-                # REVIEW SdS: 4 options
+                # [ ] REVIEW SdS: 4 options
                 # - normal + api key: Default UPL and dev both False
                 # - normal + personal login: UPL = True, dev = False @@@ Do we wwant this in lab?
                 # - dev mode + basic auth: dev = "basic"
@@ -115,8 +108,8 @@ class SQDLWriter():
                 # added personal-login as none option as a hack to force API key usage in developer mode
                 key = self.read_local_api_key()
                 if key is None:
-                    # REVIEW SdS: Why exit the hard way and not raise Exception?
-                    sys.exit(1)
+                    # [ ] REVIEW SdS: Why exit the hard way and not raise Exception?
+                    raise Exception("KeyNotFoundException")
                 self.uploader.client.use_api_key(key)
 
             self.next_tick = datetime.datetime.now() + self.tick_rate
@@ -128,7 +121,7 @@ class SQDLWriter():
                     self.uploader.poll()
 
                 except InterfaceError as error:
-                    # Review SdS: Shouldn't happen on local PC. Correct to raise and thus quit program.
+                    # [ ] Review SdS: Shouldn't happen on local PC. Correct to raise and thus quit program.
                     logger.error("Connection to local database lost.")
                     raise error
 
@@ -149,13 +142,13 @@ class SQDLWriter():
 
     def queue_datasets_for_export(self) -> None:
         """
-        REVIEW SdS: Today this comment makes sense. Next year it doesn't
+         [ ] REVIEW SdS: Today this comment makes sense. Next year it doesn't
         Covers the behaviour that would originally be done by db-sync and the remote database triggers.
 
         Looks up measurement data that needs to be synchronized from the local database, and creates
         the appropriate ExportActions.
         """
-        # Review SdS: Change to simple mechanism: oldest with one flag set: export
+        # [ ] Review SdS: Change to simple mechanism: oldest with one flag set: export
         # Review SdS: Could be integrated in exporter.
         uids_for_data_to_update = core.get_data_to_sync(self.connection)
 
@@ -167,7 +160,7 @@ class SQDLWriter():
         uids_for_meta_to_update = core.get_table_to_sync(self.connection)
 
         # cover behaviour that would usually be handled by triggers
-        # REVIEW SdS: Simplify behavior and move to exporter.
+        # [ ] REVIEW SdS: Simplify behavior and move to exporter.
         for ct_uid in uids_for_meta_to_update:
             sync_status = self.collect_measurement_sync_status(ct_uid)
             if sync_status is None:

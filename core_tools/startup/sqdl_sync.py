@@ -1,7 +1,7 @@
 from core_tools.startup.db_connection import connect_local_db
 from core_tools.startup.sample_info import set_sample_info
 from core_tools.startup.app_wrapper import run_app
-from core_tools.data.sqdl.sqdl_writer import SQDLWriter
+from core_tools.data.sqdl.sqdl_sync import SQDLSync
 
 
 def sync_init():
@@ -10,7 +10,7 @@ def sync_init():
 
 
 def sync_main():
-    writer = SQDLWriter()
+    writer = SQDLSync()
     writer.run()
 
 

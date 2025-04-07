@@ -44,19 +44,20 @@ def get_table_to_sync(conn: Connection) -> list[int]:
     return [r[0] for r in records]
 
 
-def set_data_as_synced(conn: Connection, ct_uid: int) -> bool:
+def set_data_as_synced(conn: Connection, uid: int, update_count: int) -> bool:
     with conn:
-        # REVIEW SdS: Only if data_update_count not changed! This is a bug.
+        # [x] REVIEW SdS: Only if data_update_count not changed! This is a bug.
         c = conn.cursor()
         c.execute(
             query="""
-                UPDATE global_measurement_overview
-                SET data_synchronized = TRUE
-                WHERE uuid = %(uid)s and data_update_count = %(data_update_count)s;
+                UPDATE  global_measurement_overview
+                SET     data_synchronized = TRUE
+                WHERE   uuid = %(uid)s
+                AND     data_update_count = %(data_update_count)s
             """,
             vars={
-                "uid": ct_uid,
-                "data_update_count": data_update_count,
+                "uid": uid,
+                "data_update_count": update_count,
             }
         )
         synced = c.rowcount == 1
@@ -64,7 +65,7 @@ def set_data_as_synced(conn: Connection, ct_uid: int) -> bool:
 
 
 def set_table_as_synced(conn: Connection, ct_uid: int) -> bool:
-    # REVIEW SdS: Maybe always set table and data sync = True.
+    # [ ] REVIEW SdS: Maybe always set table and data sync = True.
     with conn:
         c = conn.cursor()
         c.execute(

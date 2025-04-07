@@ -20,7 +20,7 @@ To get started with ```sqdl-client```, install the project from its repository a
 [TU Delft's GitLab](https://gitlab.tudelft.nl/sqdl/client/), either by making a clone first and
 installing locally, or by installing directly:
 
-REVIEW SdS: install from package repository.
+[ ] REVIEW SdS: install from package repository.
 
 ```bash
 python -m pip install -U git+https://gitlab.tudelft.nl/sqdl/client.git
@@ -36,7 +36,7 @@ python -m pip install -U git+https://gitlab.tudelft.nl/sqdl/client.git
 Configuration for SQDL functionality is specified in the ```sqdl_sync``` section of your ```config.yaml``` file.
 This section accepts the following parameters (default values are specified):
 
-REVIEW SdS: remove dev_mode, setup_name_correction, personal_login?. tick_rate is too low.
+[ ] REVIEW SdS: remove dev_mode, setup_name_correction, personal_login?. tick_rate is too low.
 ```yaml
 sqdl_sync:
     tick_rate: 6                    # (int) Minimum period of the event loop in seconds
@@ -52,7 +52,7 @@ sqdl_sync:
 Additionally, the ```scope``` parameter is checked for at the top level, just like ```project```, ```setup``` and ```sample```.
 
 ### Logging
-REVIEW SdS: too much detail for users.
+[ ] REVIEW SdS: too much detail for users.
 
 The process started by ```core_tools.startup.launch_sqdl_sync.py``` inherits some logging configuration
 rom the ```launch_app(...)``` functionality.
