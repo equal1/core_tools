@@ -2,8 +2,10 @@ import logging
 from typing import Callable
 from packaging.version import Version
 
+from core_tools.data.SQL.SQL_connection_mgr import SQL_database_manager as DatabaseManager
 from core_tools.data.SQL.model.versions.v1_0_0 import initialise_v1_0_0
 from core_tools.data.SQL.model.versions.v1_1_0 import update_to_v1_1_0
+from core_tools.data.SQL.model import settings
 
 from psycopg2._psycopg import connection as Connection, cursor as Cursor, Error as PGError
 from psycopg2.extras import NamedTupleCursor
@@ -39,7 +41,7 @@ __UPDATE_PATH__: dict[DatabaseVersion, UpdateOperation] = {
 
 
 def local_database_update_routine(conn: Connection):
-    version = get_database_version(conn)
+    version = get_database_version()
 
     if version.major == 0:
         with conn:
@@ -57,24 +59,38 @@ def local_database_update_routine(conn: Connection):
         version = _update_database(conn, version)
 
 
-def get_database_version(conn: Connection) -> DatabaseVersion:
+def get_database_version(assert_requirement=False) -> DatabaseVersion:
     try:
-        # Note [DB]: Context manager does automatic rollback on error, no further transaction handing needed.
-        with conn:
-            c = conn.cursor(cursor_factory=NamedTupleCursor)
-            c.execute(
-                query="SELECT major, minor, patch FROM database_version",
-            )
-            records = c.fetchall()
-        assert len(records) == 1, "Either no or more than one entries in database_version table"
-        record = records[0]
-        return DatabaseVersion(f"{record.major}.{record.minor}.{record.patch}")
+        # review todo: clean up
+        # with DatabaseManager().conn_local as conn:
+        #     c = conn.cursor(cursor_factory=NamedTupleCursor)
+        #     c.execute(
+        #         query="SELECT major, minor, patch FROM database_version",
+        #     )
+        #     records = c.fetchall()
+        # assert len(records) == 1, "Either no or more than one entries in database_version table"
+        # record = records[0]
+        # version = DatabaseVersion(f"{record.major}.{record.minor}.{record.patch}")
+
+        version_str = settings.get_setting('version')
+        version = DatabaseVersion(version_str)
+
     except PGError as err:
         if err.pgcode == "42P01":
             # 42P01 is the psycopg2 error code for UndefinedTable
-            logger.debug("No table 'database_version' found, returning v0.0.0")
-            return DatabaseVersion("0.0.0")
+            logger.debug("No table 'settings' found, returning v0.0.0")
+            version = DatabaseVersion("0.0.0")
         raise err
+
+    if assert_requirement:
+        message = (
+            "Local database is not up to date "
+            f"(expected '{__REQUIRED_DATABASE_VERSION__}', found '{version}'). "
+            "Cannot sync to SQDL."
+        )
+        assert version == __REQUIRED_DATABASE_VERSION__, message
+
+    return version
 
 
 def _update_database(conn: Connection, current: DatabaseVersion) -> DatabaseVersion:
@@ -101,13 +117,19 @@ def _check_for_database_updates(current: DatabaseVersion) -> tuple[DatabaseVersi
 
 
 def _apply_database_update(conn: Connection, update: UpdateOperation):
+    new_version, rollback_version = ''
     try:
         with conn:
             c = conn.cursor()
             update(c)
+
+        # review todo: transaction management
+        settings.set_setting('version', new_version)
+
     except Exception as err:
         logger.exception(
             "Error during update. Changes are automatically rolled back to previous successful update. "
             f"Quiting with the following error: {err}"
         )
+        settings.set_setting('version', rollback_version)
         raise err

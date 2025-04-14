@@ -71,21 +71,25 @@ def export_data(ds, scope, path, timer, updates, write_raw=True):
         for var in var_descr
         for dim in var['dims']
     )
-    # REVIEW SdS: change for better match with sqdl: title, description, rating
+
+    name_value = fix_dataset_name(ds.name)
     info = {
-        'name': fix_dataset_name(ds.name),
+        'name': name_value,
+        'title': name_value,
+        'description': name_value,
         'uid': ds.exp_uuid,
         'scope': scope,
         'project': ds.project,
         'setup': ds.set_up,
         'sample': ds.sample_name,
-        'start_time': str(ds.run_timestamp),
-        'starred': ds.starred,
+        'date_collected': str(ds.run_timestamp),
+        'rating': 1 if ds.starred else 0,
         'vars': var_list,
         'dims': list(dims),
         'var_description': var_descr,
         'application': f"core-tools:{ct_version}",
     }
+
     var_summary = []
     for var in var_descr:
         dim_desr = [
@@ -120,10 +124,6 @@ def export_data(ds, scope, path, timer, updates, write_raw=True):
         if old_info['starred'] != ds.starred:
             updates.update_star = True
             old_info['starred'] = ds.starred
-        if info != old_info:
-            # REVIEW SdS: This happens when dataset has got more data. Useless logging.
-            logger.info('metadata changed')
-            updates.upload_dataset = True
     else:
         updates.upload_dataset = True
 
