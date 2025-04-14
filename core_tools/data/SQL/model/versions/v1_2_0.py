@@ -3,16 +3,53 @@ from core_tools.data.SQL.SQL_connection_mgr import (
 )
 
 
-# review todo: create a path from 1.1.0 to 1.2.0
 def update_to_1_2_0_from_1_1_0():
-    pass
+    """
+    Special case for setups that received 1.1.0 version.
+    Default should be going from 1.0.0 to 1.2.0 directly.
+    """
 
-    # add settings
-    # export current content of taskqueue to sqlite3
-    # drop taskqueue table
+    # review todo:
+    # User is expected to export and drop the following tables manually:
+    #     - upload_task_queue
+    #     - sqdl_dataset
+    #     - sqdl_file
+    #     - coretools_export_updates
+    #     - upload_log
+    #     - database_version
+
+    with DatabaseManager() as conn:
+        cursor = conn.cursor()
+
+        cursor.execute(
+            query="""
+                CREATE TABLE IF NOT EXISTS settings (
+                    parameter TEXT UNIQUE NOT NULL,
+                    value TEXT NOT NULL
+                );
+            """
+        )
+        cursor.execute(
+            query="""
+                INSERT INTO settings
+                    ( parameter )
+                VALUES
+                    ( '1.2.0' )
+                ON CONFLICT ( parameter ) DO UPDATE
+                SET
+                    value = '1.2.0'
+            """
+        )
+        cursor.execute(
+            query="""
+                ALTER TABLE
+                    sample_info_overview
+                DROP COLUMN IF EXISTS
+                    scope
+            """
+        )
 
 
-# review todo: create a path from 1.0.0 to 1.2.0
 def update_to_1_2_0_from_1_0_0():
     with DatabaseManager as conn:
         cursor = conn.cursor()
@@ -23,6 +60,18 @@ def update_to_1_2_0_from_1_0_0():
                     parameter TEXT UNIQUE NOT NULL,
                     value TEXT NOT NULL
                 );
+            """
+        )
+
+        cursor.execute(
+            query="""
+                INSERT INTO settings
+                    ( parameter )
+                VALUES
+                    ( '1.2.0' )
+                ON CONFLICT ( parameter ) DO UPDATE
+                SET
+                    value = '1.2.0'
             """
         )
 
@@ -46,6 +95,22 @@ def update_to_1_2_0_from_1_0_0():
 
         cursor.execute(
             query="""
-                CREATE INDEX IF NOT EXISTS coretools_exported_uuid_index ON coretools_exported USING BTREE (uuid);
+                CREATE INDEX IF NOT EXISTS
+                    coretools_exported_uuid_index
+                ON
+                    coretools_exported
+                USING BTREE (
+                    uuid
+                )
+            """
+        )
+
+        cursor.execute(
+            # [x] REVIEW SdS: I think sample_info_overview.scope is never used.
+            query="""
+                ALTER TABLE
+                    global_measurement_overview
+                ADD COLUMN IF NOT EXISTS
+                    scope TEXT DEFAULT NULL
             """
         )

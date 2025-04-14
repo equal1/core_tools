@@ -251,11 +251,10 @@ class Exporter:
 
     def continue_enqueued_action(self) -> bool:
         """
-        Determine whether to continue the export of an enqueued action,
-        if it exists.
+        Determine whether to continue the export of an enqueued action, if it
+        exists.
 
-        Returns:
-            resume_action (bool)
+        :returns: Confirmation to resume action.
         """
         if self.enqueued_action is None:
             return True
@@ -264,8 +263,11 @@ class Exporter:
             return True
 
         # resume early if the measurement is finished
-        measurement_info = core.get_measurement_info(self.enqueued_action.uuid)
-        if measurement_info.completed:
+        is_complete = export.get_measurement_completed(self.enqueued_action.uuid)
+        assert_message = "Enqueued action UID no longer exists in database"
+        assert is_complete is not None, assert_message
+
+        if is_complete:
             self.enqueued_action.completed = True
             return True
 
@@ -379,7 +381,7 @@ class Exporter:
         return True
 
     def get_scope(self, coretools_uid: int) -> str:
-        scope = core.get_scope(self.connection, coretools_uid)
+        scope = export.get_measurement_scope(coretools_uid)
         if scope is None:
             raise Exception(f"No scope for measurement with ID '{coretools_uid}'")
         return scope

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 from core_tools.data.SQL.SQL_connection_mgr import (
     SQL_database_manager as DatabaseManager
@@ -7,6 +8,7 @@ from core_tools.data.SQL.SQL_connection_mgr import (
 
 from psycopg2._psycopg import connection as Connection, cursor as Cursor
 from psycopg2.extras import RealDictCursor
+from psycopg2 import sql
 
 
 @dataclass
@@ -62,7 +64,7 @@ def set_export_synchronized(action: ExportAction, name: str, rating: bool) -> tu
     """
     Register data and meta-data as synchronized if their values have not changed since Export start.
     """
-    with DatabaseManager() as conn:
+    with DatabaseManager().conn_local as conn:
         c: Cursor = conn.cursor()
         c.execute(
             query="""
@@ -192,7 +194,9 @@ def get_failed_exports() -> list[tuple[int, bool]]:
     return records
 
 
-def get_scope(coretools_uid: int) -> str | None:
+# review todo: add generic 'get X from Y for Z' query option
+# covers both get_scope and get_measurement_info implementations
+def get_measurement_scope(coretools_uid: int) -> str | None:
     statement = """
         SELECT scope FROM global_measurement_overview WHERE uuid = %(ct-uid)s;
     """
@@ -210,27 +214,100 @@ def get_scope(coretools_uid: int) -> str | None:
     return result
 
 
-# review todo: only used for completed parameter
-def get_measurement_info(coretools_uid: int) -> MeasurementInfo | None:
+# review todo: replace with generated select query
+def get_measurement_completed(uid: int) -> bool | None:
     statement = """
-        SELECT overview.uuid, datasets.sqdl_uuid, overview.scope, overview.exp_name, overview.starred, overview.completed
-        FROM global_measurement_overview AS overview
-        LEFT JOIN sqdl_dataset AS datasets
-        ON overview.uuid = datasets.coretools_uid
-        WHERE overview.uuid = %(ct-uid)s;
+            SELECT completed FROM global_measurement_overview WHERE uuid = %(uid)s
+        """
+    with DatabaseManager().conn_local as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            statement,
+            vars={
+                "uid": uid
+            }
+        )
+        result = cursor.fetchone()
+    return result
+
+
+# review todo: only used for completed parameter
+# def get_measurement_info(coretools_uid: int) -> MeasurementInfo | None:
+#     statement = """
+#         SELECT overview.uuid, datasets.sqdl_uuid, overview.scope, overview.exp_name, overview.starred, overview.completed
+#         FROM global_measurement_overview AS overview
+#         LEFT JOIN sqdl_dataset AS datasets
+#         ON overview.uuid = datasets.coretools_uid
+#         WHERE overview.uuid = %(ct-uid)s;
+#     """
+#     parameters = {
+#         "ct-uid": coretools_uid
+#     }
+#
+#     with DatabaseManager().conn_local as conn:
+#         cur = conn.cursor()
+#         cur.execute(
+#             query=statement,
+#             vars=parameters,
+#         )
+#         result = cur.fetchone()
+#
+#     if result is not None:
+#         return MeasurementInfo(*result)
+#     return None
+
+
+def execute_generic_select_query(
+        select_columns: list[str],
+        from_table: str,
+        where_equal_conditions: dict[str, Any] | None = None,
+        limit: int | None = None,
+) -> Any | None:
     """
-    parameters = {
-        "ct-uid": coretools_uid
-    }
+    Query builder for generic SELECT queries.
+
+    :param select_columns: List of column names to select.
+    :param from_table: Name of the table from which to select.
+    :param where_equal_conditions: Collection of key-value pairs used to filter
+        specified columns (keys) on containing a specific value (values).
+        Concatenated together using AND logic operator.
+    """
+
+    # basic SELECT query
+    query = sql.SQL("SELECT {fields} FROM {table} ").format(
+        fields=sql.SQL(", ").join(select_columns),
+        table=sql.Identifier(from_table)
+    )
+
+    # extend query with WHERE conditions
+    if where_equal_conditions is not None:
+        where_section = sql.SQL(" WHERE {conditions} ").format(
+            conditions=sql.SQL(" AND ").join(
+                [
+                    sql.SQL(" {key} == {placeholder} ").format(
+                        key=sql.Identifier(key),
+                        placeholder=sql.Placeholder(key)
+                    )
+                    for key
+                    in where_equal_conditions.keys()
+                ]
+            )
+        )
+        query = sql.Composed([
+            query,
+            where_section,
+        ])
+
+    # extend query with LIMIT
+    if limit is not None:
+        query = sql.Composed([
+            query,
+            sql.SQL(" LIMIT {limit_value} ").format(limit_value=limit)
+        ])
 
     with DatabaseManager().conn_local as conn:
-        cur = conn.cursor()
-        cur.execute(
-            query=statement,
-            vars=parameters,
+        cursor = conn.cursor()
+        cursor.execute(
+            query,
+            vars=where_equal_conditions,
         )
-        result = cur.fetchone()
-
-    if result is not None:
-        return MeasurementInfo(*result)
-    return None
