@@ -118,16 +118,6 @@ class Exporter:
                 is_complete=action.completed
             )
 
-            if action.id is not None:
-                # id is None for expired measurements
-                deleted = export.delete_export_action(self.connection, action)
-                if not deleted and not action.completed:
-                    # action is not deleted when dataset has been modified
-                    #  during export
-                    self.handle_modified_export(
-                        action, start_time, ds.run_timestamp
-                    )
-
             self.timer.log_times()
             logger.info(f'Exported {action.uuid}')
 
@@ -137,45 +127,57 @@ class Exporter:
                 name=ds.exp_name,
                 rating=ds.starred
             )
+
             if not data_synced:
                 logger.info("Measurement data modified during export.")
             if not table_synced:
                 logger.info("Measurement name or rating changed during export.")
 
+            if not (action.completed or (data_synced and table_synced)):
+                self.handle_modified_export(
+                    action, start_time, ds.run_timestamp
+                )
+
         except (psycopg2.Error, psycopg2.Warning):
             logger.error("Database error", exc_info=True)
+            logger.warning("REVIEW TODO: do we need to close connections?")
             time.sleep(2.0)
-            try:
-                self.connection.close()
-            except Exception:
-                pass
+            # try:
+            #     self.connection.close()
+            # except Exception:
+            #     pass
 
         except Exception as ex:
             message = str(ex)
-            sleep_time, error_code, retry_after = self.parse_exception(
+            error_code = self.parse_exception(
                 message, action
             )
 
-            # self.set_export_error(uuid, ex, error_code)
             export.set_export_error(
-                self.connection,
                 action.uuid,
                 message,
                 error_code
             )
 
-            if action.id is not None:
-                # id is None for expired measurements
-                if retry_after is not None:
-                    # self.increment_fail_count(action)
-                    export.increment_fail_count(self.connection, action)
-                    # self.set_resume_after(action, retry_after + sleep_time)
-                    export.set_resume_after(self.connection, action, retry_after + sleep_time)
-                else:
-                    # self.delete_export_action(action)
-                    export.delete_export_action(self.connection, action)
+            # -----
+            # review todo: yanked from green path, needs validation
+            data_synced, table_synced = export.set_export_synchronized(
+                action=action,
+                name=ds.exp_name,
+                rating=ds.starred
+            )
 
-            time.sleep(sleep_time)
+            if not data_synced:
+                logger.info("Measurement data modified during export.")
+            if not table_synced:
+                logger.info("Measurement name or rating changed during export.")
+
+            if not (action.completed or (data_synced and table_synced)):
+                self.handle_modified_export(
+                    action, start_time, ds.run_timestamp
+                )
+            # ----- 
+
 
         finally:
             if ds is not None:
@@ -192,7 +194,11 @@ class Exporter:
         action.resume_after = datetime.now() + timedelta(seconds=wait_time)
         self.enqueued_action = action
 
-    def parse_exception(self, message: str, action: ExportAction) -> tuple[float, int, float]:
+    def parse_exception(
+            self,
+            message: str,
+            action: ExportAction
+    ) -> tuple[int]:
         """
         Parse exception message to extract error code and establish retry delay.
 
@@ -201,53 +207,39 @@ class Exporter:
         code 99: unspecified error
         code > 100: known error and not recoverable, e.g. corrupt dataset.
         """
-        sleep_time = 0.001
         error_code = 99
-        retry_after = None
 
         if message.startswith("No scope for project"):
-            # # [x] REVIEW SdS: no scope -> Export shouldn't have started.
-            # logger.warning(message)
-            # error_code = 11
+            # [x] REVIEW SdS: no scope -> Export shouldn't have started.
             raise
 
         if message.startswith("Failed reading/writing file(s)"):
-            # # [x] REVIEW SdS: Cannot write to local disk? Fail completely.
-            # logger.warning(message)
-            # error_code = 50
-            # sleep_time = 0.5
-            # if action.fail_count < 30:
-            #     retry_after = 1.0 * action.fail_count
+            # [x] REVIEW SdS: Cannot write to local disk? Fail completely.
             raise
 
         if message.startswith("No data in dataset"):
-            # [ ] REVIEW SdS: can be ignored -> Set sync = True.
+            # [x] REVIEW SdS: can be ignored -> Set sync = True.
             # NOTE: new action will be created when data is written
             logger.warning(message)
             error_code = 101
 
         elif message.startswith("m_param with id"):
-            # [ ] REVIEW SdS: parameters not completely written. can be ignored. sync = True
+            # [x] REVIEW SdS: parameters not completely written. can be ignored. sync = True
             # NOTE: new action will be created when data is written
             logger.warning(message)
             error_code = 102
-        elif message.startswith("Dataset ") and 'too big' in message:
-            # [ ] REVIEW SdS: shouldn't happen anymore. If so: Fail completely.
-            logger.warning(message)
-            error_code = 103
-        elif "does not exist in the local/remote database" in message:
-            # [ ] REVIEW SdS: can only happen on server. Not locally. Ignore.
-            # The synchronization process has not yet finished the sync.
-            logger.warning(message)
-            error_code = 104
-        else:
-            logger.error(f'Failed to export {action.uuid}', exc_info=True)
-            self.connection.abort()
-            sleep_time = 0.5
-            if action.fail_count < 10:
-                retry_after = 5.0 + 2.0 * action.fail_count
 
-        return sleep_time, error_code, retry_after
+        elif message.startswith("Dataset ") and 'too big' in message:
+            # [x] REVIEW SdS: shouldn't happen anymore. If so: Fail completely.
+            raise
+
+        else:
+            logger.error(
+                f'Failed to export {action.uuid} with error: {message}',
+            )
+            raise
+
+        return error_code
 
     def continue_enqueued_action(self) -> bool:
         """
@@ -276,16 +268,19 @@ class Exporter:
     def get_action(self) -> ExportAction | None:
         """
         Get the next ExportAction object to handle.
+
         Objects are retrieved/created with the following priority:
         1) Enqueued actions: Continue handling the current long-running measurement.
         2) Mutated data: Export data that has recently been modified, including:
             - Currently running measurements
             - Recently finished measurements
-            - Next item in the backlog
+            - Next item in the backlog (ordered by UUID)
         3) Mutated meta-data: Export any pending name- or rating-changes.
         4) Expired exports: Re-export any measurements that have been successfully
             exported, but that have been left incomplete for extended period without
             updates.
+
+        :returns: Next export action to perform, if any exist.
         """
         if self.enqueued_action is not None:
             action = self.enqueued_action
@@ -307,7 +302,6 @@ class Exporter:
             )
 
         action = export.get_expired_export_action(
-            self.connection,
             self.measurement_expiration_time
         )
         if action is not None:
@@ -318,17 +312,18 @@ class Exporter:
 
         return None
 
-    def set_export_error(self, uuid, exception, code=99) -> None:
-        if isinstance(exception, Exception):
-            error_msg = str(exception)
-        else:
-            error_msg = f'{type(Exception)}: {str(exception)}'
-
-        self.connection.insert_or_update(
-            'coretools_exported',
-            {'uuid': uuid},
-            {'export_state': code, 'export_errors': error_msg}
-        )
+    # review todo: dead code?
+    # def set_export_error(self, uuid, exception, code=99) -> None:
+    #     if isinstance(exception, Exception):
+    #         error_msg = str(exception)
+    #     else:
+    #         error_msg = f'{type(Exception)}: {str(exception)}'
+    #
+    #     self.connection.insert_or_update(
+    #         'coretools_exported',
+    #         {'uuid': uuid},
+    #         {'export_state': code, 'export_errors': error_msg}
+    #     )
 
     def get_wait_time_not_completed(self, start_timestamp: datetime) -> int:
         now = datetime.now()

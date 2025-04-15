@@ -42,6 +42,8 @@ class MeasurementInfo:
 
 
 def get_data_for_export() -> dict | None:
+    """
+    """
     with DatabaseManager().conn_local as conn:
         c: Cursor = conn.cursor(RealDictCursor)
         c.execute(
@@ -51,7 +53,6 @@ def get_data_for_export() -> dict | None:
                 WHERE       NOT data_synchronized
                     OR      NOT table_synchronized
                 ORDER BY    data_synchronized,
-                            table_synchronized DESC,
                             uuid
                 LIMIT       1
             """
