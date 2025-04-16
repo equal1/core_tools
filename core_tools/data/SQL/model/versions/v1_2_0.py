@@ -1,9 +1,7 @@
-from core_tools.data.SQL.SQL_connection_mgr import (
-    SQL_database_manager as DatabaseManager
-)
+from psycopg2._psycopg import cursor as Cursor
 
 
-def update_to_1_2_0_from_1_1_0():
+def update_to_1_2_0_from_1_1_0(cursor: Cursor):
     """
     Special case for setups that received 1.1.0 version.
     Default should be going from 1.0.0 to 1.2.0 directly.
@@ -18,99 +16,70 @@ def update_to_1_2_0_from_1_1_0():
     #     - upload_log
     #     - database_version
 
-    with DatabaseManager() as conn:
-        cursor = conn.cursor()
-
-        cursor.execute(
-            query="""
-                CREATE TABLE IF NOT EXISTS settings (
-                    parameter TEXT UNIQUE NOT NULL,
-                    value TEXT NOT NULL
-                );
-            """
-        )
-        cursor.execute(
-            query="""
-                INSERT INTO settings
-                    ( parameter )
-                VALUES
-                    ( '1.2.0' )
-                ON CONFLICT ( parameter ) DO UPDATE
-                SET
-                    value = '1.2.0'
-            """
-        )
-        cursor.execute(
-            query="""
-                ALTER TABLE
-                    sample_info_overview
-                DROP COLUMN IF EXISTS
-                    scope
-            """
-        )
+    cursor.execute(
+        query="""
+            CREATE TABLE IF NOT EXISTS settings (
+                parameter TEXT UNIQUE NOT NULL,
+                value TEXT NOT NULL
+            )
+        """
+    )
+    cursor.execute(
+        query="""
+            ALTER TABLE
+                sample_info_overview
+            DROP COLUMN IF EXISTS
+                scope
+        """
+    )
 
 
-def update_to_1_2_0_from_1_0_0():
-    with DatabaseManager as conn:
-        cursor = conn.cursor()
+def update_to_1_2_0_from_1_0_0(cursor: Cursor):
+    cursor.execute(
+        query="""
+            CREATE TABLE IF NOT EXISTS settings (
+                parameter TEXT UNIQUE NOT NULL,
+                value TEXT NOT NULL
+            );
+        """
+    )
 
-        cursor.execute(
-            query="""
-                CREATE TABLE IF NOT EXISTS settings (
-                    parameter TEXT UNIQUE NOT NULL,
-                    value TEXT NOT NULL
-                );
-            """
-        )
+    cursor.execute(
+        query="""
+            CREATE TABLE IF NOT EXISTS coretools_exported (
+               id INT GENERATED ALWAYS AS IDENTITY,
+               uuid BIGINT NOT NULL UNIQUE,
+               path TEXT,
+               measurement_start_time timestamp, -- export raw after timeout and not completed.
+               raw_final BOOLEAN DEFAULT FALSE, -- Set when completed or after timeout.
 
-        cursor.execute(
-            query="""
-                INSERT INTO settings
-                    ( parameter )
-                VALUES
-                    ( '1.2.0' )
-                ON CONFLICT ( parameter ) DO UPDATE
-                SET
-                    value = '1.2.0'
-            """
-        )
+               -- export state
+               export_state INT DEFAULT 0, -- (0:todo, 1:done, 99: failed),
+               export_errors TEXT,
 
-        cursor.execute(
-            query="""
-                CREATE TABLE IF NOT EXISTS coretools_exported (
-                   id INT GENERATED ALWAYS AS IDENTITY,
-                   uuid BIGINT NOT NULL UNIQUE,
-                   path TEXT,
-                   measurement_start_time timestamp, -- export raw after timeout and not completed.
-                   raw_final BOOLEAN DEFAULT FALSE, -- Set when completed or after timeout.
+               PRIMARY KEY(id)
+            );
+        """
+    )
 
-                   -- export state
-                   export_state INT DEFAULT 0, -- (0:todo, 1:done, 99: failed),
-                   export_errors TEXT,
+    cursor.execute(
+        query="""
+            CREATE INDEX IF NOT EXISTS
+                coretools_exported_uuid_index
+            ON
+                coretools_exported
+            USING BTREE (
+                uuid
+            )
+        """
+    )
 
-                   PRIMARY KEY(id)
-                );
-            """
-        )
-
-        cursor.execute(
-            query="""
-                CREATE INDEX IF NOT EXISTS
-                    coretools_exported_uuid_index
-                ON
-                    coretools_exported
-                USING BTREE (
-                    uuid
-                )
-            """
-        )
-
-        cursor.execute(
-            # [x] REVIEW SdS: I think sample_info_overview.scope is never used.
-            query="""
-                ALTER TABLE
-                    global_measurement_overview
-                ADD COLUMN IF NOT EXISTS
-                    scope TEXT DEFAULT NULL
-            """
-        )
+    cursor.execute(
+        # [x] REVIEW SdS: I think sample_info_overview.scope is never used.
+        query="""
+            ALTER TABLE
+                global_measurement_overview
+            ADD COLUMN IF NOT EXISTS
+                scope TEXT DEFAULT NULL
+        """
+    )

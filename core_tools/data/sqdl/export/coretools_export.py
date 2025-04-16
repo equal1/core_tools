@@ -141,6 +141,7 @@ class Exporter:
 
         except (psycopg2.Error, psycopg2.Warning):
             logger.error("Database error", exc_info=True)
+            # review todo
             logger.warning("REVIEW TODO: do we need to close connections?")
             time.sleep(2.0)
             # try:

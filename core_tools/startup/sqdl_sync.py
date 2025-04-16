@@ -1,3 +1,4 @@
+from core_tools.startup.config import get_configuration
 from core_tools.startup.db_connection import connect_local_db
 from core_tools.startup.sample_info import set_sample_info
 from core_tools.startup.app_wrapper import run_app
@@ -10,7 +11,8 @@ def sync_init():
 
 
 def sync_main():
-    writer = SQDLSync()
+    config = get_configuration()
+    writer = SQDLSync(config)
     writer.run()
 
 

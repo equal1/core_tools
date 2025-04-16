@@ -4,6 +4,10 @@ from packaging.version import Version
 
 from core_tools.data.SQL.model.versions.v1_0_0 import initialise_v1_0_0
 from core_tools.data.SQL.model.versions.v1_1_0 import update_to_v1_1_0
+from core_tools.data.SQL.model.versions.v1_2_0 import (
+    update_to_1_2_0_from_1_0_0,
+    update_to_1_2_0_from_1_1_0
+)
 
 from psycopg2._psycopg import (
         connection as Connection,
@@ -16,28 +20,25 @@ logger = logging.getLogger(__name__)
 
 
 UpdateOperation = Callable[[Cursor], None]
+DatabaseUpdate = tuple["DatabaseVersion", UpdateOperation]
 
 
 class DatabaseVersion(Version):
     def __init__(self, version: str):
         super().__init__(version)
-        self.patch = self.micro  # staying consistent with Semantic Versioning naming convention
+        # staying consistent with Semantic Versioning naming convention
+        self.patch = self.micro
 
-    def next_patch(self):
-        return DatabaseVersion(f"{self.major}.{self.minor}.{self.patch + 1}")
-
-    def next_minor(self):
-        return DatabaseVersion(f"{self.major}.{self.minor + 1}.0")
-
-    def next_major(self):
-        return DatabaseVersion(f"{self.major + 1}.0.0")
+    def next_update(self) -> DatabaseUpdate | None:
+        return __UPDATE_PATH__.get(self)
 
 
-__REQUIRED_DATABASE_VERSION__ = DatabaseVersion("1.1.0")
+__REQUIRED_DATABASE_VERSION__ = DatabaseVersion("1.2.0")
 
 
 __UPDATE_PATH__: dict[DatabaseVersion, UpdateOperation] = {
-    DatabaseVersion("1.1.0"): update_to_v1_1_0,
+    DatabaseVersion("1.0.0"): (DatabaseVersion("1.2.0"), update_to_1_2_0_from_1_0_0, ),
+    DatabaseVersion("1.1.0"): (DatabaseVersion("1.2.0"), update_to_1_2_0_from_1_1_0, ),
 }
 
 
@@ -91,6 +92,7 @@ def get_database_version(
     return version
 
 
+# review todo: open issue about removing this check after Bruce upgrade
 def check_for_v110_case(conn: Connection) -> bool:
     try:
         with conn:
@@ -110,31 +112,31 @@ def _update_database(conn: Connection, current: DatabaseVersion) -> DatabaseVers
     return next_version
 
 
-def _check_for_database_updates(current: DatabaseVersion) -> tuple[DatabaseVersion, UpdateOperation]:
-    if current.next_patch() in __UPDATE_PATH__:
-        next_version = current.next_patch()
-    elif current.next_minor() in __UPDATE_PATH__:
-        next_version = current.next_minor()
-    elif current.next_major() in __UPDATE_PATH__:
-        next_version = current.next_major()
-    else:
+def _check_for_database_updates(current: DatabaseVersion) -> DatabaseUpdate:
+    next_update = current.next_update()
+    if next_update is None:
         raise NotImplementedError(
-            f"Unable to find a update path to version {__REQUIRED_DATABASE_VERSION__}. "
-            f"Stuck at {current}."
+            "Unable to find a update path to version "
+            f"{__REQUIRED_DATABASE_VERSION__}. Stuck at {current}."
         )
-    return next_version, __UPDATE_PATH__[next_version]
+    return next_update
 
 
-def _apply_database_update(conn: Connection, next_version: DatabaseVersion, update: UpdateOperation):
+def _apply_database_update(
+        conn: Connection,
+        next_version: DatabaseVersion,
+        update: UpdateOperation
+):
     try:
         with conn:
             c = conn.cursor()
             update(c)
             set_version_setting(c, next_version)
     except Exception as err:
-        logger.exception(
-            "Error during update. Changes are automatically rolled back to previous successful update. "
-            f"Quiting with the following error: {err}"
+        logger.error(
+            "Error during update. Changes are automatically rolled back to "
+            f"previous successful update. Quiting with the following error: {err}",
+            exc_info=True
         )
         raise err
 
@@ -145,16 +147,19 @@ def get_version_setting(cursor: Cursor) -> str:
             SELECT value FROM settings WHERE parameter = '_version'
         """
     )
-    return cursor.fetchone()
+    return cursor.fetchone()[0]
 
 
 def set_version_setting(cursor: Cursor, version: DatabaseVersion):
     cursor.execute(
         """
-            INSERT OR REPLACE INTO
+            INSERT INTO
                 settings (parameter, value)
             VALUES
-                ('_version', ?)
+                ('_version', %(version)s)
+            ON CONFLICT (parameter) DO UPDATE
+            SET
+                value = %(version)s
         """,
-        (version.__repr__(), ),
+        {"version": version.__str__()},
     )
