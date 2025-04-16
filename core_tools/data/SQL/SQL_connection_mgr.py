@@ -1,7 +1,5 @@
 import logging
 
-from core_tools.data.SQL.versioning import local_database_update_routine
-
 from .connect import SQL_conn_info_local, SQL_conn_info_remote
 from .db_connections import connect_local_db, connect_remote_db
 from .queries.dataset_creation_queries import (
@@ -9,6 +7,7 @@ from .queries.dataset_creation_queries import (
     measurement_overview_queries,
     measurement_parameters_queries
 )
+from .model.version import local_database_update_routine
 
 # import for backwards campatibility of old scripts.
 from core_tools.data.SQL.SQL_sync_manager import SQL_sync_manager

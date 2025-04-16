@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -9,6 +10,9 @@ from core_tools.data.SQL.SQL_connection_mgr import (
 from psycopg2._psycopg import connection as Connection, cursor as Cursor
 from psycopg2.extras import RealDictCursor
 from psycopg2 import sql
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -197,16 +201,23 @@ def get_failed_exports() -> list[tuple[int, bool]]:
 
 # review todo: add generic 'get X from Y for Z' query option
 # covers both get_scope and get_measurement_info implementations
-def get_measurement_scope(coretools_uid: int) -> str | None:
+def get_measurement_scope(uid: int) -> dict[str, str] | None:
+    """
+    Get a measurements scope and project values.
+
+    :param uid: Measurement UID from the core-tools database.
+    :returns: A dictionary containing scope and project parameters, if the
+        measurement exists.
+    """
     statement = """
-        SELECT scope FROM global_measurement_overview WHERE uuid = %(ct-uid)s;
+        SELECT scope, project FROM global_measurement_overview WHERE uuid = %(ct-uid)s;
     """
     parameters = {
-        "ct-uid": coretools_uid
+        "ct-uid": uid
     }
 
     with DatabaseManager().conn_local as conn:
-        cur = conn.cursor()
+        cur = conn.cursor(RealDictCursor)
         cur.execute(
             query=statement,
             vars=parameters

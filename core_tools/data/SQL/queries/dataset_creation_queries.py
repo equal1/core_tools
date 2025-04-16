@@ -7,8 +7,9 @@ from core_tools.data.SQL.SQL_common_commands import execute_statement, execute_q
 from core_tools.data.SQL.SQL_common_commands import insert_row_in_table, update_table
 
 from core_tools.data.SQL.SQL_utility import generate_uuid
+
 from core_tools.data.SQL.connect import sample_info
-from core_tools.data.SQL.versioning import get_database_version, DatabaseVersion
+from core_tools.data.SQL.model.version import get_database_version, DatabaseVersion
 
 
 def is_valid_info(arg):

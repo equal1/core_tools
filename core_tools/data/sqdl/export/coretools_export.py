@@ -40,6 +40,7 @@ class Exporter:
     def __init__(self, cfg: dict[str, Any]):
         base_path = cfg.get('sqdl_sync.base_path', "~/.sqdl")
         self.export_path = f"{base_path}/export"
+        self.scope_config_for_project = {cfg["project"]: cfg.get("scope")}
         self.connection = DatabaseManager().conn_local
 
         self.no_action_count = 0
@@ -176,8 +177,7 @@ class Exporter:
                 self.handle_modified_export(
                     action, start_time, ds.run_timestamp
                 )
-            # ----- 
-
+            # -----
 
         finally:
             if ds is not None:
@@ -375,10 +375,30 @@ class Exporter:
                     return False
         return True
 
-    def get_scope(self, coretools_uid: int) -> str:
-        scope = export.get_measurement_scope(coretools_uid)
+    def get_scope(self, uid: int) -> str:
+        """
+        Retrieve scope value for measurement.
+        If no scope is defined in the core-tools database, check if the project
+        name matches the current config, and extract scope from there.
+
+        :param uid: Measurement UID.
+        :returns: Scope name.
+        :raises Exception: If no scope is found.
+        """
+        response = export.get_measurement_scope(uid)
+        assert response is not None, f"Unreachable: No measurement with UID '{uid}'"
+
+        scope = response["scope"]
         if scope is None:
-            raise Exception(f"No scope for measurement with ID '{coretools_uid}'")
+            logger.warning(
+                f"No scope value found for measurement with ID {uid}, "
+                "checking local config for a matching project name with scope."
+            )
+            project_name = response["project"]
+            scope = self.scope_config_for_project.get(project_name)
+
+        if scope is None:
+            raise Exception(f"No scope for measurement with ID '{uid}'")
         return scope
 
     def export_measurement(self, measurement: DataSet, is_complete: bool
@@ -396,6 +416,7 @@ class Exporter:
             )
         except OSError:
             logger.error("Failed reading/writing file(s)", exc_info=True)
+            # review todo: add custom exception
             raise Exception("Failed reading/writing file(s)")
 
         if updates.upload_dataset:

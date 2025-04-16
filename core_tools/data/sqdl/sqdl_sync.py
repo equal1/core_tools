@@ -4,12 +4,10 @@ import logging
 import datetime
 
 from core_tools.data.SQL.SQL_connection_mgr import SQL_database_manager as DatabaseManager
-from core_tools.data.SQL.versioning import get_database_version
+from core_tools.data.SQL.model.settings import get_database_version
 from core_tools.data.sqdl.export.coretools_export import Exporter
 
 from sqdl_uploader import SqdlUploader
-
-__database_version__ = "1.1.0"
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +29,7 @@ class SQDLSync():
             raise Exception(
                 "Local database setup is a requirement for SQDL Sync, but no local configuration has been found."
             )
-        self.validate_version()
+        get_database_version(assert_requirement=True)
 
         base_path = config.get("sqdl_sync.base_path", "~/.sqdl")
         self.base_path = os.path.expanduser(base_path)
@@ -142,12 +140,6 @@ class SQDLSync():
     #         changed_rating=info.starred != (dataset.rating > 0)
     #     )
     #     return sync_status
-
-    def validate_version(self) -> None:
-        """
-        Assert that the local database version matches requirements.
-        """
-        get_database_version(assert_requirement=True)
 
     def sleep_to_limit_rate(self) -> None:
         """
