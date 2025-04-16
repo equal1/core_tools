@@ -72,8 +72,11 @@ def get_database_version(
     except PGError as err:
         if err.pgcode == "42P01":
             # 42P01 is the psycopg2 error code for UndefinedTable
-            logger.error("No table 'settings' found, returning v0.0.0")
-            version = DatabaseVersion("0.0.0")
+            if check_for_v110_case(connection):
+                version = DatabaseVersion("1.1.0")
+            else:
+                version = DatabaseVersion("0.0.0")
+                logger.warning("No table 'settings' found, returning v0.0.0")
         else:
             raise err
 
@@ -86,6 +89,17 @@ def get_database_version(
         assert version == __REQUIRED_DATABASE_VERSION__, message
 
     return version
+
+
+def check_for_v110_case(conn: Connection) -> bool:
+    try:
+        with conn:
+            conn.cursor().execute("SELECT * FROM database_version")
+    except PGError as err:
+        if err.pgcode == "42P01":
+            return False
+        raise err
+    return True
 
 
 def _update_database(conn: Connection, current: DatabaseVersion) -> DatabaseVersion:
