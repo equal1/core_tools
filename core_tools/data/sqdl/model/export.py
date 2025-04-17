@@ -67,14 +67,21 @@ def get_data_for_export() -> dict | None:
 
 def set_export_synchronized(action: ExportAction, name: str, rating: bool) -> tuple[bool, bool]:
     """
-    Register data and meta-data as synchronized if their values have not changed since Export start.
+    Register data and meta-data as synchronized if their values have not changed
+    since Export start.
+
+    :param action: The export action to resolve.
+    :param name: The measurement name to be updated.
+    :param rating: The measurement rating to be updated.
+    :returns: Two boolean values, indicating successful synchronization for data
+        and metadata, respectively.
     """
     with DatabaseManager().conn_local as conn:
         c: Cursor = conn.cursor()
         c.execute(
             query="""
                 UPDATE  global_measurement_overview
-                SET     data_synchronization = TRUE
+                SET     data_synchronized = TRUE
                 WHERE   uuid = %(uid)s
                     AND data_update_count = %(update_count)s
             """,

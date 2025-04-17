@@ -118,12 +118,19 @@ def export_data(ds, scope, path, timer, updates, write_raw=True):
     if os.path.exists(metadata_path):
         with open(metadata_path) as fp:
             old_info = json.load(fp)
+
         if old_info['name'] != ds.name:
             updates.update_name = True
             old_info['name'] = ds.name
-        if old_info['starred'] != ds.starred:
-            updates.update_star = True
-            old_info['starred'] = ds.starred
+
+        try:
+            if old_info['starred'] != ds.starred:
+                updates.update_star = True
+                old_info['starred'] = ds.starred
+        except KeyError:
+            if bool(old_info['rating']) != ds.starred:
+                updates.update_star = True
+                old_info['rating'] = 1 if ds.starred else 0
     else:
         updates.upload_dataset = True
 

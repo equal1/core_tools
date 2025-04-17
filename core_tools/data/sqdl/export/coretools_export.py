@@ -1,10 +1,12 @@
 import gc
+import json
 import logging
 import psutil
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
+from pathlib import Path
 
 import numpy as np
 import psycopg2
@@ -41,7 +43,6 @@ class Exporter:
         base_path = cfg.get('sqdl_sync.base_path', "~/.sqdl")
         self.export_path = f"{base_path}/export"
         self.scope_config_for_project = {cfg["project"]: cfg.get("scope")}
-        self.connection = DatabaseManager().conn_local
 
         self.no_action_count = 0
         self.loop_count = 0
@@ -69,7 +70,6 @@ class Exporter:
 
         if self.loop_count % 1_000 == 0:
             logger.info("Close database connection to free memory")
-            self.connection.close()
             unreachable = gc.collect()
             logger.info(
                 f"GC2 unreachable: {unreachable} "
@@ -113,7 +113,6 @@ class Exporter:
             self.add_sqdl_update(sqdl_update, ds_path)
 
             export.set_exported(
-                self.connection,
                 ds,
                 ds_path,
                 is_complete=action.completed
@@ -199,7 +198,7 @@ class Exporter:
             self,
             message: str,
             action: ExportAction
-    ) -> tuple[int]:
+    ) -> int:
         """
         Parse exception message to extract error code and establish retry delay.
 
@@ -207,36 +206,26 @@ class Exporter:
         code 50 - 90: known error and retry
         code 99: unspecified error
         code > 100: known error and not recoverable, e.g. corrupt dataset.
+
+        :param message: Raised error message.
+        :param action: The current export action being handled.
+        :returns: Identified error code.
         """
         error_code = 99
 
-        if message.startswith("No scope for project"):
-            # [x] REVIEW SdS: no scope -> Export shouldn't have started.
-            raise
-
-        if message.startswith("Failed reading/writing file(s)"):
-            # [x] REVIEW SdS: Cannot write to local disk? Fail completely.
-            raise
-
         if message.startswith("No data in dataset"):
-            # [x] REVIEW SdS: can be ignored -> Set sync = True.
             # NOTE: new action will be created when data is written
             logger.warning(message)
             error_code = 101
 
         elif message.startswith("m_param with id"):
-            # [x] REVIEW SdS: parameters not completely written. can be ignored. sync = True
             # NOTE: new action will be created when data is written
             logger.warning(message)
             error_code = 102
-
-        elif message.startswith("Dataset ") and 'too big' in message:
-            # [x] REVIEW SdS: shouldn't happen anymore. If so: Fail completely.
-            raise
-
         else:
             logger.error(
                 f'Failed to export {action.uuid} with error: {message}',
+                exc_info=True,
             )
             raise
 
@@ -249,10 +238,8 @@ class Exporter:
 
         :returns: Confirmation to resume action.
         """
-        if self.enqueued_action is None:
-            return True
-
-        if self.enqueued_action.resume_after < datetime.now():
+        if (self.enqueued_action is None
+                or self.enqueued_action.resume_after < datetime.now()):
             return True
 
         # resume early if the measurement is finished
@@ -288,17 +275,17 @@ class Exporter:
             self.enqueued_action = None
             return action
 
-        export_data = export.get_data_for_export()
-        if export_data is not None:
+        export_entry = export.get_data_for_export()
+        if export_entry is not None:
             # changes can be false if no local export exists yet
-            changed_rating, changed_name = self.check_for_export_files(export_data)
+            changed_rating, changed_name = self.check_for_export_files(export_entry)
             return ExportAction(
-                uuid=export_data["uuid"],
-                data_changed=not export_data["data_synchronized"],
-                completed=export_data["completed"],
+                uuid=export_entry["uuid"],
+                data_changed=not export_entry["data_synchronized"],
+                completed=export_entry["completed"],
                 update_name=changed_name,
                 update_star=changed_rating,
-                data_modify_count=export_data["data_update_count"],
+                data_modify_count=export_entry["data_update_count"],
                 resume_after=None,
             )
 
@@ -312,6 +299,30 @@ class Exporter:
             return action
 
         return None
+
+    def check_for_export_files(self, export_entry: dict[str, Any]):
+        # get local path
+        file_path = Path(
+            self.export_path,
+            export_entry["project"],
+            export_entry["start_time"].strftime("%y-%m-%d"),
+            f"{export_entry["uuid"]}",
+            f"{export_entry["uuid"]}.json"
+        )
+
+        logger.info(f"checking for previous export: path = {file_path}")
+
+        if not file_path.exists():
+            logger.warning("no previous export found")
+            return False, False
+
+        with open(file_path) as f:
+            local_data = json.load(f)
+
+        name_changed = export_entry["exp_name"] != local_data.get("name", "")
+        rating_changed = export_entry["starred"] != local_data.get("starred", False)
+
+        return name_changed, rating_changed
 
     # review todo: dead code?
     # def set_export_error(self, uuid, exception, code=99) -> None:

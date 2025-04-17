@@ -8,9 +8,9 @@ def main():
     for r in records:
         ds = load_by_uuid(r.uuid)
         print("--- new dataset ---")
-        print("dataset name: {}".format(ds.exp_name))
-        print("dataset uuid: {}".format(ds.exp_uuid))
-        print("dataset timestamp: {}".format(ds.run_timestamp))
+        print(f"dataset name: {ds.exp_name}")
+        print(f"dataset uuid: {ds.exp_uuid}")
+        print(f"dataset timestamp: {ds.run_timestamp}")
 
 
 if __name__ == "__main__":
