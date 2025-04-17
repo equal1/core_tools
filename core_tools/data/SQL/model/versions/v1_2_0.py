@@ -75,7 +75,6 @@ def update_to_1_2_0_from_1_0_0(cursor: Cursor):
     )
 
     cursor.execute(
-        # [x] REVIEW SdS: I think sample_info_overview.scope is never used.
         query="""
             ALTER TABLE
                 global_measurement_overview

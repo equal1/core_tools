@@ -34,17 +34,6 @@ class ExportAction:
     data_modify_count: int = 0
 
 
-@dataclass
-class MeasurementInfo:
-    coretools_uid: int
-    sqdl_uuid: str
-
-    scope: str
-    experiment_name: str
-    starred: bool
-    completed: bool
-
-
 def get_data_for_export() -> dict | None:
     """
     """
@@ -248,32 +237,6 @@ def get_measurement_completed(uid: int) -> bool | None:
         )
         result = cursor.fetchone()
     return result
-
-
-# review todo: only used for completed parameter
-# def get_measurement_info(coretools_uid: int) -> MeasurementInfo | None:
-#     statement = """
-#         SELECT overview.uuid, datasets.sqdl_uuid, overview.scope, overview.exp_name, overview.starred, overview.completed
-#         FROM global_measurement_overview AS overview
-#         LEFT JOIN sqdl_dataset AS datasets
-#         ON overview.uuid = datasets.coretools_uid
-#         WHERE overview.uuid = %(ct-uid)s;
-#     """
-#     parameters = {
-#         "ct-uid": coretools_uid
-#     }
-#
-#     with DatabaseManager().conn_local as conn:
-#         cur = conn.cursor()
-#         cur.execute(
-#             query=statement,
-#             vars=parameters,
-#         )
-#         result = cur.fetchone()
-#
-#     if result is not None:
-#         return MeasurementInfo(*result)
-#     return None
 
 
 def execute_generic_select_query(

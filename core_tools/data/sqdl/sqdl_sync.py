@@ -36,7 +36,6 @@ class SQDLSync():
         self.base_path = os.path.expanduser(base_path)
         os.makedirs(self.base_path, exist_ok=True)
         os.makedirs(f"{self.base_path}/export", exist_ok=True)
-        # review todo: make sure that uploader files are also created
 
         self.exporter = Exporter(config)
         self.uploader = SqdlUploader(config)
@@ -66,7 +65,7 @@ class SQDLSync():
             )
 
         finally:
-            self.uploader.disconnect_sqdl_client()
+            self.uploader.shut_down()
             logger.info("Stopping SQDL Writer event loop...")
 
     def sleep_to_limit_rate(self) -> None:

@@ -83,16 +83,15 @@ class Exporter:
         self.timer = Timer()
         self.timer.time('query actions')
 
-        # review todo: check name and loop flow
-        if not self.continue_enqueued_action():
-            return True
-
-        action = self.get_action()
-        if not action:
-            return False
-
         ds = None
         try:
+            if not self.continue_enqueued_action():
+                return True
+
+            action = self.get_action()
+            if not action:
+                return False
+
             start_time = time.perf_counter()
             self.timer.time('load')
             ds: DataSet = load_by_uuid(action.uuid)
@@ -121,7 +120,6 @@ class Exporter:
             self.timer.log_times()
             logger.info(f'Exported {action.uuid}')
 
-            # review todo: check if export is now synced
             data_synced, table_synced = export.set_export_synchronized(
                 action=action,
                 name=ds.exp_name,
@@ -140,13 +138,7 @@ class Exporter:
 
         except (psycopg2.Error, psycopg2.Warning):
             logger.error("Database error", exc_info=True)
-            # review todo
-            logger.warning("REVIEW TODO: do we need to close connections?")
             time.sleep(2.0)
-            # try:
-            #     self.connection.close()
-            # except Exception:
-            #     pass
 
         except Exception as ex:
             message = str(ex)
@@ -323,19 +315,6 @@ class Exporter:
 
         return name_changed, rating_changed
 
-    # review todo: dead code?
-    # def set_export_error(self, uuid, exception, code=99) -> None:
-    #     if isinstance(exception, Exception):
-    #         error_msg = str(exception)
-    #     else:
-    #         error_msg = f'{type(Exception)}: {str(exception)}'
-    #
-    #     self.connection.insert_or_update(
-    #         'coretools_exported',
-    #         {'uuid': uuid},
-    #         {'export_state': code, 'export_errors': error_msg}
-    #     )
-
     def get_wait_time_not_completed(self, start_timestamp: datetime) -> int:
         now = datetime.now()
         measurement_duration = now - start_timestamp
@@ -427,7 +406,6 @@ class Exporter:
             )
         except OSError:
             logger.error("Failed reading/writing file(s)", exc_info=True)
-            # review todo: add custom exception
             raise Exception("Failed reading/writing file(s)")
 
         if updates.upload_dataset:

@@ -87,9 +87,10 @@ def _configure_logging(cfg, app_name):
     file_handler.setLevel(file_level)
     file_handler.setFormatter(logging.Formatter(file_format))
     root_logger.addHandler(file_handler)
+
     # Logging to stderr is only active until detach.
     stream_handler = logging.StreamHandler(stream=sys.stderr)
-    stream_handler.setLevel("INFO") # TODO: Change to WARNING?
+    stream_handler.setLevel("INFO")
     stream_handler.setFormatter(logging.Formatter(file_format))
     root_logger.addHandler(stream_handler)
 
