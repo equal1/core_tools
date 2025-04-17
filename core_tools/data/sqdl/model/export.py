@@ -49,7 +49,7 @@ def get_data_for_export() -> dict | None:
     """
     """
     with DatabaseManager().conn_local as conn:
-        c: Cursor = conn.cursor(RealDictCursor)
+        c: Cursor = conn.cursor(cursor_factory=RealDictCursor)
         c.execute(
             query="""
                 SELECT      *
@@ -217,7 +217,7 @@ def get_measurement_scope(uid: int) -> dict[str, str] | None:
     }
 
     with DatabaseManager().conn_local as conn:
-        cur = conn.cursor(RealDictCursor)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
         cur.execute(
             query=statement,
             vars=parameters
