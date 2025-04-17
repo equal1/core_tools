@@ -305,10 +305,9 @@ class Exporter:
         file_path = Path(
             self.export_path,
             export_entry["project"],
-            export_entry["start_time"].strftime("%y-%m-%d"),
-            f"{export_entry["uuid"]}",
-            f"{export_entry["uuid"]}.json"
-        )
+            export_entry["start_time"].strftime("%Y-%m-%d"),
+            f"{export_entry["uuid"]}"
+        ).expanduser()
 
         logger.info(f"checking for previous export: path = {file_path}")
 
@@ -316,7 +315,7 @@ class Exporter:
             logger.warning("no previous export found")
             return False, False
 
-        with open(file_path) as f:
+        with open(Path(file_path, f"{export_entry["uuid"]}.json")) as f:
             local_data = json.load(f)
 
         name_changed = export_entry["exp_name"] != local_data.get("name", "")
