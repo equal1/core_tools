@@ -152,24 +152,14 @@ class Exporter:
                 error_code
             )
 
-            # -----
-            # review todo: yanked from green path, needs validation
-            data_synced, table_synced = export.set_export_synchronized(
+            # Note: Tick off failed export as synced, so that it does not get stuck
+            #  on one particular entry. When new data is added, the exporter will
+            #  try again.
+            export.set_export_synchronized(
                 action=action,
                 name=ds.exp_name,
                 rating=ds.starred
             )
-
-            if not data_synced:
-                logger.info("Measurement data modified during export.")
-            if not table_synced:
-                logger.info("Measurement name or rating changed during export.")
-
-            if not (action.completed or (data_synced and table_synced)):
-                self.handle_modified_export(
-                    action, start_time, ds.run_timestamp
-                )
-            # -----
 
         finally:
             if ds is not None:
