@@ -42,7 +42,8 @@ class Exporter:
     def __init__(self, cfg: dict[str, Any]):
         base_path = cfg.get('sqdl_sync.base_path', "~/.sqdl")
         self.export_path = f"{base_path}/export"
-        self.scope_config_for_project = {cfg["project"]: cfg.get("scope")}
+        self.project = cfg["project"]
+        self.scope = cfg.get("scope")
 
         self.no_action_count = 0
         self.loop_count = 0
@@ -79,6 +80,11 @@ class Exporter:
 
     def export_one(self):
         """
+        Core exporter loop. Identifies which dataset to handle, exports it to the
+        local filesystem, then queues the sQDL Uploader to move these exported files
+        to an sQDL backend.
+
+        :raise Exception: Any unforseen or fatal error-cases.
         """
         self.timer = Timer()
         self.timer.time('query actions')
@@ -192,6 +198,7 @@ class Exporter:
         :param message: Raised error message.
         :param action: The current export action being handled.
         :returns: Identified error code.
+        :raises Exception: Any unidentified or fatal error-cases.
         """
         error_code = 99
 
@@ -257,7 +264,7 @@ class Exporter:
             self.enqueued_action = None
             return action
 
-        export_entry = export.get_data_for_export()
+        export_entry = export.get_data_for_export(self.project)
         if export_entry is not None:
             # changes can be false if no local export exists yet
             changed_rating, changed_name = self.check_for_export_files(export_entry)
@@ -374,8 +381,8 @@ class Exporter:
                 f"No scope value found for measurement with ID {uid}, "
                 "checking local config for a matching project name with scope."
             )
-            project_name = response["project"]
-            scope = self.scope_config_for_project.get(project_name)
+            if response["project"] == self.project:
+                scope = self.scope
 
         if scope is None:
             raise Exception(f"No scope for measurement with ID '{uid}'")

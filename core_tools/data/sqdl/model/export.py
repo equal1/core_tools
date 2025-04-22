@@ -34,7 +34,7 @@ class ExportAction:
     data_modify_count: int = 0
 
 
-def get_data_for_export() -> dict | None:
+def get_data_for_export(project: str) -> dict | None:
     """
     """
     with DatabaseManager().conn_local as conn:
@@ -43,12 +43,22 @@ def get_data_for_export() -> dict | None:
             query="""
                 SELECT      *
                 FROM        global_measurement_overview
-                WHERE       NOT data_synchronized
-                    OR      NOT table_synchronized
+                WHERE       (
+                                NOT data_synchronized
+                                OR
+                                NOT table_synchronized
+                            ) AND (
+                                scope IS NOT NULL
+                                OR
+                                project = %(current_project)s
+                            )
                 ORDER BY    data_synchronized,
                             uuid
                 LIMIT       1
-            """
+            """,
+            vars={
+                "current_project": project
+            }
         )
         result = c.fetchone()
     return result
