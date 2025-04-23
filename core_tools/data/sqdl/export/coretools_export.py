@@ -84,7 +84,7 @@ class Exporter:
         local filesystem, then queues the sQDL Uploader to move these exported files
         to an sQDL backend.
 
-        :raise Exception: Any unforseen or fatal error-cases.
+        :raise Exception: Only unforseen or fatal error-cases.
         """
         self.timer = Timer()
         self.timer.time('query actions')
@@ -108,7 +108,6 @@ class Exporter:
             action.completed = (
                 action.completed
                 or self.measurement_is_completed(ds)
-                or ds.run_timestamp < self.measurement_expiration_time
             )
             sqdl_update, ds_path = self.export_measurement(ds, action.completed)
 
@@ -347,7 +346,7 @@ class Exporter:
 
     @property
     def measurement_expiration_time(self):
-        return datetime.now() - timedelta(days=3)
+        return datetime.now() - timedelta(days=1)
 
     def measurement_is_completed(self, measurement):
         if measurement.completed:

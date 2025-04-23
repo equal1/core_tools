@@ -32,6 +32,20 @@ def update_to_1_2_0_from_1_1_0(cursor: Cursor):
                 scope
         """
     )
+    cursor.execute(
+        query="""
+            ALTER TABLE     coretools_exported
+            RENAME COLUMN   raw_final
+            TO              make_data_immutable
+        """
+    )
+    cursor.execute(
+        query="""
+            ALTER TABLE     coretools_exported
+            RENAME COLUMN   measurement_start_time
+            TO              most_recent_update_time
+        """
+    )
 
 
 def update_to_1_2_0_from_1_0_0(cursor: Cursor):
@@ -50,8 +64,8 @@ def update_to_1_2_0_from_1_0_0(cursor: Cursor):
                id INT GENERATED ALWAYS AS IDENTITY,
                uuid BIGINT NOT NULL UNIQUE,
                path TEXT,
-               measurement_start_time timestamp, -- export raw after timeout and not completed.
-               raw_final BOOLEAN DEFAULT FALSE, -- Set when completed or after timeout.
+               most_recent_update_time timestamp, -- export raw after timeout and not completed.
+               make_data_immutable BOOLEAN DEFAULT FALSE, -- Set when completed or after timeout.
 
                -- export state
                export_state INT DEFAULT 0, -- (0:todo, 1:done, 99: failed),

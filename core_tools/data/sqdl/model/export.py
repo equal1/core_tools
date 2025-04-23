@@ -112,8 +112,8 @@ def get_expired_export_action(expiration_time: datetime) -> ExportAction | None:
     query = """
         SELECT      uuid
         FROM        coretools_exported
-        WHERE       raw_final = False
-            AND     measurement_start_time < %(expiration_time)s
+        WHERE       make_data_immutable = False
+            AND     most_recent_update_time < %(expiration_time)s
             AND     export_state = 1
         ORDER BY    uuid
         LIMIT       1
@@ -130,7 +130,7 @@ def get_expired_export_action(expiration_time: datetime) -> ExportAction | None:
 
 def set_exported(measurement, path: str, is_complete: bool = False) -> None:
     uuid = measurement.exp_uuid
-    start_time = measurement.run_timestamp
+    update_time = datetime.now()
     completed = measurement.completed or is_complete
 
     with DatabaseManager().conn_local as conn:
@@ -138,24 +138,30 @@ def set_exported(measurement, path: str, is_complete: bool = False) -> None:
         cursor.execute(
             query="""
                 INSERT INTO coretools_exported
-                    ( uuid, measurement_start_time, path, export_state, raw_final )
+                    (
+                        uuid, most_recent_update_time, path, export_state,
+                        make_data_immutable
+                    )
                 VALUES
-                    ( %(uuid)s, %(start_time)s, %(path)s, %(export_state)s, %(raw_final)s )
+                    (
+                        %(uuid)s, %(update_time)s, %(path)s, %(export_state)s,
+                        %(completed)s
+                    )
                 ON CONFLICT (uuid) DO UPDATE
                 SET
                     uuid = %(uuid)s,
-                    measurement_start_time = %(start_time)s,
+                    most_recent_update_time = %(update_time)s,
                     path = %(path)s,
                     export_state = %(export_state)s,
-                    raw_final = %(raw_final)s
+                    make_data_immutable = %(completed)s
 
             """,
             vars={
                 "uuid": uuid,
-                "start_time": start_time,
+                "update_time": update_time,
                 "path": path,
                 "export_state": 1,
-                "raw_final": completed,
+                "completed": completed,
             }
         )
 
@@ -186,7 +192,7 @@ def set_export_error(uuid, message, code=99) -> None:
 
 def get_failed_exports() -> list[tuple[int, bool]]:
     query = """
-        SELECT uuid, raw_final
+        SELECT uuid, make_data_immutable
         FROM coretools_exported
         WHERE export_state BETWEEN 10 AND 100
         ORDER BY uuid
