@@ -205,8 +205,6 @@ def get_failed_exports() -> list[tuple[int, bool]]:
     return records
 
 
-# review todo: add generic 'get X from Y for Z' query option
-# covers both get_scope and get_measurement_info implementations
 def get_measurement_scope(uid: int) -> dict[str, str] | None:
     """
     Get a measurements scope and project values.
@@ -215,54 +213,85 @@ def get_measurement_scope(uid: int) -> dict[str, str] | None:
     :returns: A dictionary containing scope and project parameters, if the
         measurement exists.
     """
-    statement = """
-        SELECT scope, project FROM global_measurement_overview WHERE uuid = %(ct-uid)s;
-    """
     parameters = {
-        "ct-uid": uid
+        "uuid": uid
     }
-
-    with DatabaseManager().conn_local as conn:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        cur.execute(
-            query=statement,
-            vars=parameters
-        )
-        result = cur.fetchone()
+    query = build_generic_select_query(
+        select_columns=["scope", "project"],
+        from_table="global_measurement_overview",
+        where_equal_conditions=parameters,
+    )
+    result = fetch_query_single(
+        query=query,
+        vars=parameters,
+        factory=RealDictCursor,
+    )
+    # statement = """
+    #     SELECT scope, project FROM global_measurement_overview WHERE uuid = %(ct-uid)s;
+    # """
+    # parameters = {
+    #     "ct-uid": uid
+    # }
+    #
+    # with DatabaseManager().conn_local as conn:
+    #     cur = conn.cursor(cursor_factory=RealDictCursor)
+    #     cur.execute(
+    #         query=statement,
+    #         vars=parameters
+    #     )
+    #     result = cur.fetchone()
     return result
 
 
-# review todo: replace with generated select query
 def get_measurement_completed(uid: int) -> bool | None:
-    statement = """
-            SELECT completed FROM global_measurement_overview WHERE uuid = %(uid)s
-        """
-    with DatabaseManager().conn_local as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            statement,
-            vars={
-                "uid": uid
-            }
-        )
-        result = cursor.fetchone()
+    parameters = {
+        "uuid": uid
+    }
+    query = build_generic_select_query(
+        select_columns=["completed"],
+        from_table="global_measurement_overview",
+        where_equal_conditions=parameters,
+    )
+    result = fetch_query_single(
+        query=query,
+        vars=parameters,
+    )
+
+    # statement = """
+    #         SELECT completed FROM global_measurement_overview WHERE uuid = %(uid)s
+    #     """
+    # with DatabaseManager().conn_local as conn:
+    #     cursor = conn.cursor()
+    #     cursor.execute(
+    #         statement,
+    #         vars={
+    #             "uid": uid
+    #         }
+    #     )
+    #     result = cursor.fetchone()
     return result
 
 
-def execute_generic_select_query(
+def build_generic_select_query(
         select_columns: list[str],
         from_table: str,
+        where_logic_operator: str = "and",
         where_equal_conditions: dict[str, Any] | None = None,
+        order_by: list[str] | None = None,
         limit: int | None = None,
-) -> Any | None:
+) -> sql.SQL:
     """
     Query builder for generic SELECT queries.
 
     :param select_columns: List of column names to select.
     :param from_table: Name of the table from which to select.
+    :param where_logic_operator: Instruction on how to concatenate multiple where
+        conditions. Can be 'OR' or 'AND', method argument in case-insensitive.
     :param where_equal_conditions: Collection of key-value pairs used to filter
         specified columns (keys) on containing a specific value (values).
         Concatenated together using AND logic operator.
+    :param limit: Maximum number of elements to return from the query.
+    :returns: Composed SQL query.
     """
 
     # basic SELECT query
@@ -273,8 +302,13 @@ def execute_generic_select_query(
 
     # extend query with WHERE conditions
     if where_equal_conditions is not None:
+        assert_message = "WHERE consitions must be concatinated by either OR or AND"
+        assert where_logic_operator.upper() in ["OR", "AND"], assert_message
+
         where_section = sql.SQL(" WHERE {conditions} ").format(
-            conditions=sql.SQL(" AND ").join(
+            conditions=sql.SQL(" {operator} ").format(
+                operator=where_logic_operator.upper()
+            ).join(
                 [
                     sql.SQL(" {key} == {placeholder} ").format(
                         key=sql.Identifier(key),
@@ -290,6 +324,15 @@ def execute_generic_select_query(
             where_section,
         ])
 
+    # extend query with ORDER BY
+    if order_by is not None:
+        query = sql.Composed([
+            query,
+            sql.SQL(" ORDER BY {ordering} ").format(
+                ordering=sql.SQL(", ").join(order_by)
+            )
+        ])
+
     # extend query with LIMIT
     if limit is not None:
         query = sql.Composed([
@@ -297,9 +340,43 @@ def execute_generic_select_query(
             sql.SQL(" LIMIT {limit_value} ").format(limit_value=limit)
         ])
 
+    return query
+
+
+def fetch_query_single(
+        query: sql.SQL,
+        vars: dict[str, Any] | None = None,
+        factory: Any | None = None,
+) -> Any | None:
+    """
+    """
+    if vars is None:
+        vars = {}
     with DatabaseManager().conn_local as conn:
-        cursor = conn.cursor()
+        cursor = conn.cursor(cursor_factory=factory)
         cursor.execute(
             query,
-            vars=where_equal_conditions,
+            vars=vars,
         )
+        result = cursor.fetchone()
+    return result
+
+
+def fetch_query_all(
+        query: sql.SQL,
+        vars: dict[str, Any] | None = None,
+        factory: Any = None,
+) -> list[Any]:
+    """
+    """
+    if vars is None:
+        vars = {}
+
+    with DatabaseManager().conn_local as conn:
+        cursor = conn.cursor(cursor_factory=factory)
+        cursor.execute(
+            query,
+            vars=vars,
+        )
+        result = cursor.fetchall()
+    return result
