@@ -7,7 +7,7 @@ from core_tools.data.SQL.SQL_connection_mgr import (
     SQL_database_manager as DatabaseManager
 )
 
-from psycopg2._psycopg import connection as Connection, cursor as Cursor
+from psycopg2._psycopg import cursor as Cursor
 from psycopg2.extras import RealDictCursor
 from psycopg2 import sql
 
@@ -37,30 +37,29 @@ class ExportAction:
 def get_data_for_export(project: str) -> dict | None:
     """
     """
-    with DatabaseManager().conn_local as conn:
-        c: Cursor = conn.cursor(cursor_factory=RealDictCursor)
-        c.execute(
-            query="""
-                SELECT      *
-                FROM        global_measurement_overview
-                WHERE       (
-                                NOT data_synchronized
-                                OR
-                                NOT table_synchronized
-                            ) AND (
-                                scope IS NOT NULL
-                                OR
-                                project = %(current_project)s
-                            )
-                ORDER BY    data_synchronized,
-                            uuid
-                LIMIT       1
-            """,
-            vars={
-                "current_project": project
-            }
-        )
-        result = c.fetchone()
+    query = """
+        SELECT      *
+        FROM        global_measurement_overview
+        WHERE       (
+                        NOT data_synchronized
+                        OR
+                        NOT table_synchronized
+                    ) AND (
+                        scope IS NOT NULL
+                        OR
+                        project = %(current_project)s
+                    )
+        ORDER BY    data_synchronized, uuid
+        LIMIT       1
+    """
+    parameters = {
+        "current_project": project
+    }
+    result = fetch_single_for_query(
+        query=query,
+        parameters=parameters,
+        factory=RealDictCursor,
+    )
     return result
 
 
@@ -110,23 +109,19 @@ def set_export_synchronized(action: ExportAction, name: str, rating: bool) -> tu
 
 
 def get_expired_export_action(expiration_time: datetime) -> ExportAction | None:
-    with DatabaseManager().conn_local as conn:
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-        cursor.execute(
-            query="""
-                SELECT uuid
-                FROM coretools_exported
-                WHERE       raw_final = False
-                    AND     measurement_start_time < %(expiration_time)s
-                    AND     export_state = 1
-                ORDER BY uuid
-                LIMIT 1
-            """,
-            vars={
-                "expiration_time": expiration_time
-            },
-        )
-        data = cursor.fetchone()
+    query = """
+        SELECT      uuid
+        FROM        coretools_exported
+        WHERE       raw_final = False
+            AND     measurement_start_time < %(expiration_time)s
+            AND     export_state = 1
+        ORDER BY    uuid
+        LIMIT       1
+    """
+    parameters = {
+        "expiration_time": expiration_time
+    }
+    data = fetch_single_for_query(query=query, parameters=parameters)
     if data:
         return ExportAction(data['uuid'], completed=True)
     else:
@@ -190,18 +185,13 @@ def set_export_error(uuid, message, code=99) -> None:
 
 
 def get_failed_exports() -> list[tuple[int, bool]]:
-    with DatabaseManager().conn_local as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            query="""
-                SELECT uuid, raw_final
-                FROM coretools_exported
-                WHERE export_state BETWEEN 10 AND 100
-                ORDER BY uuid
-                ;
-            """
-        )
-        records = cursor.fetchall()
+    query = """
+        SELECT uuid, raw_final
+        FROM coretools_exported
+        WHERE export_state BETWEEN 10 AND 100
+        ORDER BY uuid
+    """
+    records = fetch_all_for_query(query)
     return records
 
 
@@ -221,25 +211,11 @@ def get_measurement_scope(uid: int) -> dict[str, str] | None:
         from_table="global_measurement_overview",
         where_equal_conditions=parameters,
     )
-    result = fetch_query_single(
+    result = fetch_single_for_query(
         query=query,
-        vars=parameters,
+        parameters=parameters,
         factory=RealDictCursor,
     )
-    # statement = """
-    #     SELECT scope, project FROM global_measurement_overview WHERE uuid = %(ct-uid)s;
-    # """
-    # parameters = {
-    #     "ct-uid": uid
-    # }
-    #
-    # with DatabaseManager().conn_local as conn:
-    #     cur = conn.cursor(cursor_factory=RealDictCursor)
-    #     cur.execute(
-    #         query=statement,
-    #         vars=parameters
-    #     )
-    #     result = cur.fetchone()
     return result
 
 
@@ -252,23 +228,10 @@ def get_measurement_completed(uid: int) -> bool | None:
         from_table="global_measurement_overview",
         where_equal_conditions=parameters,
     )
-    result = fetch_query_single(
+    result = fetch_single_for_query(
         query=query,
-        vars=parameters,
+        parameters=parameters,
     )
-
-    # statement = """
-    #         SELECT completed FROM global_measurement_overview WHERE uuid = %(uid)s
-    #     """
-    # with DatabaseManager().conn_local as conn:
-    #     cursor = conn.cursor()
-    #     cursor.execute(
-    #         statement,
-    #         vars={
-    #             "uid": uid
-    #         }
-    #     )
-    #     result = cursor.fetchone()
     return result
 
 
@@ -337,40 +300,40 @@ def build_generic_select_query(
     return query
 
 
-def fetch_query_single(
+def fetch_single_for_query(
         query: sql.SQL,
-        vars: dict[str, Any] | None = None,
+        parameters: dict[str, Any] | None = None,
         factory: Any | None = None,
 ) -> Any | None:
     """
     """
-    if vars is None:
-        vars = {}
+    if parameters is None:
+        parameters = {}
     with DatabaseManager().conn_local as conn:
         cursor = conn.cursor(cursor_factory=factory)
         cursor.execute(
             query,
-            vars=vars,
+            vars=parameters,
         )
         result = cursor.fetchone()
     return result
 
 
-def fetch_query_all(
+def fetch_all_for_query(
         query: sql.SQL,
-        vars: dict[str, Any] | None = None,
+        parameters: dict[str, Any] | None = None,
         factory: Any = None,
 ) -> list[Any]:
     """
     """
-    if vars is None:
-        vars = {}
+    if parameters is None:
+        parameters = {}
 
     with DatabaseManager().conn_local as conn:
         cursor = conn.cursor(cursor_factory=factory)
         cursor.execute(
             query,
-            vars=vars,
+            vars=parameters,
         )
         result = cursor.fetchall()
     return result
