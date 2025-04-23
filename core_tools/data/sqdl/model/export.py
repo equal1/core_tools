@@ -275,7 +275,6 @@ def get_measurement_completed(uid: int) -> bool | None:
 def build_generic_select_query(
         select_columns: list[str],
         from_table: str,
-        where_logic_operator: str = "and",
         where_equal_conditions: dict[str, Any] | None = None,
         order_by: list[str] | None = None,
         limit: int | None = None,
@@ -296,21 +295,16 @@ def build_generic_select_query(
 
     # basic SELECT query
     query = sql.SQL("SELECT {fields} FROM {table} ").format(
-        fields=sql.SQL(", ").join(select_columns),
+        fields=sql.SQL(", ").join([sql.Identifier(col) for col in select_columns]),
         table=sql.Identifier(from_table)
     )
 
     # extend query with WHERE conditions
     if where_equal_conditions is not None:
-        assert_message = "WHERE consitions must be concatinated by either OR or AND"
-        assert where_logic_operator.upper() in ["OR", "AND"], assert_message
-
         where_section = sql.SQL(" WHERE {conditions} ").format(
-            conditions=sql.SQL(" {operator} ").format(
-                operator=where_logic_operator.upper()
-            ).join(
+            conditions=sql.SQL(" AND ").join(
                 [
-                    sql.SQL(" {key} == {placeholder} ").format(
+                    sql.SQL(" {key} = {placeholder} ").format(
                         key=sql.Identifier(key),
                         placeholder=sql.Placeholder(key)
                     )
@@ -329,7 +323,7 @@ def build_generic_select_query(
         query = sql.Composed([
             query,
             sql.SQL(" ORDER BY {ordering} ").format(
-                ordering=sql.SQL(", ").join(order_by)
+                ordering=sql.SQL(", ").join([sql.Identifier(by) for by in order_by])
             )
         ])
 
@@ -337,7 +331,7 @@ def build_generic_select_query(
     if limit is not None:
         query = sql.Composed([
             query,
-            sql.SQL(" LIMIT {limit_value} ").format(limit_value=limit)
+            sql.SQL(" LIMIT {limit_value} ").format(limit_value=sql.Literal(limit))
         ])
 
     return query
