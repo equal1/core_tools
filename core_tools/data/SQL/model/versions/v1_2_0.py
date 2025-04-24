@@ -5,17 +5,15 @@ def update_to_1_2_0_from_1_1_0(cursor: Cursor):
     """
     Special case for setups that received 1.1.0 version.
     Default should be going from 1.0.0 to 1.2.0 directly.
+
+    User is expected to export and drop the following tables manually:
+    - upload_task_queue
+    - sqdl_dataset
+    - sqdl_file
+    - coretools_export_updates
+    - upload_log
+    - database_version
     """
-
-    # review todo:
-    # User is expected to export and drop the following tables manually:
-    #     - upload_task_queue
-    #     - sqdl_dataset
-    #     - sqdl_file
-    #     - coretools_export_updates
-    #     - upload_log
-    #     - database_version
-
     cursor.execute(
         query="""
             CREATE TABLE IF NOT EXISTS settings (

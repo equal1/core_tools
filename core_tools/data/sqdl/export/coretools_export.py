@@ -392,7 +392,6 @@ class Exporter:
         scope = self.get_scope(int(measurement.exp_uuid))
         updates = SqdlUpdate(measurement.exp_uuid, scope, raw_final=is_complete)
         try:
-            # review todo: always doing export raw -> updates.upload_raw always true
             dsx, ds_path, var_descr = export_data(
                 measurement,
                 scope,
