@@ -25,8 +25,8 @@ class KeysightFastScanParameter(FastScanParameterBase):
             scan_config: ScanConfigBase,
             pulse_lib,
             pulse_sequence,
-            digitizer = None,
-            ):
+            digitizer=None,
+    ):
         """
         args:
             pulse_lib (pulselib): pulse library object
@@ -163,7 +163,7 @@ class FastScanGenerator(FastScanGeneratorBase):
             gate: str, swing: float, n_pt: int, t_measure: float,
             pulse_gates: dict[str, float] = {},
             biasT_corr: bool = False,
-            ) -> FastScanParameterBase:
+    ) -> FastScanParameterBase:
         """Creates 1D fast scan parameter.
 
         Args:
@@ -184,7 +184,7 @@ class FastScanGenerator(FastScanGeneratorBase):
         config = self.get_config1D(gate, swing, n_pt, t_measure, pulse_gates, biasT_corr)
 
         if biasT_corr and config.line_margin > 0:
-            print('Line margin is ignored with biasT_corr on') # @@@ change. Check acquisition_delays_ns.
+            print('Line margin is ignored with biasT_corr on')  # @@@ change. Check acquisition_delays_ns.
             config.line_margin = 0
 
         add_line_delay = config.biasT_corr and len(config.pulse_gates) > 0
@@ -252,7 +252,7 @@ class FastScanGenerator(FastScanGeneratorBase):
             n_lines=n_lines,
             start_delay=int(start_delay),
             line_delay=int(line_delay_pts*step_eff) if add_line_delay else 500,
-            )
+        )
 
         my_seq.upload()
 
@@ -262,13 +262,14 @@ class FastScanGenerator(FastScanGeneratorBase):
             pulse_sequence=my_seq,
             digitizer=self.digitizer)
 
-    def create_2D_scan(self,
+    def create_2D_scan(
+            self,
             gate1: str, swing1: float, n_pt1: int,
             gate2: str, swing2: float, n_pt2: int,
             t_measure: float,
             pulse_gates: dict[str, float] = {},
             biasT_corr: bool = True,
-            ) -> FastScanParameterBase:
+    ) -> FastScanParameterBase:
         """Creates 2D fast scan parameter.
 
         Args:
@@ -388,7 +389,7 @@ class FastScanGenerator(FastScanGeneratorBase):
             n_lines=n_lines,
             start_delay=int(start_delay),
             line_delay=line_delay,
-            )
+        )
 
         my_seq.upload()
 
@@ -435,7 +436,7 @@ class FastScanGenerator(FastScanGeneratorBase):
             n_lines: int,
             start_delay: int,
             line_delay: int,
-            ):
+    ):
 
         # generate the sequence and upload it.
         my_seq = self.pulse_lib.mk_sequence([seg])
@@ -469,10 +470,11 @@ class FastScanGenerator(FastScanGeneratorBase):
         return my_seq
 
 
-def construct_1D_scan_fast(gate, swing, n_pt, t_step, biasT_corr, pulse_lib,
-                           digitizer=None, channels=None,
-                           iq_mode=None, acquisition_delay_ns=500,
-                           enabled_markers=[], channel_map=None, pulse_gates={}, line_margin=0):
+def construct_1D_scan_fast(
+        gate, swing, n_pt, t_step, biasT_corr, pulse_lib,
+        digitizer=None, channels=None,
+        iq_mode=None, acquisition_delay_ns=500,
+        enabled_markers=[], channel_map=None, pulse_gates={}, line_margin=0):
     """
     1D fast scan parameter constructor.
 
@@ -518,10 +520,11 @@ def construct_1D_scan_fast(gate, swing, n_pt, t_step, biasT_corr, pulse_lib,
     return scan_generator.create_1D_scan(gate, swing, n_pt, t_step, pulse_gates=pulse_gates, biasT_corr=biasT_corr)
 
 
-def construct_2D_scan_fast(gate1, swing1, n_pt1, gate2, swing2, n_pt2, t_step, biasT_corr, pulse_lib,
-                           digitizer=None, channels=None, iq_mode=None,
-                           acquisition_delay_ns=500, enabled_markers=[], channel_map=None,
-                           pulse_gates={}, line_margin=0):
+def construct_2D_scan_fast(
+        gate1, swing1, n_pt1, gate2, swing2, n_pt2, t_step, biasT_corr, pulse_lib,
+        digitizer=None, channels=None, iq_mode=None,
+        acquisition_delay_ns=500, enabled_markers=[], channel_map=None,
+        pulse_gates={}, line_margin=0):
     """
     2D fast scan parameter constructor.
 
