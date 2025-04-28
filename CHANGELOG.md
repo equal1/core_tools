@@ -1,6 +1,12 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[1.5.13] - 2025-04-28
+
+- Added find_all_uuids_between to sqdl_reader
+- Removed old KeysightSD1 code
+- Added `get_effective_fpga_scaling` and added channel properties to snapshot
+
 ## \[1.5.12] - 2025-03-07
 
 - Video mode: Fix general settings in favorites
