@@ -243,7 +243,7 @@ class line_trace(MultiParameter):
             if not channel_property.active:
                 continue
             if is_fpga_version_1_1:
-                fpga_scaling = self.get_effective_fpga_scaling(channel_property.number)
+                fpga_scaling = self.my_instrument.get_effective_fpga_scaling(channel_property.number)
             else:
                 fpga_scaling = 1.0
 
