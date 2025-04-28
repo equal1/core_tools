@@ -1,7 +1,6 @@
 
 from qcodes import Instrument, MultiParameter
 from dataclasses import dataclass
-from typing import Optional
 from packaging.version import Version
 import math
 import logging
@@ -213,7 +212,8 @@ class line_trace(MultiParameter):
                     # double time adding at most 5 seconds
                     no_data_report_time += no_data_report_time if no_data_report_time < 5 else 5
 
-        logger.debug(f'channels {channels}: retrieved {data_read} points in {(time.perf_counter()-start)*1000:3.1f} ms')
+        logger.debug(f"channels {channels}: retrieved {data_read} points "
+                     f"in {(time.perf_counter()-start)*1000:3.1f} ms")
         for ch in channels:
             if data_read[ch] != len(daq_points_per_channel[ch]):
                 logger.error(f"digitizer did not collect enough data points for channel {ch}; "
@@ -243,10 +243,7 @@ class line_trace(MultiParameter):
             if not channel_property.active:
                 continue
             if is_fpga_version_1_1:
-                # correct for digital scaling in fpga
-                fpga_scaling = channel_properties.fpga_scaling
-                if channel_property.acquisition_mode in [MODES.IQ_DEMODULATION, MODES.IQ_DEMOD_I_ONLY]:
-                    fpga_scaling *= 2.0
+                fpga_scaling = self.get_effective_fpga_scaling(channel_property.number)
             else:
                 fpga_scaling = 1.0
 
@@ -310,13 +307,13 @@ class line_trace(MultiParameter):
             cached = self.cached_properties[properties.name]
 
             info_changed |= (
-                    properties.active != cached.active
-                    or properties.acquisition_mode != cached.acquisition_mode
-                    or properties.data_mode != cached.data_mode
-                    or properties.cycles != cached.cycles
-                    or properties.t_measure != cached.t_measure
-                    or properties.points_per_cycle != cached.points_per_cycle
-                    )
+                properties.active != cached.active
+                or properties.acquisition_mode != cached.acquisition_mode
+                or properties.data_mode != cached.data_mode
+                or properties.cycles != cached.cycles
+                or properties.t_measure != cached.t_measure
+                or properties.points_per_cycle != cached.points_per_cycle
+            )
             self.cached_properties[properties.name] = copy.copy(properties)
 
         if info_changed:
@@ -393,11 +390,11 @@ class channel_properties:
     t_measure: float = 0  # measurement time in ns of the channel
     sample_rate: float = 500e6
     # daq configuration
-    prescaler: Optional[int] = None
-    daq_points_per_cycle: Optional[int] = None
-    daq_cycles: Optional[int] = None
+    prescaler: int | None = None
+    daq_points_per_cycle: int | None = None
+    daq_cycles: int | None = None
     # settings of downsampler-iq FPGA image
-    downsampled_rate: Optional[float] = None
+    downsampled_rate: float | None = None
     downsampling_factor: int = 1
     lo_frequency: float = 0
     lo_phase: float = 0
@@ -433,6 +430,7 @@ class SD_DIG(Instrument):
 
         self.chassis = chassis
         self.slot = slot
+        self.n_channels = n_channels
 
         self.operation_mode = OPERATION_MODES.SOFT_TRG
         self._timeout_seconds = 3
@@ -442,7 +440,7 @@ class SD_DIG(Instrument):
             inst_name=self.name,
             parameter_class=line_trace,
             raw=False
-            )
+        )
 
         self.channel_properties = dict()
         for i in range(n_channels):
@@ -467,7 +465,23 @@ class SD_DIG(Instrument):
         if params_to_skip_update is not None:
             param_to_skip += params_to_skip_update
 
-        return super().snapshot_base(update, params_to_skip_update=param_to_skip)
+        snapshot = super().snapshot_base(update, params_to_skip_update=param_to_skip)
+
+        for i in range(self.n_channels):
+            ch_name = f"ch{i+1}"
+            properties = self.channel_properties[ch_name]
+            properties_snapshot = {}
+            snapshot[ch_name] = properties_snapshot
+            properties_snapshot["acquisition_mode"] = properties.acquisition_mode
+            properties_snapshot["data_mode"] = properties.data_mode
+            properties_snapshot["full_scale"] = properties.full_scale
+            properties_snapshot["impedance"] = "50 Ohm" if properties.impedance == 1 else "1 MOhm"
+            properties_snapshot["coupling"] = "DC" if properties.coupling == 0 else "AC"
+            properties_snapshot["input_channel"] = properties.input_channel
+            properties_snapshot["fpga_scaling"] = properties.fpga_scaling
+            # NOTE: other properties will be set after the snapshot has been taken.
+
+        return snapshot
 
     def is_iq_image_loaded(self):
         return is_iq_image_loaded(self.SD_AIN)
@@ -630,6 +644,17 @@ class SD_DIG(Instrument):
         properties = self.channel_properties[f'ch{channel}']
         properties.fpga_scaling = scaling
 
+    def get_fpga_scaling(self, channel: int) -> float:
+        return self.channel_properties[f'ch{channel}'].fpga_scaling
+
+    def get_effective_fpga_scaling(self, channel: int) -> float:
+        properties = self.channel_properties[f'ch{channel}']
+        fpga_scaling = properties.fpga_scaling
+        if properties.acquisition_mode in [MODES.IQ_DEMODULATION, MODES.IQ_DEMOD_I_ONLY]:
+            # Note: a demodulated signal will have 1/2 the amplitude of the incoming signal
+            fpga_scaling *= 2.0
+        return fpga_scaling
+
     def actual_acquisition_points(self, ch, t_measure, sample_rate):
         mode = self.channel_properties[f'ch{ch}'].acquisition_mode
         # resolution in nanoseconds
@@ -718,18 +743,15 @@ class SD_DIG(Instrument):
             eff_t_measure = points_per_cycle * downsampling_factor * 10
 
             values_per_point = (
-                    2
-                    if properties.acquisition_mode in [MODES.IQ_DEMODULATION, MODES.IQ_INPUT_SHIFTED_IQ_OUT]
-                    else 1)
+                2
+                if properties.acquisition_mode in [MODES.IQ_DEMODULATION, MODES.IQ_INPUT_SHIFTED_IQ_OUT]
+                else 1)
             daq_points_per_cycle = n_cycles * points_per_cycle * values_per_point
             daq_cycles = 1
             config_input_channel = properties.input_channel if properties.input_channel != 0 else channel
 
             if is_fpga_version_1_1:
-                fpga_scaling = properties.fpga_scaling
-                if properties.acquisition_mode in [MODES.IQ_DEMODULATION, MODES.IQ_DEMOD_I_ONLY]:
-                    # Note: a demodulated signal will have 1/2 the amplitude of the incoming signal
-                    fpga_scaling *= 2.0
+                fpga_scaling = self.get_effective_fpga_scaling(channel)
                 config_channel(self.SD_AIN, channel, properties.acquisition_mode,
                                downsampling_factor, points_per_cycle,
                                LO_f=properties.lo_frequency, phase=properties.lo_phase,
@@ -928,9 +950,7 @@ class SD_DIG(Instrument):
             logger.debug(f'ch{channel} t_measure:{properties.t_measure}')
 
             if is_fpga_version_1_1:
-                fpga_scaling = properties.fpga_scaling
-                if properties.acquisition_mode in [MODES.IQ_DEMODULATION, MODES.IQ_DEMOD_I_ONLY]:
-                    fpga_scaling *= 2.0
+                fpga_scaling = self.get_effective_fpga_scaling(channel)
                 dig_set_downsampler(self.SD_AIN, channel, downsampling_factor,
                                     properties.points_per_cycle,
                                     out_scaling=fpga_scaling)
