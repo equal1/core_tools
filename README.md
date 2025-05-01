@@ -36,3 +36,12 @@ make html
 
 You can now access the documentation by opening ```docs/build/html/index.html``` in your web-browser of choice.
 
+### Development
+
+#### Running tests
+Use ```pytest``` for running avaible tests. The package can be installed using ```pip```.
+Tests are located in the ```test/suite``` directory, and can be run with the
+following command:
+```bash
+pytest test/suite/
+```

@@ -16,7 +16,7 @@ from core_tools.data.utils.timer import Timer
 from core_tools.data.SQL.SQL_connection_mgr import (
     SQL_database_manager as DatabaseManager
 )
-from core_tools.data.sqdl.export.data_export import export_data
+from core_tools.data.sqdl.export.data_export import export_data, update_metadata
 from core_tools.data.sqdl.export.data_preview import generate_previews
 from core_tools.data.sqdl.model import export
 from core_tools.data.sqdl.model.export import ExportAction
@@ -405,5 +405,7 @@ class Exporter:
 
         if updates.upload_dataset:
             generate_previews(dsx, ds_path, var_descr, self.timer)
+
+        update_metadata(ds_path, measurement.exp_uuid)
 
         return updates, ds_path
