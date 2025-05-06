@@ -10,8 +10,8 @@ server.
 
 ## Components
 ### SQDL DataBrowser
-When using the ```qt_databrowser``` package, it is possible to load a variation on
-the regular databrowser which allows you to look up data in SQDL.
+When using the ```qt_databrowser``` package, you can get a SQDL-specific version of
+the DataBrowser as follows:
 ```python
 from qt_dataviewer.sqdl import SqdlDataBrowser
 
@@ -28,16 +28,16 @@ retrieving data from SQDL:
 ```python
 from core_tools.data.sqdl import init_sqdl, load_by_uuid
 
-# If not yet logged your internet browser will show a login page.
+# If not yet logged in, your internet browser will open a login page.
 init_sdql("scope-name")
 
 dataset = load_by_uuid(uuid)
 ```
-Other useful methods include ```sqdl_query``` to search for measurement information,
+Other useful methods include ```sqdl_query``` for searching measurement information,
 and ```list_scopes``` for seeing what scopes are available to you. 
 
 ### SQDL Sync
-SQDL Sync exists as a successor to DB Sync, and can be used as a drop-in replacement.
+SQDL Sync exists as a successor to DB Sync, and is intended as a replacement.
 
 It is responsible for exporting measurement data into an SQDL-compatible format, and 
 then upload those files. This process can run completely in the background.
@@ -78,11 +78,11 @@ on 'Software Installation' and 'Credentials'.
 ## Configuration
 Configuration for SQDL functionality is specified in the ```sqdl_sync``` section
 of your ```config.yaml``` file. This section accepts the following parameters
-(default values are specified):
+(defaults for optional values are specified):
 
 ```yaml
 # (str) Name of the Scope parameter associated with your experiments
-scope: ...
+scope: <required>
 
 sqdl_sync:
     # (str) Local path where the exported data files will be saved before uploading
@@ -95,18 +95,24 @@ sqdl_sync:
     tick_rate: 0.1
 
     # (bool) Whether or not to retry uploading previously failed uploads when
-    #  re-initialising the SQDL Writer
-    retry_failed_uploads: false
+    #  re-initialising the SQDL Sync
+    retry_failed_uploads: true
 
     # (bool) Set to true when uploading data from a non-MeasurementPC setup,
     #  see the SQDL Login section for more info
     use_personal_login: false
+
+    # (section) Apply scope name corrections when uploading data that was exported
+    #  using an incorrect scope name. Don't forget to update the 'scope' parameter
+    #  to the correct name as well.
+    scope_correction:
+        <original_name>: <corrected_name>
 ```
 
 The ```scope``` parameter is checked for at the top level, just like ```project```, ```setup``` and ```sample```.
 
 ### SQDL Login
-By default, the SQDL Writer is configured to be authenticated through the use of an
+By default, the SQDL Sync is configured to be authenticated through the use of an
 API key. This key has to be provided by your local administrator, and should be
 unique to your setup. This means that every measurement tool has it's own API key,
 and it should not by copied between systems.
