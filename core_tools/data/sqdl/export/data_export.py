@@ -278,22 +278,6 @@ def get_exported_files(dataset_path: str) -> list[Path]:
     return file_paths
 
 
-def generate_file_sequence_numbers(files: list[Path], description: dict[str, Any]):
-    fnames = [fi.name for fi in files]
-    for i, var in enumerate(description["var_description"]):
-        shape = var["shape"]
-        if not var["written"] or not shape or shape == [1]:
-            continue
-        name = var["label"]
-        dims = [dim["name"] for dim in var["dims"]]
-        fname = fix_filename(f"{name}({','.join(dims)}).png")
-        try:
-            index = fnames.index(fname)
-            files[index].seq_number = i + 1.0
-        except Exception:
-            logger.warning(f"file {fname} not found for sorting. {var}")
-
-
 def fix_filename(filename: str) -> str:
     invalid_chars = re.compile(r'[*/\<>:"|?]')
     return re.sub(invalid_chars, "_", filename)
