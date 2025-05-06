@@ -134,8 +134,6 @@ def update_metadata(ds_path, uuid):
     exported_files = get_exported_files(dataset_path=ds_path)
     update_file_info(info, exported_files)
 
-    # review todo: do we still need atomic writes in the case of single-process
-    #  exporting? can't imagine so
     with atomic_write(metadata_path) as metadata_path_tmp:
         with open(metadata_path_tmp, 'w') as fp:
             json.dump(info, fp, indent=2)
@@ -143,7 +141,8 @@ def update_metadata(ds_path, uuid):
 
 def get_dataset_info(dataset, scope: str) -> tuple[dict[str, Any], list[Any]]:
     """
-    review todo
+    Create a metadata template, and fill out where possible based on the dataset
+    object.
 
     Args:
         dataset: Dataset object being exported.
@@ -279,5 +278,5 @@ def get_exported_files(dataset_path: str) -> list[Path]:
 
 
 def fix_filename(filename: str) -> str:
-    invalid_chars = re.compile(r'[*/\<>:"|?]')
+    invalid_chars = re.compile(r'[*/\\<>:"|?]')
     return re.sub(invalid_chars, "_", filename)

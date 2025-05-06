@@ -92,7 +92,6 @@ def get_database_version(
     return version
 
 
-# review todo: open issue about removing this check after Bruce upgrade
 def check_for_v110_case(conn: Connection) -> bool:
     try:
         with conn:
