@@ -144,3 +144,12 @@ Basic Auth requires you to set up a ```.netrc``` file with the username and pass
 that you used for your local deployment. See [this page](https://everything.curl.dev/usingcurl/netrc.html)for more info.
 API-key Auth follows the normal configuration procedure.
 
+#### Logging
+Logging can be configured by using the app-wrapper format. This can be done by adding the following subsection (default values included):
+```yaml
+sqdl_sync:
+    logging:
+        file_location: ~/.core_tools/logs
+        file_name: sqdl_sync.log
+        file_level: INFO
+```
