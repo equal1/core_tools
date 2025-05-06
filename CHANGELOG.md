@@ -5,10 +5,9 @@ All notable changes to core_tools will be documented in this file.
 
 ### Added
 - Added optional functionality for synchronising data with a remote instance of SQDL. Note that this functionality depends on the internally developed ```sqdl_client``` package, and is therefor only accessible by users associated with QuTech.
-    - Added the ```SQDLWriter``` class, responsible for managing the data synchronisation process.
+    - Added the ```SQDLSync``` class, responsible for managing the data synchronisation process.
     - Added the ```.../sqdl/export/``` sub-module, responsible for exporting core-tools data into an SQDL-compatible format.
-    - Added the ```.../sqdl/uploader/``` sub-module, responsible for uploading the exported datasets to a remote SQDL instance.
-    - Added the ```.../sqdl/model/``` sub-module, which defines the local database operations associated with the ```export``` and ```uploader``` sub-modules.
+    - Added the ```.../sqdl/model/``` sub-module, which defines the local database operations associated with the ```export``` sub-module.
     - Added ```.../startup/sqdl_sync.py``` and ```.../startup/launch_sqdl_sync.py```, which fill the role of ```.../startup/db_sync.py``` and ```.../startup/launch_db_sync.py``` for the purpose of synchronising data to SQDL.
 
 - Added local database versioning.
@@ -16,12 +15,12 @@ All notable changes to core_tools will be documented in this file.
     - Added a routine that checks the currently available local database version agains the expectations of the current coretools version. If new database versions are available, the modifications are applied automatically when connecting to the local database.
         - These additions are still compatible with older coretools version, whether users are syncing their local database to remote using ```db_sync``` or using a direct remote connection. (See Changed section below)
     - Added a definition for coretools database v1.0.0 (replication of the current schema)
-    - Added a definition for coretools database v1.1.0 (includes the SQDL functionality, as well as a new Scope column, see Changed section below)
+    - Added a definition for coretools database v1.1.0 (development version)
+    - Added a definition for coretools database v1.2.0 (includes the SQDL functionality, as well as a new Scope column, see Changed section below)
 
 ### Changed
 - Added a ```scope``` attribute to sample info.
     - Updated ```sample_info``` class and functionality to include the optional ```scope``` parameter.
-    - Updated ```sample_info_overview``` table with a new "Scope" column for *local* database.
     - Updated ```global_measurement_overview``` table with a new "Scope" column *local* database.
     - Added a warning about setting the ```scope``` config parameter to the core-tools start-up configuration method.
     - Note that updating your remote database to include these columns is not require at this stage. The synchronisation process as defined by ```db_sync``` allows for this descrepancy between databases, facilitating a non-breaking upgrade. 
