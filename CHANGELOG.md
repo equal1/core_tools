@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[1.5.14] - 2025-05-15
+
+- Fixed ScriptRunner video mode start/stop.
+
 ## \[1.5.13] - 2025-04-28
 
 - Added find_all_uuids_between to sqdl_reader

@@ -113,7 +113,7 @@ class ScriptRunner(QtWidgets.QMainWindow, Ui_MainWindow):
             running = self.video_mode_running
             if running:
                 self.video_mode_paused = True
-                self._video_mode_start_stop(running)
+                self._video_mode_stop()
                 self._show_video_mode_status('PAUSED', '#FF8')
                 self.app.processEvents()
 
@@ -129,7 +129,7 @@ class ScriptRunner(QtWidgets.QMainWindow, Ui_MainWindow):
             self.latest_result = command_result
             if running:
                 self.video_mode_paused = False
-                self._video_mode_start_stop(running)
+                self._video_mode_start(running)
 
     def _add_command(self, command):
         i = len(self.commands)
@@ -207,11 +207,14 @@ class ScriptRunner(QtWidgets.QMainWindow, Ui_MainWindow):
         self.video_mode_label.setText(f'VideoMode: {text}')
         self.video_mode_label.setStyleSheet(f'QLabel {{ background-color : {color} }}')
 
-    def _video_mode_start_stop(self, mode):
+    def _video_mode_start(self, mode):
         if mode == '1D':
-            liveplotting.last_instance._1D_start_stop()
+            liveplotting.last_instance._start_1D()
         if mode == '2D':
-            liveplotting.last_instance._2D_start_stop()
+            liveplotting.last_instance._start_2D()
+
+    def _video_mode_stop(self):
+        liveplotting.last_instance.stop()
 
 
 if __name__ == "__main__":
