@@ -4,6 +4,7 @@ import re
 import logging
 from typing import Any
 from pathlib import Path
+from datetime import datetime
 
 from core_tools import __version__ as ct_version
 from core_tools.data.ds.ds_hdf5 import save_xr_hdf5
@@ -63,6 +64,35 @@ def fix_dataset_name(name):
     return name
 
 
+def get_export_path(
+    base_path: Path | str,
+    project: str,
+    timestamp: datetime,
+    uuid: int
+) -> tuple[Path, Path]:
+    """
+    Get path to the dataset export directory, as well as the path to the associated
+    JSON metadata file.
+
+    Args:
+        base_path: Export path as defined in the sqdl-sync configuration.
+        project: Measurement project, extracted from database.
+        timestamp: Measurement start time, extracted from database.
+        uuid: Measurement UID, extracted from database.
+
+    Returns:
+        Paths to the export directory and json file, respectively.
+    """
+    export_path = Path(
+        base_path,
+        project,
+        timestamp.strftime("%Y-%m-%d"),
+        uuid
+    ).expanduser()
+    export_json = Path(export_path, f"{uuid}.json")
+    return export_path, export_json
+
+
 def export_data(ds, scope, path, timer, updates, write_raw=True):
     uuid = ds.exp_uuid
     path = os.path.expanduser(path)
@@ -75,18 +105,16 @@ def export_data(ds, scope, path, timer, updates, write_raw=True):
     if sum(var['written'] for var in var_descr) == 0:
         raise Exception(f'No data in dataset {uuid}')
 
-    dir_name = fix_dirname(ds.project)
-    ds_dir = f'/{dir_name}/{ds.run_timestamp:%Y-%m-%d}/{uuid}'
-    ds_path = path + ds_dir
-
     timer.time('save json')
     if not os.path.exists(path):
         raise Exception(f"Path '{path}' does not (yet) exist.")
 
+    ds_path, metadata_path = get_export_path(
+        path, ds.project, ds.run_timestamp, ds.exp_uuid
+    )
     os.makedirs(ds_path, exist_ok=True)
     logger.info(f'Path {ds_path}')
 
-    metadata_path = f'{ds_path}/{uuid}.json'
     determine_update_behaviour(updates, ds, metadata_path)
 
     with atomic_write(metadata_path) as metadata_path_tmp:
@@ -108,20 +136,25 @@ def export_data(ds, scope, path, timer, updates, write_raw=True):
     return dsx, ds_path, var_descr
 
 
+def check_for_metadata_changes(file_path: Path, name: str, starred: bool):
+    with open(file_path) as fp:
+        info = json.load(fp)
+
+    name_changed = info['name'] != name
+    try:
+        rating_changed = info['starred'] != starred
+    except KeyError:
+        rating_changed = info['rating'] != (1 if starred else 0)
+    return name_changed, rating_changed
+
+
 def determine_update_behaviour(updates, ds, path):
     if os.path.exists(path):
-        with open(path) as fp:
-            old_info = json.load(fp)
-
-        if old_info['name'] != ds.name:
-            updates.update_name = True
-
-        try:
-            if old_info['starred'] != ds.starred:
-                updates.update_star = True
-        except KeyError:
-            if bool(old_info['rating']) != ds.starred:
-                updates.update_star = True
+        name_changed, rating_changed = check_for_metadata_changes(
+            path, ds.name, ds.starred
+        )
+        updates.update_name |= name_changed
+        updates.update_star |= rating_changed
     else:
         updates.upload_dataset = True
 
@@ -149,7 +182,7 @@ def get_dataset_info(dataset, scope: str) -> tuple[dict[str, Any], list[Any]]:
         scope: Scope name that the dataset belongs to.
 
     Returns:
-        info  A dictionary containing metadata to be exported.
+        info: A dictionary containing metadata to be exported.
         description: A nested datastructure containing all the measurement
             parameters defined in the Dataset.
     """

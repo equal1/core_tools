@@ -13,7 +13,10 @@ import psycopg2
 
 from core_tools.data.ds.data_set import load_by_uuid, data_set as DataSet
 from core_tools.data.utils.timer import Timer
-from core_tools.data.sqdl.export.data_export import export_data, update_metadata
+from core_tools.data.sqdl.export.data_export import (
+    export_data, update_metadata,
+    get_export_path, check_for_metadata_changes,
+)
 from core_tools.data.sqdl.export.data_preview import generate_previews
 from core_tools.data.sqdl.model import export
 from core_tools.data.sqdl.model.export import ExportAction
@@ -81,8 +84,8 @@ class Exporter:
         local filesystem, then queues the sQDL Uploader to move these exported files
         to an sQDL backend.
 
-        # REVIEW: Documentation style.
-        :raise Exception: Only unforseen or fatal error-cases.
+        Raises:
+            Exception: Only unforseen or fatal error-cases.
         """
         self.timer = Timer()
         self.timer.time('query actions')
@@ -193,11 +196,15 @@ class Exporter:
         code 99: unspecified error
         code > 100: known error and not recoverable, e.g. corrupt dataset.
 
-        # REVIEW: Documentation style.
-        :param message: Raised error message.
-        :param action: The current export action being handled.
-        :returns: Identified error code.
-        :raises Exception: Any unidentified or fatal error-cases.
+        Args:
+            message: Raised error message.
+            action: The current export action being handled.
+
+        Returns:
+            Identified error code.
+
+        Raises:
+            Exception: Any unidentified or fatal error-cases.
         """
         error_code = 99
 
@@ -224,8 +231,8 @@ class Exporter:
         Determine whether to continue the export of an enqueued action, if it
         exists.
 
-        # REVIEW: Documentation style.
-        :returns: Confirmation to resume action.
+        Returns:
+            Confirmation to resume action.
         """
         # REVIEW: This mechanisms hangs on a measurement of which the completed flag is never set.
         #         Completed flag is not set when measurement process is killed or crashes
@@ -264,8 +271,8 @@ class Exporter:
             exported, but that have been left incomplete for extended period without
             updates.
 
-        # REVIEW: Documentation style.
-        :returns: Next export action to perform, if any exist.
+        Returns:
+            Next export action to perform, if any exist.
         """
         if self.enqueued_action is not None:
             action = self.enqueued_action
@@ -298,33 +305,26 @@ class Exporter:
         return None
 
     def check_for_export_files(self, export_entry: dict[str, Any]):
-        # REVIEW: This path is also constructed in data_export.py. There should be a single method for this.
+        export_uuid = export_entry["uuid"]
+
         # get local path
-        file_path = Path(
+        export_path, export_json = get_export_path(
             self.export_path,
             export_entry["project"],
-            export_entry["start_time"].strftime("%Y-%m-%d"),
-            f"{export_entry["uuid"]}"
-        ).expanduser()
+            export_entry["start_time"],
+            f"{export_uuid}"
+        )
+        logger.info(f"checking for previous export: path = {export_path}")
 
-        logger.info(f"checking for previous export: path = {file_path}")
-
-        if not file_path.exists():
+        if not export_path.exists():
             logger.warning("no previous export found")
             return False, False
 
-        # REVIEW " in f-string is Python 3.12 feature. This fails on 3.10.
-        with open(Path(file_path, f"{export_entry["uuid"]}.json")) as f:
-            local_data = json.load(f)
-
-        # REVIEW: Keep knowledge in modules. Use classes where needed.
-        #         "exp_name" comes directly from database. This is database knowledge
-        #         "name" comes from json file. This is json file knowledge.
-        name_changed = export_entry["exp_name"] != local_data.get("name", "")
-        # REVIEW: json file does not contain "starred"
-        rating_changed = export_entry["starred"] != local_data.get("starred", False)
-
-        return name_changed, rating_changed
+        return check_for_metadata_changes(
+            export_json,
+            export_entry["exp_name"],
+            export_entry["starred"]
+        )
 
     def get_wait_time_not_completed(self, start_timestamp: datetime) -> int:
         now = datetime.now()
@@ -383,9 +383,14 @@ class Exporter:
         If no scope is defined in the core-tools database, check if the project
         name matches the current config, and extract scope from there.
 
-        :param uid: Measurement UID.
-        :returns: Scope name.
-        :raises Exception: If no scope is found.
+        Args:
+            uid: Measurement UID.
+
+        Returns:
+            Scope name.
+
+        Raises:
+            Exception: If no scope is found.
         """
         # REVIEW: why not add scope to DataSet? That would save this extra query.
         response = export.get_measurement_scope(uid)
