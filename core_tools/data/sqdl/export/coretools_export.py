@@ -13,9 +13,6 @@ import psycopg2
 
 from core_tools.data.ds.data_set import load_by_uuid, data_set as DataSet
 from core_tools.data.utils.timer import Timer
-from core_tools.data.SQL.SQL_connection_mgr import (
-    SQL_database_manager as DatabaseManager
-)
 from core_tools.data.sqdl.export.data_export import export_data, update_metadata
 from core_tools.data.sqdl.export.data_preview import generate_previews
 from core_tools.data.sqdl.model import export
@@ -84,6 +81,7 @@ class Exporter:
         local filesystem, then queues the sQDL Uploader to move these exported files
         to an sQDL backend.
 
+        # REVIEW: Documentation style.
         :raise Exception: Only unforseen or fatal error-cases.
         """
         self.timer = Timer()
@@ -189,11 +187,13 @@ class Exporter:
         """
         Parse exception message to extract error code and establish retry delay.
 
+        # REVIEW: these codes do not make sense anymore, because only 99, 101 and 102 are used.
         code 10 - 49: known error and (possibly) recoverable
         code 50 - 90: known error and retry
         code 99: unspecified error
         code > 100: known error and not recoverable, e.g. corrupt dataset.
 
+        # REVIEW: Documentation style.
         :param message: Raised error message.
         :param action: The current export action being handled.
         :returns: Identified error code.
@@ -224,8 +224,16 @@ class Exporter:
         Determine whether to continue the export of an enqueued action, if it
         exists.
 
+        # REVIEW: Documentation style.
         :returns: Confirmation to resume action.
         """
+        # REVIEW: This mechanisms hangs on a measurement of which the completed flag is never set.
+        #         Completed flag is not set when measurement process is killed or crashes
+        #         This mechanism also keeps on exporting the not completed measurement even when no new data is written.
+
+        # Better mechanism:
+        # Retrieve not sync'd measurement from database and then check if this one was the last exported measurement.
+
         if (self.enqueued_action is None
                 or self.enqueued_action.resume_after < datetime.now()):
             return True
@@ -256,6 +264,7 @@ class Exporter:
             exported, but that have been left incomplete for extended period without
             updates.
 
+        # REVIEW: Documentation style.
         :returns: Next export action to perform, if any exist.
         """
         if self.enqueued_action is not None:
@@ -289,6 +298,7 @@ class Exporter:
         return None
 
     def check_for_export_files(self, export_entry: dict[str, Any]):
+        # REVIEW: This path is also constructed in data_export.py. There should be a single method for this.
         # get local path
         file_path = Path(
             self.export_path,
@@ -303,10 +313,15 @@ class Exporter:
             logger.warning("no previous export found")
             return False, False
 
+        # REVIEW " in f-string is Python 3.12 feature. This fails on 3.10.
         with open(Path(file_path, f"{export_entry["uuid"]}.json")) as f:
             local_data = json.load(f)
 
+        # REVIEW: Keep knowledge in modules. Use classes where needed.
+        #         "exp_name" comes directly from database. This is database knowledge
+        #         "name" comes from json file. This is json file knowledge.
         name_changed = export_entry["exp_name"] != local_data.get("name", "")
+        # REVIEW: json file does not contain "starred"
         rating_changed = export_entry["starred"] != local_data.get("starred", False)
 
         return name_changed, rating_changed
@@ -344,6 +359,7 @@ class Exporter:
                 path=ds_path
             )
 
+    # REVIEW: a property that returns different values on succesive calls is not really a property. (Yes, I wrote the original code..)
     @property
     def measurement_expiration_time(self):
         return datetime.now() - timedelta(days=1)
@@ -371,12 +387,17 @@ class Exporter:
         :returns: Scope name.
         :raises Exception: If no scope is found.
         """
+        # REVIEW: why not add scope to DataSet? That would save this extra query.
         response = export.get_measurement_scope(uid)
         assert response is not None, f"Unreachable: No measurement with UID '{uid}'"
 
+        # REVIEW: why look into the dictionary that comes from the database and not return scope or None?
         scope = response["scope"]
         if scope is None:
-            logger.warning(
+            # REVIEW: This will still log many warnings after setting the scope.
+            #         Log warning when there is project is not equal to current project.
+            #         Log info when the scope is assigned.
+            logger.info(
                 f"No scope value found for measurement with ID {uid}, "
                 "checking local config for a matching project name with scope."
             )
@@ -384,11 +405,13 @@ class Exporter:
                 scope = self.scope
 
         if scope is None:
+            # Actually, this should never happen since the query filter on scopy is not null or project == current project.
             raise Exception(f"No scope for measurement with ID '{uid}'")
         return scope
 
     def export_measurement(self, measurement: DataSet, is_complete: bool
                            ) -> tuple[SqdlUpdate, str]:
+        # REVIEW: why cast to int?
         scope = self.get_scope(int(measurement.exp_uuid))
         updates = SqdlUpdate(measurement.exp_uuid, scope, raw_final=is_complete)
         try:

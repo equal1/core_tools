@@ -23,7 +23,7 @@ All notable changes to core_tools will be documented in this file.
     - Updated ```sample_info``` class and functionality to include the optional ```scope``` parameter.
     - Updated ```global_measurement_overview``` table with a new "Scope" column *local* database.
     - Added a warning about setting the ```scope``` config parameter to the core-tools start-up configuration method.
-    - Note that updating your remote database to include these columns is not require at this stage. The synchronisation process as defined by ```db_sync``` allows for this descrepancy between databases, facilitating a non-breaking upgrade. 
+    - Note that updating your remote database to include these columns is not required at this stage. The synchronisation process as defined by ```db_sync``` allows for this discrepancy between databases, facilitating a non-breaking upgrade. 
 
 - Replaced the generate-table section of the DatabaseManager (see ```SQL_database_manager``` class in ```core_tools.data.SQL.SQL_database_mgr.py```) responsible for creating tables if they did not already exist, with the new versioning routine (see the Added section above).
 
