@@ -396,7 +396,7 @@ class Scan:
         except AbortMeasurement:
             logger.warning('Measurement aborted')
         except KeyboardInterrupt:
-            logger.debug('Measurement interrupted', exc_info=True)
+            logger.info('Measurement interrupted', exc_info=True)
             logger.warning('Measurement interrupted')
             raise KeyboardInterrupt('Measurement interrupted') from None
         except Exception as ex:
