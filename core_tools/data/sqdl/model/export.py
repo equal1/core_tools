@@ -68,11 +68,14 @@ def set_export_synchronized(action: ExportAction, name: str, rating: bool) -> tu
     Register data and meta-data as synchronized if their values have not changed
     since Export start.
 
-    :param action: The export action to resolve.
-    :param name: The measurement name to be updated.
-    :param rating: The measurement rating to be updated.
-    :returns: Two boolean values, indicating successful synchronization for data
-        and metadata, respectively.
+    Args:
+        action: The export action to resolve.
+        name: The measurement name to be updated.
+        rating: The measurement rating to be updated.
+
+    Returns:
+        Two boolean values, indicating successful synchronization for data
+            and metadata, respectively.
     """
     with DatabaseManager().conn_local as conn:
         c: Cursor = conn.cursor()

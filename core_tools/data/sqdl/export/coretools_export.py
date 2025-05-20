@@ -49,7 +49,7 @@ class Exporter:
         self.loop_count = 0
 
         self.process = psutil.Process()
-        self.enqueued_action: ExportAction | None = None
+        self.active_action: ExportAction | None = None
 
     def poll(self) -> None:
         self.loop_count += 1
@@ -84,6 +84,9 @@ class Exporter:
         local filesystem, then queues the sQDL Uploader to move these exported files
         to an sQDL backend.
 
+        Returns:
+            Whether the exporter is busy with a running measurement.
+
         Raises:
             Exception: Only unforseen or fatal error-cases.
         """
@@ -92,12 +95,9 @@ class Exporter:
 
         ds = None
         try:
-            if not self.continue_enqueued_action():
-                return True
-
-            action = self.get_action()
+            action, is_busy = self.get_action()
             if not action:
-                return False
+                return is_busy
 
             start_time = time.perf_counter()
             self.timer.time('load')
@@ -137,8 +137,8 @@ class Exporter:
             if not table_synced:
                 logger.info("Measurement name or rating changed during export.")
 
-            if not (action.completed or (data_synced and table_synced)):
-                self.handle_modified_export(
+            if not action.completed:
+                self.handle_incomplete_dataset(
                     action, start_time, ds.run_timestamp
                 )
 
@@ -176,11 +176,11 @@ class Exporter:
 
         return True
 
-    def handle_modified_export(self, action, start_time, run_timestamp):
+    def handle_incomplete_dataset(self, action, start_time, run_timestamp):
         duration = int(time.perf_counter() - start_time)
         wait_time = duration + self.get_wait_time_not_completed(run_timestamp)
         action.resume_after = datetime.now() + timedelta(seconds=wait_time)
-        self.enqueued_action = action
+        self.active_action = action
 
     def parse_exception(
             self,
@@ -226,42 +226,12 @@ class Exporter:
 
         return error_code
 
-    def continue_enqueued_action(self) -> bool:
-        """
-        Determine whether to continue the export of an enqueued action, if it
-        exists.
-
-        Returns:
-            Confirmation to resume action.
-        """
-        # REVIEW: This mechanisms hangs on a measurement of which the completed flag is never set.
-        #         Completed flag is not set when measurement process is killed or crashes
-        #         This mechanism also keeps on exporting the not completed measurement even when no new data is written.
-
-        # Better mechanism:
-        # Retrieve not sync'd measurement from database and then check if this one was the last exported measurement.
-
-        if (self.enqueued_action is None
-                or self.enqueued_action.resume_after < datetime.now()):
-            return True
-
-        # resume early if the measurement is finished
-        is_complete = export.get_measurement_completed(self.enqueued_action.uuid)
-        assert_message = "Enqueued action UID no longer exists in database"
-        assert is_complete is not None, assert_message
-
-        if is_complete:
-            self.enqueued_action.completed = True
-            return True
-
-        return False
-
-    def get_action(self) -> ExportAction | None:
+    def get_action(self) -> tuple[ExportAction | None, bool]:
         """
         Get the next ExportAction object to handle.
 
         Objects are retrieved/created with the following priority:
-        1) Enqueued actions: Continue handling the current long-running measurement.
+        1) Active action: Continue handling the current long-running measurement.
         2) Mutated data: Export data that has recently been modified, including:
             - Currently running measurements
             - Recently finished measurements
@@ -272,18 +242,23 @@ class Exporter:
             updates.
 
         Returns:
-            Next export action to perform, if any exist.
+            action: Next export action to perform, if any exist.
+            is_busy: Value to distinguish between throttling export rates and having
+                nothing to export.
         """
-        if self.enqueued_action is not None:
-            action = self.enqueued_action
-            self.enqueued_action = None
-            return action
-
         export_entry = export.get_data_for_export(self.project)
         if export_entry is not None:
+            if self.active_action is not None:
+                if (
+                    export_entry["uuid"] == self.active_action.uuid
+                    and
+                    datetime.now() < self.active_action.resume_after
+                ):
+                    return None, True
+
             # changes can be false if no local export exists yet
             changed_rating, changed_name = self.check_for_export_files(export_entry)
-            return ExportAction(
+            action = ExportAction(
                 uuid=export_entry["uuid"],
                 data_changed=not export_entry["data_synchronized"],
                 completed=export_entry["completed"],
@@ -292,6 +267,7 @@ class Exporter:
                 data_modify_count=export_entry["data_update_count"],
                 resume_after=None,
             )
+            return action, True
 
         action = export.get_expired_export_action(
             self.measurement_expiration_time
@@ -300,9 +276,9 @@ class Exporter:
             logger.info(
                 f'Export raw data of expired incomplete measurement {action.uuid}'
             )
-            return action
+            return action, True
 
-        return None
+        return None, False
 
     def check_for_export_files(self, export_entry: dict[str, Any]):
         export_uuid = export_entry["uuid"]
