@@ -2,9 +2,6 @@ import numpy as np
 
 
 class buffer_reference:
-    '''
-    object in case a user want to take a copy of the reader/writer
-    '''
     def __init__(self, data):
         self.buffer = data
         self.buffer_lambda = buffer_reference.__empty_lambda
@@ -37,12 +34,13 @@ class buffer_reference:
 
 
 class buffer_writer(buffer_reference):
-    def __init__(self, SQL_conn, input_buffer):
-        self.conn = SQL_conn
+    def __init__(self, db_mgr, input_buffer):
+        self.db_mgr = db_mgr
         self.buffer = input_buffer.ravel()
         self.buffer_lambda = buffer_reference.reshaper(input_buffer.shape)
 
-        self.lobject = self.conn.lobject(0,'w')
+        conn = db_mgr.connection
+        self.lobject = conn.lobject(0, 'w')
         self.oid = self.lobject.oid
         self.cursor = 0
         self.cursor_db = 0
@@ -62,10 +60,11 @@ class buffer_writer(buffer_reference):
             if self.cursor - self.cursor_db != 0:
                 self.lobject.write((self.buffer[self.cursor_db:self.cursor]).tobytes())
                 self.cursor_db += self.cursor - self.cursor_db
-        except:
+        except Exception:
             # NOTE: After a commit the lobject is not valid anymore and must be created again.
             #       The overhead for this is very small.
-            self.lobject = self.conn.lobject(self.oid, 'w')
+            conn = self.db_mgr.connection
+            self.lobject = conn.lobject(self.oid, 'w')
             self.lobject.seek(self.cursor_db*8)
             self.sync()
 
@@ -74,13 +73,14 @@ class buffer_writer(buffer_reference):
 
 
 class buffer_reader(buffer_reference):
-    def __init__(self, SQL_conn, oid, shape):
-        self.conn = SQL_conn
+    def __init__(self, db_mgr, oid, shape):
+        self.db_mgr = db_mgr
         self.buffer = np.full(shape, np.nan).ravel()
         self.buffer_lambda = buffer_reference.reshaper(shape)
         self.oid = oid
 
-        self.lobject = self.conn.lobject(oid,'rb')
+        conn = db_mgr.connection
+        self.lobject = conn.lobject(oid, 'rb')
         self.cursor = 0
         self.sync()
 
@@ -88,7 +88,8 @@ class buffer_reader(buffer_reference):
         '''
         update the buffer (for datasets that are still being written)
         '''
-        self.lobject = self.conn.lobject(self.oid, 'rb')
+        conn = self.db_mgr.connection
+        self.lobject = conn.lobject(self.oid, 'rb')
         self.lobject.seek(self.cursor*8)
         binary_data = self.lobject.read()
         data = np.frombuffer(binary_data)

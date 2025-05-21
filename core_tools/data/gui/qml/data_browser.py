@@ -6,7 +6,8 @@ import platform
 import ctypes
 import core_tools.data.gui.qml as qml_in
 
-from core_tools.data.SQL.connect import SQL_conn_info_local, sample_info, set_up_local_storage
+from core_tools.data.SQL.connect import sample_info
+
 
 def coalesce(*args):
     for arg in args:
@@ -73,7 +74,7 @@ class data_browser():
             self.win.setWidth(window_size[0])
             self.win.setHeight(window_size[1])
 
-        if self.instance_ready == False:
+        if self.instance_ready is False:
             self.app.exec_()
 
 
@@ -81,4 +82,3 @@ def set_app_icon():
     if platform.system() == 'Windows':
         myappid = u'core_tools.data_browser' # arbitrary string
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
-

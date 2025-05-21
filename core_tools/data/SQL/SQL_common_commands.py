@@ -3,22 +3,23 @@ from psycopg2 import sql
 
 from core_tools.data.SQL.SQL_utility import sql_name_formatter, sql_value_formatter, name_value_formatter
 
-def execute_statement(conn, statement, placeholders = []):
+
+def execute_statement(conn, statement, placeholders=[]):
     try:
         cursor = conn.cursor()
         cursor.execute(statement, placeholders)
         cursor.close()
         return ((), )
-    except:
+    except Exception:
         # After exception the connection cannot be used anymore.
         # A new connection will automatically be opened for the next command.
         conn.close()
         raise
 
 
-def execute_query(conn, query, dict_cursor=False, placeholders = []):
+def execute_query(conn, query, dict_cursor=False, placeholders=[]):
     try:
-        if dict_cursor == False:
+        if dict_cursor is False:
             cursor = conn.cursor()
         else:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
@@ -27,14 +28,14 @@ def execute_query(conn, query, dict_cursor=False, placeholders = []):
         return_values = cursor.fetchall()
         cursor.close()
         return return_values
-    except:
+    except Exception:
         # After exception the connection cannot be used anymore.
         # A new connection will automatically be opened for the next command.
         conn.close()
         raise
 
 
-def select_elements_in_table(conn, table_name, var_names, where=None, order_by = None, limit=None, dict_cursor=True):
+def select_elements_in_table(conn, table_name, var_names, where=None, order_by=None, limit=None, dict_cursor=True):
     '''
     execute a query on a table
 
@@ -63,6 +64,7 @@ def select_elements_in_table(conn, table_name, var_names, where=None, order_by =
 
     return execute_query(conn, query, dict_cursor)
 
+
 def insert_row_in_table(conn, table_name, var_names, var_values, returning=None, custom_statement=''):
     '''
     insert a row in a table
@@ -77,7 +79,9 @@ def insert_row_in_table(conn, table_name, var_names, var_values, returning=None,
     var_values_SQL, placeholders = sql_value_formatter(var_values)
     var_names_SQL = sql_name_formatter(var_names)
 
-    statement = sql.SQL("INSERT INTO {} ({}) VALUES ({}) ").format(sql.SQL(table_name),
+    statement = sql.SQL(
+        "INSERT INTO {} ({}) VALUES ({}) ").format(
+            sql.SQL(table_name),
             sql.SQL(', ').join(var_names_SQL),
             sql.SQL(', ').join(var_values_SQL))
 
@@ -108,7 +112,7 @@ def update_table(conn, table_name, var_names, var_values, condition=None,
     if len(names_values) == 0:
         return ""
 
-    statement += sql.SQL(', ').join(sql.SQL("{} = {} ").format(i,j) for i,j in names_values.var_name_pairs)
+    statement += sql.SQL(', ').join(sql.SQL("{} = {} ").format(i, j) for i, j in names_values.var_name_pairs)
 
     if condition is not None:
         statement += sql.SQL("WHERE {0} = {1} ").format(sql.Identifier(condition[0]), sql.Literal(condition[1]))
@@ -121,6 +125,7 @@ def update_table(conn, table_name, var_names, var_values, condition=None,
 
     return execute_statement(conn, statement, placeholders=names_values.placeholders)
 
+
 def alter_table(conn, table_name, colums, dtypes):
     '''
     add columns to a table
@@ -132,6 +137,8 @@ def alter_table(conn, table_name, colums, dtypes):
         dtypes (tuple<str>) : type of the column's
     '''
     statement = sql.SQL("ALTER TABLE {} ADD COLUMN ").format(sql.SQL(table_name))
-    statement += sql.SQL(" , ADD COLUMN ").join(sql.SQL(" {0} {1} ").format(sql.Identifier(i), sql.SQL(j)) for i, j in zip(colums, dtypes))
+    statement += sql.SQL(
+        " , ADD COLUMN ").join(sql.SQL(" {0} {1} ").format(
+            sql.Identifier(i), sql.SQL(j)) for i, j in zip(colums, dtypes))
 
     return execute_statement(conn, statement)

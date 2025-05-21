@@ -8,7 +8,7 @@ from .virtual_gate_matrix import VirtualGateMatrix
 
 
 def load_virtual_gate(name, real_gates, virtual_gates=None, matrix=None, normalization=False):
-    conn = SQL_database_manager().conn_local
+    conn = SQL_database_manager().connection
     virtual_gate_queries.generate_table(conn)
 
     if virtual_gates is None:
@@ -42,7 +42,7 @@ def load_virtual_gate(name, real_gates, virtual_gates=None, matrix=None, normali
 
 
 def save_virtual_gate(vg_matrix):
-    conn = SQL_database_manager().conn_local
+    conn = SQL_database_manager().connection
 
     if virtual_gate_queries.check_var_in_table_exist(conn, vg_matrix.name):
         # merge in case there are more entries

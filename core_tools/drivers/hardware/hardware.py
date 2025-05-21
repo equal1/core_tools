@@ -64,7 +64,7 @@ class awg2dac_ratios_mgr():
         self._ratios = dict()
 
     def add(self, gates):
-        conn = SQL_database_manager().conn_local
+        conn = SQL_database_manager().connection
         AWG_2_dac_ratio_queries.generate_table(conn)
         ratios_db = AWG_2_dac_ratio_queries.get_AWG_2_dac_ratios(conn, 'general')
 
@@ -95,7 +95,7 @@ class awg2dac_ratios_mgr():
 
         self._ratios[gate] = value
 
-        conn = SQL_database_manager().conn_local
+        conn = SQL_database_manager().connection
         ratios_db = AWG_2_dac_ratio_queries.get_AWG_2_dac_ratios(conn, 'general')
         ratios_db[gate] = value
         AWG_2_dac_ratio_queries.set_AWG_2_dac_ratios(conn, 'general', ratios_db)

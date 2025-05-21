@@ -9,7 +9,7 @@ class alter_dataset:
 
     @staticmethod
     def update_name(uuid, name):
-        conn = SQL_database_manager().conn_local
+        conn = SQL_database_manager().connection
         update_table(conn, 'global_measurement_overview',
                      ('exp_name', 'table_synchronized'), (name, False),
                      condition=('uuid', uuid))
@@ -17,7 +17,7 @@ class alter_dataset:
 
     @staticmethod
     def star_measurement(uuid, state):
-        conn = SQL_database_manager().conn_local
+        conn = SQL_database_manager().connection
         update_table(conn, 'global_measurement_overview',
                      ('starred', 'table_synchronized'), (state, False),
                      condition=('uuid', uuid))
@@ -55,7 +55,8 @@ class query_for_samples():
         else:
             statement += ";"
 
-        con = SQL_database_manager().conn_local
+        db_mgr = SQL_database_manager()
+        con = db_mgr.connection
         cur = con.cursor()
         cur.execute(statement)
         res = cur.fetchall()
@@ -63,13 +64,6 @@ class query_for_samples():
         cur.close()
         con.commit()
 
-        con = SQL_database_manager().conn_remote
-        cur = con.cursor()
-        cur.execute(statement)
-        res = cur.fetchall()
-        result |= set(sum(res, ()))
-        cur.close()
-        con.commit()
         return sorted(list(result))
 
 
@@ -241,7 +235,7 @@ class query_for_measurement_results:
 
     @staticmethod
     def _execute(statement, remote):
-        connection = SQL_database_manager().conn_remote if remote else SQL_database_manager().conn_local
+        connection = SQL_database_manager().remote_connection if remote else SQL_database_manager().connection
         cur = connection.cursor()
         cur.execute(statement)
         res = cur.fetchall()

@@ -1,10 +1,13 @@
+import getpass
+import json
+
+import psycopg2
+
 from core_tools.data.SQL.SQL_common_commands import execute_statement, execute_query
 from core_tools.data.SQL.SQL_common_commands import insert_row_in_table, update_table
 
 from core_tools.data.SQL.SQL_utility import generate_uuid
-from core_tools.data.SQL.connect import SQL_conn_info_local, sample_info
-
-import psycopg2, json
+from core_tools.data.SQL.connect import sample_info
 
 
 def is_valid_info(arg):
@@ -37,9 +40,11 @@ class sample_info_queries:
         if is_valid_info(sample) and is_valid_info(set_up) and is_valid_info(project):
             var_names = ('sample_info_hash', 'sample', 'set_up', 'project')
             var_values = (set_up+project+sample, sample, set_up, project)
-            insert_row_in_table(conn, sample_info_queries.table_name, var_names, var_values,
+            insert_row_in_table(
+                conn, sample_info_queries.table_name, var_names, var_values,
                 custom_statement='ON CONFLICT DO NOTHING')
             conn.commit()
+
 
 class measurement_overview_queries:
     '''
@@ -47,7 +52,7 @@ class measurement_overview_queries:
 
     The raw data is saved in table measurement_parameters (Old version: data_table_queries)
     '''
-    table_name="global_measurement_overview"
+    table_name = "global_measurement_overview"
 
     @staticmethod
     def generate_table(conn):
@@ -59,33 +64,40 @@ class measurement_overview_queries:
         statement += "set_up text NOT NULL,"
         statement += "project text NOT NULL,"
         statement += "sample text NOT NULL,"
-        statement += "creasted_by text NOT NULL," # database account used when ds was created
+        statement += "creasted_by text NOT NULL,"  # database account used when ds was created
 
         statement += "start_time TIMESTAMP, "
         statement += "stop_time TIMESTAMP, "
 
-        statement += "exp_data_location text," # Database table name of parameter table. Older datasets. [SdS]
+        statement += "exp_data_location text,"  # Database table name of parameter table. Older datasets. [SdS]
         statement += "snapshot BYTEA, "
         statement += "metadata BYTEA,"
         statement += "keywords JSONB, "
         statement += "starred BOOL DEFAULT False, "
 
         statement += "completed BOOL DEFAULT False, "
-        statement += "data_size int," # Total size of data. Is written at finish.
+        statement += "data_size int,"  # Total size of data. Is written at finish.
         statement += "data_cleared BOOL DEFAULT False, "     # Note [SdS]: Column is not used
-        statement += "data_update_count int DEFAULT 0, " # number of times the data has been updated on local client
+        statement += "data_update_count int DEFAULT 0, "  # number of times the data has been updated on local client
 
         statement += "data_synchronized BOOL DEFAULT False,"  # data + param table sync'd
-        statement += "table_synchronized BOOL DEFAULT False," # global_measurements_overview sync'd
-        statement += "sync_location text); "                  # Note [SdS]: Column is abused for migration to new measurement_parameters table
+        statement += "table_synchronized BOOL DEFAULT False,"  # global_measurements_overview sync'd
+        # Note [SdS]: Column is abused for migration to new measurement_parameters table
+        statement += "sync_location text); "
 
-        statement += "CREATE INDEX IF NOT EXISTS id_indexed ON {} USING BTREE (id) ;".format(measurement_overview_queries.table_name)
-        statement += "CREATE INDEX IF NOT EXISTS uuid_indexed ON {} USING BTREE (uuid) ;".format(measurement_overview_queries.table_name)
-        statement += "CREATE INDEX IF NOT EXISTS starred_indexed ON {} USING BTREE (starred) ;".format(measurement_overview_queries.table_name)
-        statement += "CREATE INDEX IF NOT EXISTS date_day_index ON {} USING BTREE (project, set_up, sample) ;".format(measurement_overview_queries.table_name)
+        statement += "CREATE INDEX IF NOT EXISTS id_indexed ON {} USING BTREE (id) ;".format(
+            measurement_overview_queries.table_name)
+        statement += "CREATE INDEX IF NOT EXISTS uuid_indexed ON {} USING BTREE (uuid) ;".format(
+            measurement_overview_queries.table_name)
+        statement += "CREATE INDEX IF NOT EXISTS starred_indexed ON {} USING BTREE (starred) ;".format(
+            measurement_overview_queries.table_name)
+        statement += "CREATE INDEX IF NOT EXISTS date_day_index ON {} USING BTREE (project, set_up, sample) ;".format(
+            measurement_overview_queries.table_name)
 
-        statement += "CREATE INDEX IF NOT EXISTS data_synced_index ON {} USING BTREE (data_synchronized);".format(measurement_overview_queries.table_name)
-        statement += "CREATE INDEX IF NOT EXISTS table_synced_index ON {} USING BTREE (table_synchronized);".format(measurement_overview_queries.table_name)
+        statement += "CREATE INDEX IF NOT EXISTS data_synced_index ON {} USING BTREE (data_synchronized);".format(
+            measurement_overview_queries.table_name)
+        statement += "CREATE INDEX IF NOT EXISTS table_synced_index ON {} USING BTREE (table_synchronized);".format(
+            measurement_overview_queries.table_name)
 
         execute_statement(conn, statement)
         conn.commit()
@@ -93,7 +105,7 @@ class measurement_overview_queries:
     @staticmethod
     def update_local_table(conn):
         # Only do this on local database.
-        # The update of the table on the remote database takes very long and afterwards other clients with old SW crash.
+        # The updating remote database makes it incompatible with old client software.
         statement = "ALTER TABLE global_measurement_overview ADD COLUMN IF NOT EXISTS data_update_count int DEFAULT 0;"
         execute_statement(conn, statement)
         conn.commit()
@@ -111,20 +123,21 @@ class measurement_overview_queries:
         '''
         if (not is_valid_info(sample_info.project)
             or not is_valid_info(sample_info.set_up)
-            or not is_valid_info(sample_info.sample)):
+                or not is_valid_info(sample_info.sample)):
             raise Exception(f'Sample info not valid: {sample_info}')
 
         uuid = generate_uuid()
+        username = getpass.getuser()
         # NOTE: column sync_location is abused for migration to new format
         var_names = (
-                'uuid', 'set_up', 'project', 'sample',
-                'creasted_by', 'exp_name', 'sync_location', 'exp_data_location',
-                'start_time')
+            'uuid', 'set_up', 'project', 'sample',
+            'creasted_by', 'exp_name', 'sync_location', 'exp_data_location',
+            'start_time')
         var_values = (
-                uuid, str(sample_info.set_up), str(sample_info.project), str(sample_info.sample),
-                SQL_conn_info_local.user, exp_name, 'New measurement_parameters', '',
-                psycopg2.sql.SQL("TO_TIMESTAMP({})").format(psycopg2.sql.Literal(start_time))
-                )
+            uuid, str(sample_info.set_up), str(sample_info.project), str(sample_info.sample),
+            username, exp_name, 'New measurement_parameters', '',
+            psycopg2.sql.SQL("TO_TIMESTAMP({})").format(psycopg2.sql.Literal(start_time))
+        )
 
         returning = ('id', 'uuid')
         query_outcome = insert_row_in_table(conn, measurement_overview_queries.table_name,
@@ -184,9 +197,9 @@ class measurement_overview_queries:
 
     @staticmethod
     def is_completed(conn, uuid):
-        completed =  execute_query(conn,
-            "SELECT completed FROM {} where uuid = {};".format(measurement_overview_queries.table_name, uuid))
+        completed = execute_query(conn, f"SELECT completed FROM global_measurement_overview where uuid = {uuid};")
         return completed[0][0]
+
 
 class data_table_queries:
     '''
@@ -194,7 +207,7 @@ class data_table_queries:
     '''
     @staticmethod
     def generate_table(conn, table_name):
-        statement = "CREATE TABLE if not EXISTS {} ( ".format(table_name )
+        statement = "CREATE TABLE if not EXISTS {} ( ".format(table_name)
         statement += "id SERIAL primary key, "
         statement += "param_id BIGINT, "
         statement += "nth_set INT, "
@@ -211,7 +224,7 @@ class data_table_queries:
         statement += "write_cursor INT, "
         statement += "total_size INT, "
         statement += "oid INT, "
-        statement += "synchronized BOOL DEFAULT False," # Note [SdS]: Column is not used
+        statement += "synchronized BOOL DEFAULT False,"  # Note [SdS]: Column is not used
         statement += "sync_location text);"             # Note [SdS]: Column is not used
         execute_statement(conn, statement)
         conn.commit()
@@ -226,15 +239,16 @@ class data_table_queries:
             data_item (m_param_raw) : raw format of the measurement parameter
         '''
         var_names = ("param_id", "nth_set", "nth_dim", "param_id_m_param",
-            "setpoint", "setpoint_local", "name_gobal", "name",
-            "label", "unit", "depencies", "shape",
-            "write_cursor", "total_size", "oid")
+                     "setpoint", "setpoint_local", "name_gobal", "name",
+                     "label", "unit", "depencies", "shape",
+                     "write_cursor", "total_size", "oid")
 
         var_values = (data_item.param_id, data_item.nth_set, data_item.nth_dim,
-            data_item.param_id_m_param, data_item.setpoint, data_item.setpoint_local,
-            data_item.name_gobal, data_item.name, data_item.label,
-            data_item.unit, psycopg2.extras.Json(data_item.dependency), psycopg2.extras.Json(data_item.shape),
-            0, data_item.size, data_item.oid)
+                      data_item.param_id_m_param, data_item.setpoint, data_item.setpoint_local,
+                      data_item.name_gobal, data_item.name, data_item.label,
+                      data_item.unit, psycopg2.extras.Json(
+                          data_item.dependency), psycopg2.extras.Json(data_item.shape),
+                      0, data_item.size, data_item.oid)
 
         insert_row_in_table(conn, table_name, var_names, var_values)
 
@@ -242,7 +256,8 @@ class data_table_queries:
     def update_cursors_in_meas_tab(conn, table_name, data_items):
         statement = ""
         for i in range(len(data_items)):
-            statement += "UPDATE {} SET write_cursor = {} WHERE id = {}; ".format(table_name, data_items[i].data_buffer.cursor, i+1)
+            statement += "UPDATE {} SET write_cursor = {} WHERE id = {}; ".format(
+                table_name, data_items[i].data_buffer.cursor, i+1)
 
         execute_statement(conn, statement)
 
@@ -288,7 +303,7 @@ class measurement_parameters_queries:
             data_items (list[m_param_raw]) : raw format of the measurement parameter
         '''
         var_names = (
-            "exp_uuid","param_index",
+            "exp_uuid", "param_index",
             "param_id", "nth_set", "nth_dim", "param_id_m_param",
             "setpoint", "setpoint_local", "name_gobal", "name",
             "label", "unit", "depencies", "shape",
@@ -310,8 +325,8 @@ class measurement_parameters_queries:
         statement = ""
         for index, item in enumerate(data_items):
             statement += (
-                    "UPDATE measurement_parameters "
-                    f"SET write_cursor = {item.data_buffer.cursor} "
-                    f"WHERE exp_uuid = {exp_uuid} AND param_index = {index}; ")
+                "UPDATE measurement_parameters "
+                f"SET write_cursor = {item.data_buffer.cursor} "
+                f"WHERE exp_uuid = {exp_uuid} AND param_index = {index}; ")
 
         execute_statement(conn, statement)

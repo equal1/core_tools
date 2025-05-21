@@ -57,8 +57,6 @@ def create_new_data_set(experiment_name, measurement_snapshot, *m_params):
     '''
     logger.info(f"creating new dataset {experiment_name}")
     SQL_mgr = SQL_dataset_creator()
-    if SQL_mgr.conn is None:
-        raise Exception('No database connection set up')
 
     ds = data_set_raw(exp_name=experiment_name)
 

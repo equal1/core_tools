@@ -1,20 +1,19 @@
-from core_tools.data.SQL.connect import SQL_conn_info_local, SQL_conn_info_remote, sample_info
 from core_tools.data.SQL.SQL_connection_mgr import SQL_database_manager
 
 
 from core_tools.utility.variable_mgr.var_mgr_sql import var_sql_queries
 from core_tools.utility.variable_mgr.qml.gui_controller import GUI_controller
-import psycopg2
+
 
 class variable_descriptor:
-    def __init__(self, name, unit, category,step, value=0, skip_init=False):
+    def __init__(self, name, unit, category, step, value=0, skip_init=False):
         self.name = name
         self.unit = unit
         self.step = step
         self.category = category
 
-        if skip_init == False:
-            var_sql_queries.add_variable(variable_mgr().conn_local, name , unit, category, step, value)
+        if skip_init is False:
+            var_sql_queries.add_variable(variable_mgr().conn_local, name, unit, category, step, value)
 
     def __get__(self, obj, objtype=None):
         return obj.vars[self.name]
@@ -31,13 +30,14 @@ class variable_descriptor:
 
     @value.setter
     def value(self, value):
-        return self.__set__(variable_mgr(),value)
+        return self.__set__(variable_mgr(), value)
 
     def __repr__(self):
         return f'{self.__class__}: {self.name}: {self.value} [{self.unit}]'
 
     def __str__(self):
         return f'{self.name}: {self.value} [{self.unit}]'
+
 
 class variable_mgr():
     __instance = None
@@ -51,23 +51,23 @@ class variable_mgr():
     def __init__(self):
         # fetch the connection from the database object, no need to connect multiple times.
         if self.conn_local is None:
-            self.conn_local = SQL_database_manager().conn_local
+            self.conn_local = SQL_database_manager().connection
 
             self.__GUI = None
             self.data = dict()
             self.vars = dict()
             self.__load_variables()
         elif self.conn_local.closed:
-            self.conn_local = SQL_database_manager().conn_local
+            self.conn_local = SQL_database_manager().connection
 
     def __repr__(self):
-        c=self.__class__
+        c = self.__class__
         name = c.__module__ + '.' + c.__name__
         return f'<{name} at {id(self):x}>: {self.number_of_categories} categories, {self.number_of_variables} variables'
 
     @property
     def number_of_variables(self) -> int:
-        return sum( len(item) for item in self.data.values() )
+        return sum(len(item) for item in self.data.values())
 
     @property
     def number_of_categories(self) -> int:
@@ -90,14 +90,14 @@ class variable_mgr():
     def update_column_name(self, old, new):
         var_sql_queries.change_column_name(self.conn_local, old, new)
 
-    def add_variable(self, category, name ,unit, step, value=0, skip_init=False):
+    def add_variable(self, category, name, unit, step, value=0, skip_init=False):
         if not hasattr(self, name):
-            my_desc = variable_descriptor(name, unit, category,step, value, skip_init)
+            my_desc = variable_descriptor(name, unit, category, step, value, skip_init)
             if category not in self.data.keys():
                 self.data[category] = dict()
             self.data[category][name] = my_desc
             setattr(self, name, my_desc)
-            if skip_init == False:
+            if skip_init is False:
                 self.vars = var_sql_queries.get_all_values(self.conn_local)
                 if self.__GUI is not None:
                     self.__GUI.set_data()
@@ -125,23 +125,24 @@ class variable_mgr():
         super().__delattr__(variable_name)
 
         if self.__GUI is not None:
-                    self.__GUI.set_data()
+            self.__GUI.set_data()
 
     def __getitem__(self, item):
         return getattr(self, item)
 
-    def __getattribute__(self, name): #little hack to make make the descriptors work.
+    def __getattribute__(self, name):  # little hack to make make the descriptors work.
         attr = super().__getattribute__(name)
         if isinstance(attr, variable_descriptor):
             return attr.__get__(self, attr)
         return attr
 
-    def __setattr__(self, name, value): #little hack to make make the descriptors work.
+    def __setattr__(self, name, value):  # little hack to make make the descriptors work.
         try:
             attr = super().__getattribute__(name)
             return attr.__set__(self, value)
         except AttributeError:
             return super().__setattr__(name, value)
+
 
 if __name__ == '__main__':
     from core_tools.data.SQL.connect import set_up_local_storage, set_up_remote_storage
@@ -157,15 +158,15 @@ if __name__ == '__main__':
     except:
         pass
     for var in list(t.vars.keys())[2:]:
-        x,y = t.get_history(var)
+        x, y = t.get_history(var)
         plt.title(var)
         plt.figure(figsize=(8, 6), dpi=80)
         idx = (x >= np.datetime64('2021-07-05T03:30')) & (x <= np.datetime64('2021-08-25T03:30'))
         fig, axs = plt.subplots()
         average = np.average(y[idx])
-        std  =np.std(y[idx])
+        std = np.std(y[idx])
         # plt.ylim((average-std*1.5,average+std*1.5))
-        axs.plot(x[idx],y[idx])
+        axs.plot(x[idx], y[idx])
         for label in axs.get_xticklabels(which='major'):
             label.set(rotation=30, horizontalalignment='right')
         # plt.show()

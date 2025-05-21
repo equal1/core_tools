@@ -3,22 +3,11 @@ definition of storage locations and initializer for storage.
 '''
 from core_tools.data.name_validation import validate_data_identifier_value
 
-class SQL_descriptor(object):
-    def __init__(self, required=False):
-        self.val = None
-
-    def __set__(self, obj, val):
-        self.val = val
-
-    def __get__(self, obj, objtype):
-        if self.val is None:
-            raise ConnectionError('No sample information provided\n\n** Please check the docs (set up section). \n\n')
-        return self.val
 
 class sample_info:
-    project = SQL_descriptor(True)
-    set_up = SQL_descriptor(True)
-    sample = SQL_descriptor(True)
+    project: str | None = None
+    set_up: str | None = None
+    sample: str | None = None
 
     def __init__(self, project, set_up, sample):
         if project is not None:
@@ -35,70 +24,51 @@ class sample_info:
         return f"{sample_info.project}: {sample_info.set_up}-{sample_info.sample}"
 
 
-class conn_info_descriptor:
-    def __set_name__(self, owner, name):
-        setattr(owner,'__'+name, None)
-        self.name = '__' + name
-        self.owner = owner
-
-    def __set__(self, obj, val):
-        setattr(self.owner, self.name, val)
-
-    def __get__(self, obj, objtype):
-        if getattr(self.owner, self.name) is None:
-            if objtype is SQL_conn_info_local:
-                val =  getattr(SQL_conn_info_remote, self.name)
-            elif objtype is SQL_conn_info_remote:
-                val =  getattr(SQL_conn_info_local, self.name)
-
-            if val is None:
-                raise ConnectionError('Nor a local server/remote server, please check the set up section of the dataset documentation.')
-
-            return val
-
-        return objtype.__dict__[self.name]
-
-
-'''
-if one of the two connection object is not configured it will automatically fall back to the other one.
-'''
 class SQL_conn_info_local:
-    host = conn_info_descriptor()
-    port = conn_info_descriptor()
-    user = conn_info_descriptor()
-    passwd = conn_info_descriptor()
-    dbname = conn_info_descriptor()
-    readonly = conn_info_descriptor()
+    host: str | None = None
+    port: int = None
+    user: str | None = None
+    passwd: str | None = None
+    dbname: str | None = None
+    readonly: bool = False
 
     def __init__(self, host, port, user, passwd, dbname, readonly=False):
-        self.host = host
-        self.port = port
-        self.user = user
-        self.passwd = passwd
-        self.dbname = dbname
-        self.readonly = readonly
+        SQL_conn_info_local.host = host
+        SQL_conn_info_local.port = port
+        SQL_conn_info_local.user = user
+        SQL_conn_info_local.passwd = passwd
+        SQL_conn_info_local.dbname = dbname
+        SQL_conn_info_local.readonly = readonly
 
     def __repr__(self):
-        return f'{self.__class__}: host {self.host}, port {self.port}, user {self.user}, passwd *, dbname {self.dbname}, readonly {self.readonly}'
+        return (
+            f'{self.__class__}: host {self.host}, port {self.port}, user {self.user}, passwd *, '
+            f'dbname {self.dbname}, readonly {self.readonly}'
+            )
+
 
 class SQL_conn_info_remote:
-    host = conn_info_descriptor()
-    port = conn_info_descriptor()
-    user = conn_info_descriptor()
-    passwd = conn_info_descriptor()
-    dbname = conn_info_descriptor()
-    readonly = conn_info_descriptor()
+    host: str | None = None
+    port: int = None
+    user: str | None = None
+    passwd: str | None = None
+    dbname: str | None = None
+    readonly: bool = False
 
     def __init__(self, host, port, user, passwd, dbname, readonly=False):
-        self.host = host
-        self.port = port
-        self.user = user
-        self.passwd = passwd
-        self.dbname = dbname
-        self.readonly = readonly
+        SQL_conn_info_remote.host = host
+        SQL_conn_info_remote.port = port
+        SQL_conn_info_remote.user = user
+        SQL_conn_info_remote.passwd = passwd
+        SQL_conn_info_remote.dbname = dbname
+        SQL_conn_info_remote.readonly = readonly
 
     def __repr__(self):
-        return f'{self.__class__}: host {self.host}, port {self.port}, user {self.user}, passwd *, dbname {self.dbname}, readonly {self.readonly}'
+        return (
+            f'{self.__class__}: host {self.host}, port {self.port}, user {self.user}, passwd *, '
+            f'dbname {self.dbname}, readonly {self.readonly}'
+            )
+
 
 def set_up_local_storage(user, passwd, dbname, project, set_up, sample, readonly=False):
     '''
@@ -116,12 +86,13 @@ def set_up_local_storage(user, passwd, dbname, project, set_up, sample, readonly
     SQL_conn_info_local('localhost', 5432, user, passwd, dbname, readonly)
     sample_info(project, set_up, sample)
 
+
 def set_up_remote_storage(host, port, user, passwd, dbname, project, set_up, sample, readonly=False):
     '''
     Set up the specification for the datastorage needed to store/retrieve measurements.
 
     Args:
-        host (str) : host that is used for storage, e.g. "localhost" for local or "spin_data.tudelft.nl" for global storage
+        host (str) : host that is used for storage, e.g. "vanvliet.qutech.tudelft.nl"
         port (int) : port number to connect through, the default it 5432
         user (str) : name of the user to connect with
         passwd (str) : password of the user
@@ -134,6 +105,7 @@ def set_up_remote_storage(host, port, user, passwd, dbname, project, set_up, sam
     SQL_conn_info_remote(host, port, user, passwd, dbname, readonly)
     sample_info(project, set_up, sample)
 
+
 def set_up_local_and_remote_storage(host, port,
                                     user_local, passwd_local, dbname_local,
                                     user_remote, passwd_remote, dbname_remote,
@@ -143,7 +115,7 @@ def set_up_local_and_remote_storage(host, port,
     Set up the specification for the datastorage needed to store/retrieve measurements.
 
     Args:
-        host (str) : host that is used for storage, e.g. "localhost" for local or "spin_data.tudelft.nl" for global storage
+        host (str) : host that is used for storage, e.g. "vanvliet.qutech.tudelft.nl"
         port (int) : port number to connect through, the default it 5432
 
         user_local (str) : [local server] name of the user to connect with
