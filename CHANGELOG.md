@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[1.5.16] - 2025-05-21
+
+- Fixed VideoMode step during play bug.
+
 ## \[1.5.15] - 2025-05-21
 
 - Log KeyboardInterrupt exception to know where the measurement was interrupted.
