@@ -1,8 +1,9 @@
 from setuptools import setup, find_packages
 
-setup(name="core_tools",
+setup(
+    name="core_tools",
     version="1.5.14",
-    packages = find_packages(),
+    packages=find_packages(),
     python_requires=">=3.10",
     install_requires=[
           'pyqt5 >= 5.15.1',
@@ -17,6 +18,7 @@ setup(name="core_tools",
           'ruamel-yaml',
           # 'pulse_lib',
           'qdarkstyle',
+          'qt-dataviewer',
       ],
     package_data={
         "core_tools": ["py.typed"],
