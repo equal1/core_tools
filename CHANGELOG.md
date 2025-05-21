@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[1.5.15] - 2025-05-21
+
+- Log KeyboardInterrupt exception to know where the measurement was interrupted.
+- Changed database connection management for connect/disconnect issues.
+
 ## \[1.5.14] - 2025-05-15
 
 - Fixed ScriptRunner video mode start/stop.
