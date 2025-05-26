@@ -131,17 +131,17 @@ class SQL_dataset_creator:
             sync2local (bool): sync measurement to local database
         '''
         db_mgr = SQL_database_manager()
-        conn = db_mgr.connection
         sync = False
-        if not load_ds_queries.check_uuid(conn, exp_uuid):
+        remote = False
+        if not load_ds_queries.check_uuid(db_mgr.connection, exp_uuid):
             if (db_mgr.remote_connection_configured
                     and load_ds_queries.check_uuid(db_mgr.remote_connection, exp_uuid)):
-                conn = db_mgr.remote_connection
+                remote = True
                 sync = sync2local
             else:
                 raise ValueError(f"uuid {exp_uuid}, does not exist in the local/remote database.")
 
-        ds_raw = load_ds_queries.get_dataset_raw(db_mgr, exp_uuid)
+        ds_raw = load_ds_queries.get_dataset_raw(db_mgr, exp_uuid, remote=remote)
         if sync:
             sample_info_list = sync_mgr_queries.get_sample_info_list(db_mgr.connection)
             sync_agent = _SyncAgent(db_mgr.connection, db_mgr.remote_connection)

@@ -73,13 +73,18 @@ class buffer_writer(buffer_reference):
 
 
 class buffer_reader(buffer_reference):
-    def __init__(self, db_mgr, oid, shape):
+    def __init__(self, db_mgr, oid, shape, remote: bool = False):
+        """Read data stream from database (large object).
+        Args:
+            remote: if True explictly use remote connection.
+        """
         self.db_mgr = db_mgr
         self.buffer = np.full(shape, np.nan).ravel()
         self.buffer_lambda = buffer_reference.reshaper(shape)
         self.oid = oid
+        self.remote = remote
 
-        conn = db_mgr.connection
+        conn = db_mgr.connection if not remote else db_mgr.remote_connection
         self.lobject = conn.lobject(oid, 'rb')
         self.cursor = 0
         self.sync()
@@ -88,7 +93,7 @@ class buffer_reader(buffer_reference):
         '''
         update the buffer (for datasets that are still being written)
         '''
-        conn = self.db_mgr.connection
+        conn = self.db_mgr.connection if not self.remote else self.db_mgr.remote_connection
         self.lobject = conn.lobject(self.oid, 'rb')
         self.lobject.seek(self.cursor*8)
         binary_data = self.lobject.read()

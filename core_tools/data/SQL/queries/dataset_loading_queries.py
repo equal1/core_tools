@@ -43,9 +43,10 @@ class load_ds_queries:
         return return_data[0][0]
 
     @staticmethod
-    def get_dataset_raw(db_mgr, exp_uuid):
+    def get_dataset_raw(db_mgr, exp_uuid, remote: bool = False):
+        conn = db_mgr.connection if not remote else db_mgr.remote_connection
         data = select_elements_in_table(
-            db_mgr.connection,
+            conn,
             load_ds_queries.table_name,
             var_names=('*',),
             where=("uuid", exp_uuid))[0]
@@ -70,16 +71,16 @@ class load_ds_queries:
         new_format = data['sync_location'] == 'New measurement_parameters'
         exp_uuid = data['uuid']
         ds.measurement_parameters_raw = load_ds_queries.__get_dataset_raw_dataclasses(
-            db_mgr, ds.SQL_datatable, new_format, exp_uuid)
+            db_mgr, ds.SQL_datatable, new_format, exp_uuid, remote=remote)
         return ds
 
     @staticmethod
-    def __get_dataset_raw_dataclasses(db_mgr, table_name, new_format, exp_uuid):
+    def __get_dataset_raw_dataclasses(db_mgr, table_name, new_format, exp_uuid, remote: bool = False):
         var_names = ("param_id", "nth_set", "nth_dim", "param_id_m_param",
                      "setpoint", "setpoint_local", "name_gobal", "name", "label",
                      "unit", "depencies", "shape", "total_size", "oid")
 
-        conn = db_mgr.connection
+        conn = db_mgr.connection if not remote else db_mgr.remote_connection
         if new_format:
             return_data = select_elements_in_table(conn, 'measurement_parameters', var_names,
                                                    where=("exp_uuid", exp_uuid),
@@ -95,7 +96,7 @@ class load_ds_queries:
             raw_data_row = m_param_raw(*row)
             if np.prod(raw_data_row.shape) >= 2**27:
                 raise Exception(f"Dataset too big. Var '{raw_data_row.name}'{tuple(raw_data_row.shape)} >= 1 GB.")
-            raw_data_row.data_buffer = buffer_reader(db_mgr, raw_data_row.oid, raw_data_row.shape)
+            raw_data_row.data_buffer = buffer_reader(db_mgr, raw_data_row.oid, raw_data_row.shape, remote=remote)
             data_raw.append(raw_data_row)
 
         return data_raw

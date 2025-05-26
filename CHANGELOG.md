@@ -1,7 +1,12 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
-## \[1.5.16] - 2025-05-22
+## \[1.5.18] - 2025-05-26
+
+- Fixed loading of dataset from remote server when local database is configured as well.
+- Cleanup and extra logging.
+
+## \[1.5.17] - 2025-05-22
 
 - Fixed bugs made in previous release.
 
