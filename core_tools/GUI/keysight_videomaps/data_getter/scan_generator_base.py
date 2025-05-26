@@ -394,7 +394,8 @@ class FastScanGeneratorBase:
         raise NotImplementedError("create_1D_scan should be implemented")
 
     @abstractmethod
-    def create_2D_scan(self,
+    def create_2D_scan(
+            self,
             gate1: str, swing1: float, n_pt1: int,
             gate2: str, swing2: float, n_pt2: int,
             t_step: float,
