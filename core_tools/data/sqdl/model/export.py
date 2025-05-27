@@ -77,7 +77,7 @@ def set_export_synchronized(action: ExportAction, name: str, rating: bool) -> tu
         Two boolean values, indicating successful synchronization for data
             and metadata, respectively.
     """
-    with DatabaseManager().conn_local as conn:
+    with DatabaseManager().connection as conn:
         c: Cursor = conn.cursor()
         c.execute(
             query="""
@@ -136,7 +136,7 @@ def set_exported(measurement, path: str, is_complete: bool = False) -> None:
     update_time = datetime.now()
     completed = measurement.completed or is_complete
 
-    with DatabaseManager().conn_local as conn:
+    with DatabaseManager().connection as conn:
         cursor = conn.cursor()
         cursor.execute(
             query="""
@@ -170,7 +170,7 @@ def set_exported(measurement, path: str, is_complete: bool = False) -> None:
 
 
 def set_export_error(uuid, message, code=99) -> None:
-    with DatabaseManager().conn_local as conn:
+    with DatabaseManager().connection as conn:
         cursor = conn.cursor()
         cursor.execute(
             query="""
@@ -318,7 +318,7 @@ def fetch_single_for_query(
     """
     if parameters is None:
         parameters = {}
-    with DatabaseManager().conn_local as conn:
+    with DatabaseManager().connection as conn:
         cursor = conn.cursor(cursor_factory=factory)
         cursor.execute(
             query,
@@ -338,7 +338,7 @@ def fetch_all_for_query(
     if parameters is None:
         parameters = {}
 
-    with DatabaseManager().conn_local as conn:
+    with DatabaseManager().connection as conn:
         cursor = conn.cursor(cursor_factory=factory)
         cursor.execute(
             query,

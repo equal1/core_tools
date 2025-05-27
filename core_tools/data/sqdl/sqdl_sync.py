@@ -24,12 +24,8 @@ class SQDLSync():
 
     def __init__(self, config):
         database = DatabaseManager()
+        database.connection
 
-        if not database.local_conn_active:
-            raise Exception(
-                "Local database setup is a requirement for SQDL Sync, but no "
-                "local configuration has been found."
-            )
         get_database_version(assert_requirement=True)
 
         base_path = config.get("sqdl_sync.base_path", "~/.sqdl")

@@ -87,7 +87,7 @@ def get_export_path(
         base_path,
         project,
         timestamp.strftime("%Y-%m-%d"),
-        uuid
+        str(uuid)
     ).expanduser()
     export_json = Path(export_path, f"{uuid}.json")
     return export_path, export_json
@@ -126,14 +126,15 @@ def export_data(ds, scope, path, timer, updates, write_raw=True):
         if size > 2**28:
             raise Exception(f"Dataset {uuid} too big. Var {var['name']}{tuple(var['shape'])} > 2 GB.")
 
-    hdf5_name = ds_path + f'/ds_{uuid}.hdf5'
+    hdf5_name = str(ds_path) + f"/ds_{uuid}.hdf5"
     dsx = ds2xarray(ds)
     if write_raw:
+        logger.info(f"Writing .hdf5 file: {hdf5_name}")
         timer.time('save hdf5')
         save_xr_hdf5(dsx, hdf5_name)
         updates.upload_raw_data = True
 
-    return dsx, ds_path, var_descr
+    return dsx, str(ds_path), var_descr
 
 
 def check_for_metadata_changes(file_path: Path, name: str, starred: bool):

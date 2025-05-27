@@ -5,39 +5,51 @@ from core_tools.data.SQL.model import version
 
 
 def get_setting(parameter: str) -> str | None:
-    with DatabaseManager().conn_local as cursor:
+    with DatabaseManager().connection as conn:
+        cursor = conn.cursor()
         cursor.execute(
-            sql="""
-                SELECT value FROM settings WHERE parameter = ?
+            """
+                SELECT value FROM settings WHERE parameter = %s
             """,
-            parameters=(parameter,)
+            vars=(parameter,)
         )
         value = cursor.fetchone()
     return value
 
 
 def set_setting(parameter: str, value: str):
-    with DatabaseManager().conn_local as cursor:
+    with DatabaseManager().connection as conn:
+        cursor = conn.cursor()
         cursor.execute(
             """
-                INSERT OR REPLACE INTO settings (parameter, value) VALUES (?, ?)
+                INSERT INTO settings
+                    (parameter, value)
+                VALUES
+                    (%(parameter)s, %(value)s)
+                ON CONFLICT (parameter) DO UPDATE
+                SET
+                    value = %(value)s
             """,
-            (parameter, value)
+            vars={
+                "parameter": parameter,
+                "value": value
+            }
         )
 
 
 def clear_setting(parameter: str):
-    with DatabaseManager().conn_local as cursor:
+    with DatabaseManager().connection as conn:
+        cursor = conn.cursor()
         cursor.execute(
             """
-                DELETE FROM settings WHERE parameter = ?
+                DELETE FROM settings WHERE parameter = %s
             """,
-            (parameter,)
+            vars=(parameter,)
         )
 
 
 def get_database_version(assert_requirement=False) -> str:
     version.get_database_version(
-        DatabaseManager().conn_local,
+        DatabaseManager().connection,
         assert_requirement
     )

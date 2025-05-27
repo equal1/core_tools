@@ -292,7 +292,7 @@ class Exporter:
         )
         logger.info(f"checking for previous export: path = {export_path}")
 
-        if not export_path.exists():
+        if not (export_path.exists() and export_json.exists()):
             logger.warning("no previous export found")
             return False, False
 
