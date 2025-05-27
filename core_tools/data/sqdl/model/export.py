@@ -111,18 +111,18 @@ def set_export_synchronized(action: ExportAction, name: str, rating: bool) -> tu
     return data_synced, table_synced
 
 
-def get_expired_export_action(expiration_time: datetime) -> ExportAction | None:
+def get_expired_export_action(expiration_threshold: datetime) -> ExportAction | None:
     query = """
         SELECT      uuid
         FROM        coretools_exported
         WHERE       make_data_immutable = False
-            AND     most_recent_update_time < %(expiration_time)s
+            AND     most_recent_update_time < %(expiration_threshold)s
             AND     export_state = 1
         ORDER BY    uuid
         LIMIT       1
     """
     parameters = {
-        "expiration_time": expiration_time
+        "expiration_threshold": expiration_threshold
     }
     data = fetch_single_for_query(query=query, parameters=parameters)
     if data:
@@ -202,30 +202,6 @@ def get_failed_exports() -> list[tuple[int, bool]]:
     """
     records = fetch_all_for_query(query)
     return records
-
-
-def get_measurement_scope(uid: int) -> dict[str, str] | None:
-    """
-    Get a measurements scope and project values.
-
-    :param uid: Measurement UID from the core-tools database.
-    :returns: A dictionary containing scope and project parameters, if the
-        measurement exists.
-    """
-    parameters = {
-        "uuid": uid
-    }
-    query = build_generic_select_query(
-        select_columns=["scope", "project"],
-        from_table="global_measurement_overview",
-        where_equal_conditions=parameters,
-    )
-    result = fetch_single_for_query(
-        query=query,
-        parameters=parameters,
-        factory=RealDictCursor,
-    )
-    return result
 
 
 def get_measurement_completed(uid: int) -> bool | None:

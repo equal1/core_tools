@@ -188,11 +188,8 @@ class Exporter:
             action: ExportAction
     ) -> int:
         """
-        Parse exception message to extract error code and establish retry delay.
+        Parse exception message to extract error code.
 
-        # REVIEW: these codes do not make sense anymore, because only 99, 101 and 102 are used.
-        code 10 - 49: known error and (possibly) recoverable
-        code 50 - 90: known error and retry
         code 99: unspecified error
         code > 100: known error and not recoverable, e.g. corrupt dataset.
 
@@ -212,7 +209,6 @@ class Exporter:
             # NOTE: new action will be created when data is written
             logger.warning(message)
             error_code = 101
-
         elif message.startswith("m_param with id"):
             # NOTE: new action will be created when data is written
             logger.warning(message)
@@ -270,7 +266,7 @@ class Exporter:
             return action, True
 
         action = export.get_expired_export_action(
-            self.measurement_expiration_time
+            self.get_measurement_expiration_threshold()
         )
         if action is not None:
             logger.info(
@@ -335,9 +331,7 @@ class Exporter:
                 path=ds_path
             )
 
-    # REVIEW: a property that returns different values on succesive calls is not really a property. (Yes, I wrote the original code..)
-    @property
-    def measurement_expiration_time(self):
+    def get_measurement_expiration_threshold(self):
         return datetime.now() - timedelta(days=1)
 
     def measurement_is_completed(self, measurement):
@@ -353,14 +347,14 @@ class Exporter:
                     return False
         return True
 
-    def get_scope(self, uid: int) -> str:
+    def validate_scope(self, ds: DataSet) -> str:
         """
         Retrieve scope value for measurement.
         If no scope is defined in the core-tools database, check if the project
         name matches the current config, and extract scope from there.
 
         Args:
-            uid: Measurement UID.
+            ds: Measurement DataSet object.
 
         Returns:
             Scope name.
@@ -368,32 +362,25 @@ class Exporter:
         Raises:
             Exception: If no scope is found.
         """
-        # REVIEW: why not add scope to DataSet? That would save this extra query.
-        response = export.get_measurement_scope(uid)
-        assert response is not None, f"Unreachable: No measurement with UID '{uid}'"
-
-        # REVIEW: why look into the dictionary that comes from the database and not return scope or None?
-        scope = response["scope"]
+        scope = ds.scope
         if scope is None:
-            # REVIEW: This will still log many warnings after setting the scope.
-            #         Log warning when there is project is not equal to current project.
-            #         Log info when the scope is assigned.
             logger.info(
-                f"No scope value found for measurement with ID {uid}, "
+                f"No scope value found for measurement with UID {ds.exp_uuid}, "
                 "checking local config for a matching project name with scope."
             )
-            if response["project"] == self.project:
+            if ds.project == self.project:
+                # Only handle (expired) exports that belong to the current project.
                 scope = self.scope
 
         if scope is None:
-            # Actually, this should never happen since the query filter on scopy is not null or project == current project.
-            raise Exception(f"No scope for measurement with ID '{uid}'")
+            raise Exception(
+                f"No scope for measurement with UID {ds.exp_uuid}"
+            )
         return scope
 
     def export_measurement(self, measurement: DataSet, is_complete: bool
                            ) -> tuple[SqdlUpdate, str]:
-        # REVIEW: why cast to int?
-        scope = self.get_scope(int(measurement.exp_uuid))
+        scope = self.validate_scope(measurement)
         updates = SqdlUpdate(measurement.exp_uuid, scope, raw_final=is_complete)
         try:
             dsx, ds_path, var_descr = export_data(
