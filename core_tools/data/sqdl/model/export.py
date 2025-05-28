@@ -230,15 +230,17 @@ def build_generic_select_query(
     """
     Query builder for generic SELECT queries.
 
-    :param select_columns: List of column names to select.
-    :param from_table: Name of the table from which to select.
-    :param where_logic_operator: Instruction on how to concatenate multiple where
-        conditions. Can be 'OR' or 'AND', method argument in case-insensitive.
-    :param where_equal_conditions: Collection of key-value pairs used to filter
-        specified columns (keys) on containing a specific value (values).
-        Concatenated together using AND logic operator.
-    :param limit: Maximum number of elements to return from the query.
-    :returns: Composed SQL query.
+    Args:
+        select_columns: List of column names to select.
+        from_table: Name of the table from which to select.
+        where_logic_operator: Instruction on how to concatenate multiple where
+            conditions. Can be 'OR' or 'AND', method argument in case-insensitive.
+        where_equal_conditions: Collection of key-value pairs used to filter
+            specified columns (keys) on containing a specific value (values).
+            Concatenated together using AND logic operator.
+        limit: Maximum number of elements to return from the query.
+    Returns:
+        Composed SQL query.
     """
 
     # basic SELECT query
