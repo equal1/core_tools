@@ -160,14 +160,16 @@ class sync_mgr_queries:
             update_table(
                 conn_dest,
                 'global_measurement_overview',
-                content_to_update.keys(), content_to_update.values(),
+                content_to_update.keys(),
+                content_to_update.values(),
                 condition=("uuid", uuid))
 
         if source_content['data_synchronized']:
             update_table(
                 sync_agent.conn_local,
                 'global_measurement_overview',
-                ('table_synchronized', ), (True, ),
+                ('table_synchronized', ),
+                (True, ),
                 condition=("uuid", uuid))
 
         conn_src.commit()
@@ -212,8 +214,7 @@ class sync_mgr_queries:
             raw_data_table_name, sync_location, data_update_count = select_elements_in_table(
                 conn_src,
                 'global_measurement_overview',
-                ('exp_data_location', 'sync_location',
-                 'data_update_count'),
+                ('exp_data_location', 'sync_location', 'data_update_count'),
                 where=("uuid", uuid),
                 dict_cursor=False
             )[0]
@@ -234,7 +235,8 @@ class sync_mgr_queries:
         update_table(
             sync_agent.conn_local,
             'global_measurement_overview',
-            ('data_synchronized', ), (True, ),
+            ('data_synchronized', ),
+            (True, ),
             conditions=conditions)
         sync_agent.conn_local.commit()
 
@@ -292,13 +294,15 @@ class sync_mgr_queries:
             'measurement_parameters',
             ('write_cursor', 'total_size', 'oid'),
             where=('exp_uuid', exp_uuid),
-            order_by=('param_index', ''))
+            order_by=('param_index', '')
+        )
         res_dest = select_elements_in_table(
             conn_dest,
             'measurement_parameters',
             ('write_cursor', 'total_size', 'oid'),
             where=('exp_uuid', exp_uuid),
-            order_by=('param_index', ''))
+            order_by=('param_index', '')
+        )
 
         logger.info(f'update large object {exp_uuid}')
         for i in range(len(res_src)):
@@ -326,6 +330,8 @@ class sync_mgr_queries:
             update_table(
                 conn_dest,
                 'measurement_parameters',
+                ('write_cursor', ),
+                (src_cursor, ),
                 condition=('oid', dest_oid)
             )
 
