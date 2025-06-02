@@ -1,5 +1,7 @@
 import json
 import logging
+import numpy as np
+import psycopg2
 
 import psycopg2
 import numpy as np
@@ -16,12 +18,13 @@ class sync_mgr_queries:
 
     @staticmethod
     def get_sample_info_list(conn):
-        '''
+        """
         Returns:
             list[tuple[str,str,str]]: list with (project, set_up, sample)
-        '''
+        """
         res = select_elements_in_table(
-            conn, "sample_info_overview",
+            conn,
+            "sample_info_overview",
             ('project', 'set_up', 'sample'),
             dict_cursor=False)
 
@@ -29,33 +32,35 @@ class sync_mgr_queries:
 
     @staticmethod
     def get_sample_info_from_measurements(conn):
-        '''
+        """
         Returns:
             list[tuple[str,str,str]]: list with (project, set_up, sample)
-        '''
-        res = execute_query(conn,
-                            "SELECT DISTINCT project, set_up, sample from global_measurement_overview")
+        """
+        res = execute_query(conn, "SELECT DISTINCT project, set_up, sample from global_measurement_overview")
 
         return res
 
     @staticmethod
     def delete_all_sample_info_overview(conn):
-        '''
+        """
         Deletes all entries from sample info overview.
-        '''
+        """
         print('WARNING: Deleting all entries from sample_info_overview')
         execute_statement(conn, 'DELETE FROM sample_info_overview')
 
     @staticmethod
     def get_sync_items_meas_table(sync_agent):
-        '''
+        """
         returns:
             meaurments <list<long>> : list of uuid's who's table entries need a sync
-        '''
+        """
         res = select_elements_in_table(
-            sync_agent.conn_local, "global_measurement_overview",
-            ('uuid', ), where=("table_synchronized", False),
-            dict_cursor=False)
+            sync_agent.conn_local,
+            "global_measurement_overview",
+            ('uuid', ),
+            where=("table_synchronized", False),
+            dict_cursor=False
+        )
 
         uuid_entries = list(sum(res, ()))
         uuid_entries.sort()
@@ -64,14 +69,14 @@ class sync_mgr_queries:
 
     @staticmethod
     def sync_table(sync_agent, uuid, to_local=False, sample_info_list=None):
-        '''
+        """
         syncs row in the table to the remote for the given uuid
 
         Args:
             sync_agent: class holding local and remote connection
             uuid (int): unique id of measurement
             to_local (bool): if True syncs from remote to local server
-        '''
+        """
         if to_local:
             conn_src = sync_agent.conn_remote
             conn_dest = sync_agent.conn_local
@@ -81,14 +86,20 @@ class sync_mgr_queries:
 
         # check if uuid exists
         entry_exists = select_elements_in_table(
-            conn_dest, "global_measurement_overview",
-            ('uuid', ), where=("uuid", uuid),
-            dict_cursor=False)
+            conn_dest,
+            "global_measurement_overview",
+            ('uuid', ),
+            where=("uuid", uuid),
+            dict_cursor=False
+        )
 
         source_content = select_elements_in_table(
-            conn_src, "global_measurement_overview",
-            ('*', ), where=("uuid", uuid),
-            dict_cursor=True)[0]
+            conn_src,
+            "global_measurement_overview",
+            ('*', ),
+            where=("uuid", uuid),
+            dict_cursor=True
+        )[0]
         sync_mgr_queries.convert_SQL_raw_table_entry_to_python(source_content)
 
         del source_content['id']
@@ -110,15 +121,31 @@ class sync_mgr_queries:
                     sample_info_queries.add_sample(conn_dest, *sample_info)
                     sample_info_list.append(sample_info)
 
+            # test for presence of optional "scope" column, if missing, drop it from sync data
+            #  added as a patch for pre-database-versioning issues
+            dest_content = select_elements_in_table(
+                conn_dest,
+                "global_measurement_overview",
+                ('*', ),
+                dict_cursor=True,
+                limit=1,
+            )[0]
+            if "scope" not in dest_content:
+                _ = source_content.pop("scope")
+
             insert_row_in_table(
-                conn_dest, 'global_measurement_overview',
+                conn_dest,
+                'global_measurement_overview',
                 tuple(source_content.keys()), tuple(source_content.values()))
         else:
             logger.info(f'update measurement entry {uuid}')
             dest_content = select_elements_in_table(
-                conn_dest, "global_measurement_overview",
-                ('*', ), where=("uuid", uuid),
-                dict_cursor=True)[0]
+                conn_dest,
+                "global_measurement_overview",
+                ('*', ),
+                where=("uuid", uuid),
+                dict_cursor=True,
+            )[0]
             sync_mgr_queries.convert_SQL_raw_table_entry_to_python(dest_content)
 
             del dest_content['id']
@@ -131,14 +158,18 @@ class sync_mgr_queries:
                     content_to_update[key] = source_content[key]
 
             update_table(
-                conn_dest, 'global_measurement_overview',
-                content_to_update.keys(), content_to_update.values(),
+                conn_dest,
+                'global_measurement_overview',
+                content_to_update.keys(),
+                content_to_update.values(),
                 condition=("uuid", uuid))
 
         if source_content['data_synchronized']:
             update_table(
-                sync_agent.conn_local, 'global_measurement_overview',
-                ('table_synchronized', ), (True, ),
+                sync_agent.conn_local,
+                'global_measurement_overview',
+                ('table_synchronized', ),
+                (True, ),
                 condition=("uuid", uuid))
 
         conn_src.commit()
@@ -146,13 +177,16 @@ class sync_mgr_queries:
 
     @staticmethod
     def get_sync_items_raw_data(sync_agent):
-        '''
+        """
         returns:
             meaurments <list<long>> : list of uuid's where the data needs to be updated of.
-        '''
+        """
         res = select_elements_in_table(
-            sync_agent.conn_local, "global_measurement_overview",
-            ('uuid', ), where=('data_synchronized', False), dict_cursor=False)
+            sync_agent.conn_local,
+            "global_measurement_overview",
+            ('uuid', ),
+            where=('data_synchronized', False),
+            dict_cursor=False)
 
         uuid_entries = list(sum(res, ()))
         uuid_entries.sort()
@@ -174,14 +208,16 @@ class sync_mgr_queries:
                 'global_measurement_overview',
                 ('exp_data_location', 'sync_location'),
                 where=("uuid", uuid),
-                dict_cursor=False)[0]
+                dict_cursor=False
+            )[0]
         else:
             raw_data_table_name, sync_location, data_update_count = select_elements_in_table(
                 conn_src,
                 'global_measurement_overview',
                 ('exp_data_location', 'sync_location', 'data_update_count'),
                 where=("uuid", uuid),
-                dict_cursor=False)[0]
+                dict_cursor=False
+            )[0]
 
         # NOTE: column sync_location is abused for migration to new format
         new_format = sync_location == 'New measurement_parameters'
@@ -197,24 +233,30 @@ class sync_mgr_queries:
         if not to_local:
             conditions.append(("data_update_count", data_update_count))
         update_table(
-            sync_agent.conn_local, 'global_measurement_overview',
-            ('data_synchronized', ), (True, ),
+            sync_agent.conn_local,
+            'global_measurement_overview',
+            ('data_synchronized', ),
+            (True, ),
             conditions=conditions)
         sync_agent.conn_local.commit()
 
     @staticmethod
     def _sync_raw_data_table(conn_src, conn_dest, exp_uuid):
         n_row_src = select_elements_in_table(
-            conn_src, 'measurement_parameters',
+            conn_src,
+            'measurement_parameters',
             (psycopg2.sql.SQL('COUNT(*)'), ),
             where=('exp_uuid', exp_uuid),
-            dict_cursor=False)[0][0]
+            dict_cursor=False
+        )[0][0]
 
         n_row_dest = select_elements_in_table(
-            conn_dest, 'measurement_parameters',
+            conn_dest,
+            'measurement_parameters',
             (psycopg2.sql.SQL('COUNT(*)'), ),
             where=('exp_uuid', exp_uuid),
-            dict_cursor=False)[0][0]
+            dict_cursor=False
+        )[0][0]
 
         if n_row_src != n_row_dest:
             logger.info(f'update parameters {exp_uuid}')
@@ -222,10 +264,12 @@ class sync_mgr_queries:
             execute_statement(conn_dest, remove_old_params)
 
             res_src = select_elements_in_table(
-                conn_src, 'measurement_parameters',
+                conn_src,
+                'measurement_parameters',
                 ('*', ),
                 where=('exp_uuid', exp_uuid),
-                order_by=('param_index', ''))
+                order_by=('param_index', '')
+            )
 
             for result in res_src:
                 lobject = conn_dest.lobject(0, 'w')
@@ -235,8 +279,10 @@ class sync_mgr_queries:
                 result['depencies'] = json.dumps(result['depencies'])
                 result['shape'] = json.dumps(result['shape'])
                 insert_row_in_table(
-                    conn_dest, 'measurement_parameters',
-                    result.keys(), result.values())
+                    conn_dest,
+                    'measurement_parameters',
+                    result.keys(), result.values()
+                )
 
         conn_src.commit()
         conn_dest.commit()
@@ -244,15 +290,19 @@ class sync_mgr_queries:
     @staticmethod
     def _sync_raw_data_lobj(conn_src, conn_dest, exp_uuid):
         res_src = select_elements_in_table(
-            conn_src, 'measurement_parameters',
+            conn_src,
+            'measurement_parameters',
             ('write_cursor', 'total_size', 'oid'),
             where=('exp_uuid', exp_uuid),
-            order_by=('param_index', ''))
+            order_by=('param_index', '')
+        )
         res_dest = select_elements_in_table(
-            conn_dest, 'measurement_parameters',
+            conn_dest,
+            'measurement_parameters',
             ('write_cursor', 'total_size', 'oid'),
             where=('exp_uuid', exp_uuid),
-            order_by=('param_index', ''))
+            order_by=('param_index', '')
+        )
 
         logger.info(f'update large object {exp_uuid}')
         for i in range(len(res_src)):
@@ -278,29 +328,42 @@ class sync_mgr_queries:
             src_lobject.close()
 
             update_table(
-                conn_dest, 'measurement_parameters',
-                ('write_cursor', ), (src_cursor, ),
-                condition=('oid', dest_oid))
+                conn_dest,
+                'measurement_parameters',
+                ('write_cursor', ),
+                (src_cursor, ),
+                condition=('oid', dest_oid)
+            )
 
         conn_src.commit()
         conn_dest.commit()
 
     @staticmethod
     def _sync_raw_data_table_old(conn_src, conn_dest, raw_data_table_name):
-        n_row_src = select_elements_in_table(conn_src, raw_data_table_name,
-                                             (psycopg2.sql.SQL('COUNT(*)'), ), dict_cursor=False)[0][0]
+        n_row_src = select_elements_in_table(
+            conn_src,
+            raw_data_table_name,
+            (psycopg2.sql.SQL('COUNT(*)'), ),
+            dict_cursor=False
+        )[0][0]
 
-        table_name = execute_query(conn_dest,
-                                   "SELECT to_regclass('{}.{}');".format('public', raw_data_table_name))[0][0]
+        table_name = execute_query(
+            conn_dest,
+            f"SELECT to_regclass('public.{raw_data_table_name}');"
+        )[0][0]
 
         n_row_dest = 0
         if table_name is not None:
-            n_row_dest = select_elements_in_table(conn_dest, raw_data_table_name,
-                                                  (psycopg2.sql.SQL('COUNT(*)'), ), dict_cursor=False)[0][0]
+            n_row_dest = select_elements_in_table(
+                conn_dest,
+                raw_data_table_name,
+                (psycopg2.sql.SQL('COUNT(*)'), ),
+                dict_cursor=False,
+            )[0][0]
 
         if n_row_src != n_row_dest or table_name is None:
             print('update raw table', raw_data_table_name)
-            get_rid_of_table = "DROP TABLE IF EXISTS {} ; ".format(raw_data_table_name)
+            get_rid_of_table = f"DROP TABLE IF EXISTS {raw_data_table_name} ; "
             execute_statement(conn_dest, get_rid_of_table)
 
             data_table_queries.generate_table(conn_dest, raw_data_table_name)
@@ -314,18 +377,31 @@ class sync_mgr_queries:
                 result['write_cursor'] = 0
                 result['depencies'] = json.dumps(result['depencies'])
                 result['shape'] = json.dumps(result['shape'])
-                insert_row_in_table(conn_dest, raw_data_table_name,
-                                    result.keys(), result.values())
+                insert_row_in_table(
+                    conn_dest,
+                    raw_data_table_name,
+                    result.keys(),
+                    result.values()
+                )
 
         conn_src.commit()
         conn_dest.commit()
 
     @staticmethod
     def _sync_raw_data_lobj_old(conn_src, conn_dest, raw_data_table_name):
-        res_src = select_elements_in_table(conn_src, raw_data_table_name,
-                                           ('write_cursor', 'total_size', 'oid'), order_by=('id', ''))
-        res_dest = select_elements_in_table(conn_dest, raw_data_table_name,
-                                            ('write_cursor', 'total_size', 'oid'), order_by=('id', ''))
+        res_src = select_elements_in_table(
+            conn_src,
+            raw_data_table_name,
+
+            ('write_cursor', 'total_size', 'oid'),
+            order_by=('id', '')
+        )
+        res_dest = select_elements_in_table(
+            conn_dest,
+            raw_data_table_name,
+            ('write_cursor', 'total_size', 'oid'),
+            order_by=('id', '')
+        )
 
         print('update large object', raw_data_table_name)
         for i in range(len(res_src)):
@@ -351,8 +427,13 @@ class sync_mgr_queries:
             dest_lobject.close()
             src_lobject.close()
 
-            update_table(conn_dest, raw_data_table_name,
-                         ('write_cursor',), (src_cursor,), condition=('oid', dest_oid))
+            update_table(
+                conn_dest,
+                raw_data_table_name,
+                ('write_cursor',),
+                (src_cursor,),
+                condition=('oid', dest_oid)
+            )
 
         conn_src.commit()
         conn_dest.commit()

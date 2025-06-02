@@ -49,7 +49,8 @@ class load_ds_queries:
             conn,
             load_ds_queries.table_name,
             var_names=('*',),
-            where=("uuid", exp_uuid))[0]
+            where=("uuid", exp_uuid)
+        )[0]
 
         if data['stop_time'] is None:
             data['stop_time'] = data['start_time']
@@ -62,7 +63,7 @@ class load_ds_queries:
 
         ds = data_set_raw(
             exp_id=data['id'], exp_uuid=data['uuid'], exp_name=data['exp_name'],
-            set_up=data['set_up'], project=data['project'], sample=data['sample'],
+            set_up=data['set_up'], project=data['project'], sample=data['sample'], scope=data.get('scope'),
             UNIX_start_time=data['start_time'].timestamp(), UNIX_stop_time=data['stop_time'].timestamp(),
             SQL_datatable=data['exp_data_location'], snapshot=data['snapshot'], metadata=data['metadata'],
             keywords=data['keywords'], completed=data['completed'], starred=data['starred'], )

@@ -20,75 +20,79 @@ class data_set:
 
     @property
     def completed(self):
-        return self._data_set__data_set_raw.completed
+        return self.__data_set_raw.completed
 
     @property
     def dbname(self):
-        return self._data_set__data_set_raw.dbname
+        return self.__data_set_raw.dbname
 
     @property
     def table_name(self):
-        return self._data_set__data_set_raw.SQL_table_name
+        return self.__data_set_raw.SQL_table_name
 
     @property
     def name(self):
-        return self._data_set__data_set_raw.exp_name
+        return self.__data_set_raw.exp_name
 
     @property
     def exp_id(self):
-        return self._data_set__data_set_raw.exp_id
+        return self.__data_set_raw.exp_id
 
     @property
     def exp_uuid(self):
-        return self._data_set__data_set_raw.exp_uuid
+        return self.__data_set_raw.exp_uuid
 
     @property
     def exp_name(self):
-        return self._data_set__data_set_raw.exp_name
+        return self.__data_set_raw.exp_name
 
     @property
     def project(self):
-        return self._data_set__data_set_raw.project
+        return self.__data_set_raw.project
 
     @property
     def set_up(self):
-        return self._data_set__data_set_raw.set_up
+        return self.__data_set_raw.set_up
+
+    @property
+    def scope(self):
+        return self.__data_set_raw.scope
 
     @property
     def sample_name(self):
-        return self._data_set__data_set_raw.sample
+        return self.__data_set_raw.sample
 
     @property
     def metadata(self):
-        return self._data_set__data_set_raw.metadata
+        return self.__data_set_raw.metadata
 
     @property
     def snapshot(self):
-        return self._data_set__data_set_raw.snapshot
+        return self.__data_set_raw.snapshot
 
     @property
     def keywords(self):
-        return self._data_set__data_set_raw.keywords
+        return self.__data_set_raw.keywords
 
     @property
     def starred(self):
-        return self._data_set__data_set_raw.starred
+        return self.__data_set_raw.starred
 
     @property
     def run_timestamp(self):
-        return datetime.fromtimestamp(self._data_set__data_set_raw.UNIX_start_time)
+        return datetime.fromtimestamp(self.__data_set_raw.UNIX_start_time)
 
     @property
     def run_timestamp_raw(self):
-        return self._data_set__data_set_raw.UNIX_start_time
+        return self.__data_set_raw.UNIX_start_time
 
     @property
     def completed_timestamp(self):
-        return datetime.fromtimestamp(self._data_set__data_set_raw.UNIX_stop_time)
+        return datetime.fromtimestamp(self.__data_set_raw.UNIX_stop_time)
 
     @property
     def completed_timestamp_raw(self):
-        return self._data_set__data_set_raw.UNIX_stop_time
+        return self.__data_set_raw.UNIX_stop_time
 
     def __len__(self):
         return len(self.__repr_attr_overview)

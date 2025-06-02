@@ -7,4 +7,4 @@ from .sqdl_reader import (
     sqdl_query,
     download_hdf5,
     download_hdf5_parallel,
-    )
+)

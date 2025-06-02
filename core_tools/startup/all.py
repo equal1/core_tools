@@ -5,9 +5,9 @@ from datetime import datetime, timedelta
 
 from .config import load_configuration
 from .db_connection import (
-        connect_local_db,
-        connect_remote_db,
-        connect_local_and_remote_db)
+    connect_local_db,
+    connect_remote_db,
+    connect_local_and_remote_db)
 from .sample_info import set_sample_info
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,14 @@ def _configure_sample(cfg):
     project = cfg['project']
     setup = cfg['setup']
     sample = cfg['sample']
-    set_sample_info(project, setup, sample)
+    try:
+        scope = cfg['scope']
+    except KeyError:
+        logger.warning("Configuration warning: newer versions of core-tools expect the 'scope' config parameter "
+                       "for compatibility with SQDL. Either specify the scope for your project, or suppress "
+                       "this warning by adding 'scope: ~' to your config file.")
+        scope = None
+    set_sample_info(project, setup, sample, scope)
 
 
 def _connect_to_db(cfg):
@@ -91,9 +98,9 @@ def _configure_logging(cfg):
     expiry_time = (datetime.now() - timedelta(max_age)).timestamp()
     for entry in os.scandir(path):
         if (entry.is_file()
-            and pattern.match(entry.name)
-            and entry.stat().st_mtime < expiry_time):
-                old_files.append(entry.name)
+                and pattern.match(entry.name)
+                and entry.stat().st_mtime < expiry_time):
+            old_files.append(entry.name)
 
     if old_files:
         print(f"Deleting {len(old_files)} log files older than {max_age} days")

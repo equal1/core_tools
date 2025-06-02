@@ -65,6 +65,7 @@ def xarray2ds(xr_ds):
             set_up = attrs.get('setup', attrs.get('set_up')),
             project = attrs['project'],
             sample = attrs['sample_name'],
+            scope = attrs.get('scope'),
             UNIX_start_time=datetime.fromisoformat(attrs['measurement_time']).timestamp(),
             UNIX_stop_time=datetime.fromisoformat(attrs['completed_time']).timestamp(),
             SQL_datatable='',

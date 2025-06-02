@@ -5,20 +5,24 @@ from core_tools.data.SQL.queries.dataset_creation_queries import sample_info_que
 from core_tools.startup.db_connection import is_connected
 
 
-def set_sample_info(project=None, setup=None, sample=None):
+def set_sample_info(project=None, setup=None, sample=None, scope=None):
     if project is None:
         project = sample_info.project
     else:
         validate_data_identifier_value(project)
+
     if setup is None:
         setup = sample_info.set_up
     else:
         validate_data_identifier_value(setup)
+
     if sample is None:
         sample = sample_info.sample
     else:
         validate_data_identifier_value(sample)
-    sample_info(project, setup, sample)
+
+    sample_info(project, setup, sample, scope)
+
     if is_connected():
         if SQL_conn_info_local.dbname is not None and not SQL_conn_info_local.readonly:
             db_mgr = SQL_database_manager()
