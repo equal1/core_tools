@@ -7,15 +7,10 @@ from core_tools.data.SQL.queries.dataset_gui_queries import (
         alter_dataset, query_for_samples, query_for_measurement_results)
 
 from core_tools.data.ds.data_set import load_by_uuid
-try:
-    from qt_dataviewer.core_tools import CoreToolsDatasetViewer
-    from qt_dataviewer import DatasetList
-    from packaging.version import Version
-    from qt_dataviewer import __version__ as qt_dataviewer_version
-    use_qt_dataviewer = True
-except ImportError:
-    from core_tools.data.gui.plot_mgr import data_plotter
-    use_qt_dataviewer = False
+from qt_dataviewer.core_tools import CoreToolsDatasetViewer
+from qt_dataviewer import DatasetList
+from packaging.version import Version
+from qt_dataviewer import __version__ as qt_dataviewer_version
 
 from core_tools.data.gui.data_browser_models.result_table_data_class import m_result_overview
 from core_tools.data.name_validation import validate_dataset_name
@@ -279,23 +274,20 @@ class signale_handler(QtQuick.QQuickView):
             logger.error(f'Failed to load dataset {uuid}', exc_info=True)
             return
         try:
-            if use_qt_dataviewer:
-                if Version(qt_dataviewer_version) < Version("0.3.10"):
-                    error_msg = "Update QT-DataViewer. Minimmum version 0.3.10"
-                    logger.error(error_msg)
-                    msg = QMessageBox()
-                    msg.setIcon(QMessageBox.Critical)
-                    msg.setText(error_msg)
-                    msg.setWindowTitle("Update QT-DataViewer")
-                    msg.setStandardButtons(QMessageBox.Ok)
-                    msg.exec_()
-                    raise Exception(error_msg)
+            if Version(qt_dataviewer_version) < Version("0.3.10"):
+                error_msg = "Update QT-DataViewer. Minimmum version 0.3.10"
+                logger.error(error_msg)
+                msg = QMessageBox()
+                msg.setIcon(QMessageBox.Critical)
+                msg.setText(error_msg)
+                msg.setWindowTitle("Update QT-DataViewer")
+                msg.setStandardButtons(QMessageBox.Ok)
+                msg.exec_()
+                raise Exception(error_msg)
 
-                datalist = DataList(self.data_overview_model, uuid)
-                p = CoreToolsDatasetViewer(ds, datalist=datalist)
-                datalist.viewer = p
-            else:
-                p = data_plotter(ds)
+            datalist = DataList(self.data_overview_model, uuid)
+            p = CoreToolsDatasetViewer(ds, datalist=datalist)
+            datalist.viewer = p
             self.plots.append(p)
 
             for i in range(len(self.plots)-1, -1, -1):
@@ -355,50 +347,48 @@ class signale_handler(QtQuick.QQuickView):
         self.plots = []
 
 
-if use_qt_dataviewer:
+class DataList(DatasetList):
+    def __init__(self, data_overview_model, uuid):
+        self.data_overview_model = data_overview_model
+        self.uuid = uuid
 
-    class DataList(DatasetList):
-        def __init__(self, data_overview_model, uuid):
-            self.data_overview_model = data_overview_model
-            self.uuid = uuid
+    def has_next(self):
+        # Note: data is ordered in descending order.
+        # So 'next' in time is lower index
+        index = self._get_index()
+        return index is not None and index > 0
 
-        def has_next(self):
-            # Note: data is ordered in descending order.
-            # So 'next' in time is lower index
-            index = self._get_index()
-            return index is not None and index > 0
+    def has_previous(self):
+        index = self._get_index()
+        return index is not None and index + 1 < len(self.data_overview_model._data)
 
-        def has_previous(self):
-            index = self._get_index()
-            return index is not None and index + 1 < len(self.data_overview_model._data)
+    def _get_index(self):
+        uuid = self.uuid
+        for i, row in enumerate(self.data_overview_model._data):
+            if row.uuid == uuid:
+                return i
+        return None
 
-        def _get_index(self):
-            uuid = self.uuid
-            for i, row in enumerate(self.data_overview_model._data):
-                if row.uuid == uuid:
-                    return i
+    def _load_ds(self, uuid):
+        try:
+            return load_by_uuid(uuid)
+        except Exception:
+            logger.error(f'Failed to load dataset {uuid}', exc_info=True)
+            # TODO raise Exception
             return None
 
-        def _load_ds(self, uuid):
-            try:
-                return load_by_uuid(uuid)
-            except Exception:
-                logger.error(f'Failed to load dataset {uuid}', exc_info=True)
-                # TODO raise Exception
-                return None
+    def get_next(self):
+        index = self._get_index()
+        if index is not None and index > 0:
+            self.uuid = self.data_overview_model._data[index-1].uuid
+            return self._load_ds(self.uuid)
+        logger.info(f"No next data (index = {index})")
+        raise StopIteration('No more datasets') from None
 
-        def get_next(self):
-            index = self._get_index()
-            if index is not None and index > 0:
-                self.uuid = self.data_overview_model._data[index-1].uuid
-                return self._load_ds(self.uuid)
-            logger.info(f"No next data (index = {index})")
-            raise StopIteration('No more datasets') from None
-
-        def get_previous(self):
-            index = self._get_index()
-            if index is not None and index + 1 < len(self.data_overview_model._data):
-                self.uuid = self.data_overview_model._data[index+1].uuid
-                return self._load_ds(self.uuid)
-            logger.info(f"No previous data (index = {index})")
-            raise StopIteration('No more datasets') from None
+    def get_previous(self):
+        index = self._get_index()
+        if index is not None and index + 1 < len(self.data_overview_model._data):
+            self.uuid = self.data_overview_model._data[index+1].uuid
+            return self._load_ds(self.uuid)
+        logger.info(f"No previous data (index = {index})")
+        raise StopIteration('No more datasets') from None
