@@ -1,7 +1,7 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
-## \[Unreleased\]
+## \[1.6.0\] - 2025-06-03
 
 ### Added
 - Added optional functionality for synchronising data with a remote instance of SQDL. Note that this functionality depends on the internally developed ```sqdl_client``` and ```sqdl_uploader``` packages, and is therefor only accessible by users associated with QuTech.
@@ -23,7 +23,7 @@ All notable changes to core_tools will be documented in this file.
     - Updated ```sample_info``` class and functionality to include the optional ```scope``` parameter.
     - Updated ```global_measurement_overview``` table with a new "Scope" column *local* database.
     - Added a warning about setting the ```scope``` config parameter to the core-tools start-up configuration method.
-    - Note that updating your remote database to include these columns is not required at this stage. The synchronisation process as defined by ```db_sync``` allows for this discrepancy between databases, facilitating a non-breaking upgrade. 
+    - Note that updating your remote database to include these columns is not required at this stage. The synchronisation process as defined by ```db_sync``` allows for this discrepancy between databases, facilitating a non-breaking upgrade.
 
 - Replaced the generate-table section of the DatabaseManager (see ```SQL_database_manager``` class in ```core_tools.data.SQL.SQL_database_mgr.py```) responsible for creating tables if they did not already exist, with the new versioning routine (see the Added section above).
 
@@ -31,6 +31,10 @@ All notable changes to core_tools will be documented in this file.
     - Note that the connection manager uses the value ```localhost``` to distinguish between local and remote connections. In order to guarentee this funcionality, misconfiguration of local and/or remote database ```address``` values will result in an ```AssertionError``` when running ```core_tools.configure("...")```.
 
 - Updated some examples in the DemoStation to use modern Mocks.
+
+### Removed
+
+- QML GUIs.
 
 ## \[1.5.18] - 2025-05-26
 
