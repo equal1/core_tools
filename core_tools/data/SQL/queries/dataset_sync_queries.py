@@ -59,6 +59,7 @@ class sync_mgr_queries:
             "global_measurement_overview",
             ('uuid', ),
             where=("table_synchronized", False),
+            limit=100,
             dict_cursor=False
         )
 
@@ -186,6 +187,7 @@ class sync_mgr_queries:
             "global_measurement_overview",
             ('uuid', ),
             where=('data_synchronized', False),
+            limit=1000,
             dict_cursor=False)
 
         uuid_entries = list(sum(res, ()))
