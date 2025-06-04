@@ -22,6 +22,10 @@ class data_set:
     def completed(self):
         return self.__data_set_raw.completed
 
+    @completed.setter
+    def completed(self, value: bool):
+        self.__data_set_raw.completed = value
+
     @property
     def dbname(self):
         return self.__data_set_raw.dbname
