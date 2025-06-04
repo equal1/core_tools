@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[1.6.1\] - 2025-06-04
+
+- Fixed bug in dataset refactoring.
+
 ## \[1.6.0\] - 2025-06-03
 
 ### Added
