@@ -12,7 +12,16 @@ import sys
 import json
 from pathlib import Path
 import logging
-from eq1x.util.utils import find_opx_element
+
+# For some reason we depend on the eq1x package for some utility functions
+def find_opx_element(opx_instr, search_name):
+    if opx_instr:
+        for element_name in opx_instr.config["elements"].keys():
+            if element_name == search_name:
+                return opx_instr
+    return None
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +163,7 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
         if opx.job:
             opx.job.halt()
         #qdac2 = station.get_component('opx_instr')
-        #qdac2.abort()  
+        #qdac2.abort()
 
 
     @qt_log_exception
@@ -277,7 +286,7 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
         else:
             self.virtual_gates.append(param_data_obj(parameter,  voltage_input, 1))
 
-        # Need to save away the handle to the voltage_input QDoubleSpinBox 
+        # Need to save away the handle to the voltage_input QDoubleSpinBox
         # so that we can update the different gates from the self.dependant_gate_map
         self.real_gates_qt_voltage_input[name] = voltage_input
 
@@ -289,8 +298,8 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
             return
 
         # The original function takes arg 'value' in the form of a Qt type which
-        # makes it a little awkward to reuse this function when running the 
-        # update_dependant_gates function, therefore the alt_val was added 
+        # makes it a little awkward to reuse this function when running the
+        # update_dependant_gates function, therefore the alt_val was added
         # so that a simple numeric value can be used instead  (ma)
         if alt_value:
             val = alt_value
@@ -346,7 +355,7 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
                 #     'Vds'         :  [[+0.5,  'Vcm',    +1.0 ,   0.0,   'HG07b'],  # changing Vds will update HG07b
                 #                       [-0.5,  'Vcm',     1.0 ,   0.0,   'HG12b']], # changing Vds will update HG12b
                 # where the following operation is performed
-                # gate2 =  gate*mult + gate1*mult1 + ofs 
+                # gate2 =  gate*mult + gate1*mult1 + ofs
                 # HG07b =   Vds*0.5  +   Vcm*1.0   + ofs
                 #print( f'(update_dependant_gates) {gate.name=} {value=} {dpgmap[gate.name]=}  ')
                 for dep in dpgmap[gate.name]:
@@ -479,7 +488,7 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
 
 
         return changed
-    
+
 
 
     ##############################################################
@@ -489,5 +498,3 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
 
         with open(SETTINGS_FILE, 'w') as f:
             json.dump(self.SETTINGS_DICT,f,  indent=4)
-
-
