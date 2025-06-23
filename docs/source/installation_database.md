@@ -12,18 +12,23 @@ Steps:
 1. Download [PostgreSQL](https://www.postgresql.org/download/)
 2. Go through the installer and install the database.
    Use a password for postgres that you can remember or store it on a safe place. You'll need it later.
-3. Choose a user name, password and a name for the local database. In the instructions below where it says
+3. Launch the psql program (c:\Program Files\PostgreSQL\<version>\bin) (press enter until the shell asks for the
+   password configured in the installation). 
+4. Choose a user name, password and a name for the local database. In the instructions below where it says
    __myusername__, __mypassword__ and __mydbname__ you should use the names you have chosen.
-4. Launch the psql program and make a database user and a database (press enter until the shell asks for the
-   password configured in the installation). Type the following commands:
+   Type the following commands:
 ```SQL
 CREATE USER myusername WITH PASSWORD 'mypasswd';
-CREATE DATABASE 'mydbname';
-GRANT ALL PRIVILEGES ON DATABASE 'mydbname' TO 'myusername';
-\connect 'mydbname'
-GRANT CREATE ON SCHEMA public TO 'myusername';
+CREATE DATABASE mydbname;
+GRANT ALL PRIVILEGES ON DATABASE mydbname TO myusername;
+\connect mydbname
+GRANT CREATE ON SCHEMA public TO myusername;
 ```
-*Note: The last line is required since release 15 of Postgresql.*
+Notes:
+* Single quotes around mypasswd are required.
+* Use lower case for myusername and mydbname. Postgres will convert these identifiers to lower case. 
+  You can use double quotes to avoid conversion to lower case, but then you must always use the double quotes.
+  Keeping everything lower case is much easier.
 
 
 
