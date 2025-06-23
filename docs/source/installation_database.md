@@ -12,8 +12,12 @@ Steps:
 1. Download [PostgreSQL](https://www.postgresql.org/download/)
 2. Go through the installer and install the database.
    Use a password for postgres that you can remember or store it on a safe place. You'll need it later.
-3. Launch the psql program (c:\Program Files\PostgreSQL\<version>\bin) (press enter until the shell asks for the
+3. Launch the psql program (press enter until the shell asks for the
    password configured in the installation). 
+   ```
+   cd \Program Files\PostgreSQL\<version>\bin
+   psql -U postgres
+   ```
 4. Choose a user name, password and a name for the local database. In the instructions below where it says
    __myusername__, __mypassword__ and __mydbname__ you should use the names you have chosen.
    Type the following commands:
