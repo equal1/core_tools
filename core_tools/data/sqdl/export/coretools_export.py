@@ -51,7 +51,7 @@ class Exporter:
         self.process = psutil.Process()
         self.active_action: ExportAction | None = None
 
-    def poll(self) -> None:
+    def poll(self) -> bool:
         self.loop_count += 1
         done_work = self.export_one()
         if not done_work:
@@ -77,6 +77,7 @@ class Exporter:
                 f"counts:{gc.get_count()} {gc.get_freeze_count()}"
             )
             logger.info(f"MEM2: {self.process.memory_info()}")
+        return done_work
 
     def export_one(self):
         """

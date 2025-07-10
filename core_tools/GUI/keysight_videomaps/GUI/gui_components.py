@@ -253,4 +253,3 @@ class OffsetsList(GuiElement):
             if gate != "<None>" and voltage != 0.0:
                 result[gate] = voltage
         return result
-

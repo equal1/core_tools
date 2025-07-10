@@ -50,9 +50,10 @@ class SQDLSync():
             self.next_tick = datetime.datetime.now() + self.tick_rate
 
             while True:
-                self.exporter.poll()
-                self.uploader.poll()
-                self.sleep_to_limit_rate()
+                work_done = self.exporter.poll()
+                work_done = work_done or self.uploader.poll()
+                if not work_done:
+                    self.sleep_to_limit_rate()
 
         except Exception as exc:
             logger.error(

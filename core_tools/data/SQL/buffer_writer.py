@@ -40,8 +40,9 @@ class buffer_writer(buffer_reference):
         self.buffer_lambda = buffer_reference.reshaper(input_buffer.shape)
 
         conn = db_mgr.connection
-        self.lobject = conn.lobject(0, 'w')
-        self.oid = self.lobject.oid
+        lobject = conn.lobject(0, 'w')
+        self.oid = lobject.oid
+        lobject.close()
         self.cursor = 0
         self.cursor_db = 0
 
@@ -56,20 +57,16 @@ class buffer_writer(buffer_reference):
         self.cursor += data.size
 
     def sync(self):
-        try:
-            if self.cursor - self.cursor_db != 0:
-                self.lobject.write((self.buffer[self.cursor_db:self.cursor]).tobytes())
-                self.cursor_db += self.cursor - self.cursor_db
-        except Exception:
-            # NOTE: After a commit the lobject is not valid anymore and must be created again.
-            #       The overhead for this is very small.
+        if self.cursor > self.cursor_db:
             conn = self.db_mgr.connection
-            self.lobject = conn.lobject(self.oid, 'w')
-            self.lobject.seek(self.cursor_db*8)
-            self.sync()
+            lobject = conn.lobject(self.oid, 'w')
+            lobject.seek(self.cursor_db*8)
+            lobject.write((self.buffer[self.cursor_db:self.cursor]).tobytes())
+            lobject.close()
+            self.cursor_db += self.cursor - self.cursor_db
 
     def close(self):
-        self.lobject.close()
+        pass
 
 
 class buffer_reader(buffer_reference):
@@ -83,9 +80,6 @@ class buffer_reader(buffer_reference):
         self.buffer_lambda = buffer_reference.reshaper(shape)
         self.oid = oid
         self.remote = remote
-
-        conn = db_mgr.connection if not remote else db_mgr.remote_connection
-        self.lobject = conn.lobject(oid, 'rb')
         self.cursor = 0
         self.sync()
 
@@ -94,13 +88,14 @@ class buffer_reader(buffer_reference):
         update the buffer (for datasets that are still being written)
         '''
         conn = self.db_mgr.connection if not self.remote else self.db_mgr.remote_connection
-        self.lobject = conn.lobject(self.oid, 'rb')
-        self.lobject.seek(self.cursor*8)
-        binary_data = self.lobject.read()
+        lobject = conn.lobject(self.oid, 'rb')
+        lobject.seek(self.cursor*8)
+        binary_data = lobject.read()
         data = np.frombuffer(binary_data)
+        lobject.close()
 
         self.buffer[self.cursor:self.cursor+data.size] = data
         self.cursor = self.cursor+data.size
 
     def close(self):
-        self.lobject.close()
+        pass

@@ -1,6 +1,13 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[1.6.2\] - 2025-07-10
+
+- Fixed loading virtual gate matrices from snapshot.
+- Improved speed of sQDL export and upload.
+- Improved database raw data read/write.
+- Improved error reporting from measurement.
+
 ## \[1.6.1\] - 2025-06-04
 
 - Fixed bug in dataset refactoring.

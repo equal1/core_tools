@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
-from qcodes import Parameter
+from qcodes.parameters import Parameter, ElapsedTimeParameter
 
 from pulse_lib.sequencer import sequencer, index_param
 
@@ -433,6 +433,7 @@ class Runner:
         self._m_values = {}
         self._action_stats = defaultdict(ActionStats)
         self._resume_at_label = None
+        self._exception_at = None
         self._skipped_setters = set()
 
     def run(self, reset_param=False, silent=False):
@@ -442,12 +443,18 @@ class Runner:
         self.pbar = progress_bar(self._n_pts) if not silent else None
         try:
             self._loop(self._root.actions)
-        except BaseException:
-            last_index = {
-                param.name: data
-                for param, data in self._setpoints
-            }
-            msg = f'Measurement stopped at {last_index}'
+        except BaseException as ex:
+            if isinstance(ex, KeyboardInterrupt):
+                msg = "Measurement interrupted"
+            else:
+                msg = "Measurement stopped"
+            if self._exception_at is not None:
+                last_index = {
+                    param.name: data
+                    for param, data in self._exception_at
+                }
+                msg += f' at {last_index}'
+
             if not silent:
                 print('\n'+msg, flush=True)
             logger.info(msg)
@@ -516,8 +523,8 @@ class Runner:
                         t_start += store_duration
                     except Break:
                         raise
-                    except Exception:
-                        raise Exception(f'Failure getting {m_param.name}: {value}')
+                    except Exception as ex:
+                        raise Exception(f'Failure getting {m_param.name}: {value}') from ex
 
                 elif isinstance(action, SequenceStart):
                     play_time = action.play()
@@ -540,6 +547,10 @@ class Runner:
                 self._action_stats[stats_name].add_time(time.perf_counter() - t_start)
             except Break as _break:
                 self._handle_break(_break)
+            except KeyboardInterrupt:
+                if self._exception_at is None:
+                    self._exception_at = self._setpoints.copy()
+                raise
 
         if n_setters == 0:
             self._inc_count()
@@ -557,10 +568,8 @@ class Runner:
                     self._loop(block.actions)
                     continue
                 t_start = time.perf_counter()
-                # @@@ ElapsedTime?
-                # if not isinstance(action.param, ElapsedTimeParameter):
-                #     action.param(value)
-                setter.param(value)
+                if not isinstance(setter.param, ElapsedTimeParameter):
+                    setter.param(value)
                 if setter._delay:
                     time.sleep(setter._delay)
                 value = setter.param()  # @@@ Why retrieve the value that is just written?
@@ -569,6 +578,10 @@ class Runner:
                 self._loop(block.actions)
             if setter.value_after is not None:
                 setter.param(setter.value_after)
+        except (KeyboardInterrupt, Exception):
+            if self._exception_at is None:
+                self._exception_at = self._setpoints.copy()
+            raise
         finally:
             self._setpoints.pop()
             self._skipped_setters.discard(setter)
@@ -591,6 +604,7 @@ class Runner:
         # resume with this action
         logger.info(f"Resuming at '{action.label}' npt={self._n}")
         self._resume_at_label = None
+        self._exception_at = None
         return False
 
     def _check_resume(self, action):
