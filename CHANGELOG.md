@@ -1,6 +1,15 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## Unreleased
+
+- Changed underlying implementation of doND measurements: now use Scan instead of scan-generic
+- Added integration tests for Scan
+- Added integration tests to verify Scan and scan-generic implementation of doND remain compatible
+- Added deprication warning on scan-generic: listed for later removal
+- Changed demo-station examples for Scan, with additional explanation on basic usage
+- Removed out-of-date demo-station examples for old measurements
+
 ## \[1.6.3\] - 2025-07-22
 
 - Fixed single shot HVI for case when next measurement is started within 450 to 500 ms after end of previous measurement.
