@@ -7,11 +7,11 @@ local_database:
     password: XXXX
     database: measurement_data
 
-remote_database:
-    user: username
-    password: yyyyy!
-    database: veldhorst_data
-    address: vanvliet.qutech.tudelft.nl:5432
+# remote_database:
+#     user: username
+#     password: yyyyy!
+#     database: veldhorst_data
+#     address: vanvliet.qutech.tudelft.nl:5432
 
-databrowser:
+qt_databrowser:
     datasource: local # required value

@@ -23,7 +23,7 @@ def test_scan_0d_for_correct_data():
     )
 
     # -- perform --
-    ds = sweeps.do0D(*[x], name=name, silent=True).run()
+    ds = sweeps.do0D(x, name=name, silent=True).run()
     dxs = ds2xarray(ds, snapshot=None)
 
     # -- validate --
@@ -127,7 +127,7 @@ def test_scan_2d_for_correct_data():
         for x, y
         in zip(
             list(chain.from_iterable(dxs.z.values)),
-            list(map(sum, product(*[dxs.x.values, dxs.y.values]))),
+            list(map(sum, product(dxs.x.values, dxs.y.values))),
         )
     ])
     assert dxs.title == name

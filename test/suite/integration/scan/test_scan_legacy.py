@@ -24,10 +24,10 @@ def test_validate_new_scan_0d_against_legacy():
     )
 
     # -- perform --
-    ds_new = sweeps.do0D(*[x], name=name, silent=True).run()
+    ds_new = sweeps.do0D(x, name=name, silent=True).run()
     dxs_new = ds2xarray(ds_new, snapshot=None)
     with pytest.warns(DeprecationWarning):
-        ds_legacy = sweeps_legacy.do0D(*[x], name=name, silent=True).run()
+        ds_legacy = sweeps_legacy.do0D(x, name=name, silent=True).run()
     dxs_legacy = ds2xarray(ds_legacy, snapshot=None)
 
     # -- validate --
