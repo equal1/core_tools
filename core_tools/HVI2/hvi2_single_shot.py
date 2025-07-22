@@ -387,5 +387,6 @@ class Hvi2SingleShot():
             logger.warning(f'HVI running-1: {hvi_exec.is_running()}; started: {self.started}')
         self.started = False
         hvi_exec.write_register(self.r_stop, 1)
+        hvi_exec.stop()
         if self.started != hvi_exec.is_running():
             logger.warning(f'HVI running-2: {hvi_exec.is_running()}; started: {self.started}')
