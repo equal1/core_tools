@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[1.6.3\] - 2025-07-22
+
+- Fixed single shot HVI for case when next measurement is started within 450 to 500 ms after end of previous measurement.
+
 ## \[1.6.2\] - 2025-07-10
 
 - Fixed loading virtual gate matrices from snapshot.
