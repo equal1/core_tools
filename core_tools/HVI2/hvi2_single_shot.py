@@ -314,7 +314,7 @@ class Hvi2SingleShot():
     def start(self, hvi_exec, waveform_duration, n_repetitions, hvi_params):
         if self.started != hvi_exec.is_running():
             logger.debug(f'HVI running: {not self.started}; started: {self.started}')
-            self.started = not self.started
+            self.stop(hvi_exec)
         if self.started:
             if self.use_systicks:
                 sys_ticks = self.hardware.awgs[0].get_sys_ticks()//200_000
@@ -383,10 +383,8 @@ class Hvi2SingleShot():
 
     def stop(self, hvi_exec):
         logger.debug('stop HVI')
-        if self.started != hvi_exec.is_running():
-            logger.warning(f'HVI running-1: {hvi_exec.is_running()}; started: {self.started}')
-        self.started = False
         hvi_exec.write_register(self.r_stop, 1)
         hvi_exec.stop()
+        self.started = False
         if self.started != hvi_exec.is_running():
-            logger.warning(f'HVI running-2: {hvi_exec.is_running()}; started: {self.started}')
+            logger.warning(f'HVI running after stop: {hvi_exec.is_running()}; started: {self.started}')
