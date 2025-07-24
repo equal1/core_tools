@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[1.6.5\] - 2025-07-24
+
+- Changed condition for exporting sqdl preview images. Now runs every export.
+
 ## \[1.6.4\] - 2025-07-23
 
 - Changed underlying implementation of doND measurements: now use Scan instead of scan-generic
