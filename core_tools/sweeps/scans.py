@@ -524,7 +524,10 @@ class Runner:
                     except Break:
                         raise
                     except Exception as ex:
-                        raise Exception(f'Failure getting {m_param.name}: {value}') from ex
+                        raise Exception(
+                            f"Failure getting {m_param.name}: {value}\n"
+                            "Scroll back for root cause."
+                            ) from ex
 
                 elif isinstance(action, SequenceStart):
                     play_time = action.play()
@@ -572,7 +575,7 @@ class Runner:
                     setter.param(value)
                 if setter._delay:
                     time.sleep(setter._delay)
-                value = setter.param()  # @@@ Why retrieve the value that is just written?
+                value = setter.param()
                 setpoint[1] = value
                 self._action_stats[setter.name].add_time(time.perf_counter()-t_start)
                 self._loop(block.actions)
