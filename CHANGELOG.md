@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[1.6.6\] - 2025-07-24
+
+- Fixed do0D, do1D, do2D implementations to reproduce old behaviour.
+- Fixed single shot HVI for case when next measurement is started just after 500 ms after end of previous measurement.
+
 ## \[1.6.5\] - 2025-07-24
 
 - Changed condition for exporting sqdl preview images. Now runs every export.
