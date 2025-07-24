@@ -395,7 +395,9 @@ class Exporter:
             logger.error("Failed reading/writing file(s)", exc_info=True)
             raise Exception("Failed reading/writing file(s)")
 
-        if updates.upload_dataset:
+        if updates.upload_dataset or updates.upload_raw_data:
+            # note: upload_raw_data makes export run the generation of previews any
+            #  time new data is being exported -> could be resource intensive
             generate_previews(dsx, ds_path, var_descr, self.timer)
 
         update_metadata(ds_path, measurement.exp_uuid)
