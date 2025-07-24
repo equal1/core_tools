@@ -3,11 +3,29 @@ import logging
 from core_tools.sweeps.scans import Scan, ArraySetter
 # re-export scan_generic for compatibility reasons
 from core_tools.sweeps.sweeps_legacy import scan_generic
+from pulse_lib.sequencer import sequencer
 
 import numpy as np
 
 
 logger = logging.getLogger(__name__)
+
+
+def _reorder_m_instr(*m_instr):
+    """Reorder m_instr to match requirements of Scan.
+
+    This puts any pulse-lib sequence at the start of the list, because
+    pulse-lib loop indices must be set and pulse-lib sequence played before
+    data is retrieved.
+    The old implementation called sequence before any other m_instr.
+    """
+    reordered_m_instr = []
+    for param in m_instr:
+        if isinstance(param, sequencer):
+            reordered_m_instr.insert(0, param)
+        else:
+            reordered_m_instr.append(param)
+    return reordered_m_instr
 
 
 def do0D(*m_instr, name="", silent=False):
@@ -17,6 +35,7 @@ def do0D(*m_instr, name="", silent=False):
     Args:
         m_instr (*list) :  list of parameters to measure
     """
+    m_instr = _reorder_m_instr(*m_instr)
     return Scan(
         *m_instr,
         name=name,
@@ -42,13 +61,14 @@ def do1D(
             after the meaurement
         silent (bool) : If True do not print dataset id and progress bar
     """
-    m_param = ArraySetter(
+    sweep = ArraySetter(
         param=param,
         data=np.linspace(start, stop, n_points),
         delay=delay,
     )
+    m_instr = _reorder_m_instr(*m_instr)
     return Scan(
-        m_param,
+        sweep,
         *m_instr,
         name=name,
         reset_param=reset_param,
@@ -79,20 +99,21 @@ def do2D(
         silent (bool) : If True do not print dataset id and progress bar
     """
 
-    m_param_1 = ArraySetter(
+    sweep1 = ArraySetter(
         param=param_1,
         data=np.linspace(start_1, stop_1, n_points_1),
         delay=delay_1,
     )
-    m_param_2 = ArraySetter(
+    sweep2 = ArraySetter(
         param=param_2,
         data=np.linspace(start_2, stop_2, n_points_2),
         delay=delay_2,
     )
+    m_instr = _reorder_m_instr(*m_instr)
 
     return Scan(
-        m_param_2,
-        m_param_1,
+        sweep2,
+        sweep1,
         *m_instr,
         name=name,
         reset_param=reset_param,
