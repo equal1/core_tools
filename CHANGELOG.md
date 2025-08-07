@@ -1,9 +1,14 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[1.6.8\] - 2025-08-07
+
+- Fixed bug in sqdl-sync where all export operations would be performed before starting uploads.
+- Fixed typo in changelog.
+
 ## \[1.6.7\] - 2025-08-07
 
-- Fix bug in exporting of expired measurements through sqdl-sync. 
+- Fixed bug in exporting of expired measurements through sqdl-sync. 
 - Removed dead code in export model.
 
 ## \[1.6.6\] - 2025-07-24
