@@ -51,7 +51,7 @@ class SQDLSync():
 
             while True:
                 work_done = self.exporter.poll()
-                work_done = work_done or self.uploader.poll()
+                work_done = self.uploader.poll() or work_done
                 if not work_done:
                     self.sleep_to_limit_rate()
 
