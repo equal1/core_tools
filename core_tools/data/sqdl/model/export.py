@@ -208,22 +208,6 @@ def get_failed_exports() -> list[tuple[int, bool]]:
     return records
 
 
-def get_measurement_completed(uid: int) -> bool | None:
-    parameters = {
-        "uuid": uid
-    }
-    query = build_generic_select_query(
-        select_columns=["completed"],
-        from_table="global_measurement_overview",
-        where_equal_conditions=parameters,
-    )
-    result = fetch_single_for_query(
-        query=query,
-        parameters=parameters,
-    )
-    return result
-
-
 def build_generic_select_query(
         select_columns: list[str],
         from_table: str,
