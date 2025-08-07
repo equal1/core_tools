@@ -124,7 +124,11 @@ def get_expired_export_action(expiration_threshold: datetime) -> ExportAction | 
     parameters = {
         "expiration_threshold": expiration_threshold
     }
-    data = fetch_single_for_query(query=query, parameters=parameters)
+    data = fetch_single_for_query(
+        query=query,
+        parameters=parameters,
+        factory=RealDictCursor,
+    )
     if data:
         return ExportAction(data['uuid'], completed=True)
     else:
