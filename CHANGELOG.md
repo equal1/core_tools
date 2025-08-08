@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[1.6.9\] - 2025-08-08
+
+- Cleanup Parameter Viewer.
+- Skip `None` arguments in `Scan`.
+
 ## \[1.6.8\] - 2025-08-07
 
 - Fixed bug in sqdl-sync where all export operations would be performed before starting uploads.
@@ -8,7 +13,7 @@ All notable changes to core_tools will be documented in this file.
 
 ## \[1.6.7\] - 2025-08-07
 
-- Fixed bug in exporting of expired measurements through sqdl-sync. 
+- Fixed bug in exporting of expired measurements through sqdl-sync.
 - Removed dead code in export model.
 
 ## \[1.6.6\] - 2025-07-24
