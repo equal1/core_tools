@@ -11,7 +11,7 @@ from qcodes.parameters.specialized_parameters import ElapsedTimeParameter
 #  required. This includes information about your setup, as well as where to store
 #  the collected data. You can use the specified .yml file as a reference.
 
-ct.configure("./setup_config/ct_config_measurement_minimal.yml")
+ct.configure("./setup_config/ct_config_measurement_minimal.yaml")
 
 # Use the DataBrowser for user-friendly access to your collected data.
 ct.launch_qt_databrowser()
