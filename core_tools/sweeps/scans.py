@@ -315,6 +315,9 @@ class Scan:
                 self._add_actions(section.args)
                 # pop stack
                 self._block_stack = self._block_stack[:depth]
+            elif arg is None:
+                # skip arg.
+                pass
             else:
                 # Assume it is a measurement parameter
                 getter = Getter(arg)
@@ -364,6 +367,9 @@ class Scan:
             for action in block.actions:
                 if isinstance(action, SequenceStart):
                     sequence_added = True
+                    if seq_function.axis == 0:
+                        # If there are no loops, then this is the place to insert it.
+                        break
         else:
             # axis not found.
             if not sequence_added:
