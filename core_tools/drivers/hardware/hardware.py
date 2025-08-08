@@ -111,24 +111,6 @@ class awg2dac_ratios_mgr():
         return doc
 
 
-class rf_source():
-    def __init__(self, parameter):
-        self.source_param = parameter
-
-    @property
-    def power(self):
-        return self.source_param.power
-
-
-class rf_source_mgr():
-    def __init__(self):
-        self.rf_source_names = []
-
-    def add(self, parameter):
-        self.rf_source_names += [parameter.name]
-        setattr(self, parameter.name, rf_source(parameter))
-
-
 class hardware(qc.Instrument):
 
     def __init__(self, name: str = 'hardware'):

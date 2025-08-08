@@ -92,22 +92,6 @@
 		</item>
        </layout>
       </widget>
-      <widget class="QWidget" name="RFsettings">
-       <attribute name="title">
-        <string>RF Settings</string>
-       </attribute>
-       <widget class="QWidget" name="layoutWidget">
-        <property name="geometry">
-         <rect>
-          <x>10</x>
-          <y>10</y>
-          <width>761</width>
-          <height>501</height>
-         </rect>
-        </property>
-        <layout class="QGridLayout" name="layout_RF"/>
-       </widget>
-      </widget>
      </widget>
     </item>
     <item row="1" column="0">

@@ -10,7 +10,7 @@ _vmg_qt = None
 _script_runner = None
 
 
-def start_parameter_viewer(keysight_rf=None):
+def start_parameter_viewer():
     from core_tools.GUI.param_viewer.param_viewer_GUI_main import param_viewer
 
     global _pv_qt
@@ -20,7 +20,6 @@ def start_parameter_viewer(keysight_rf=None):
     _pv_qt = param_viewer(
             gates,
             max_diff=cfg.get('max_diff'),
-            keysight_rf=keysight_rf,
             locked=cfg.get('parameter_viewer.lock', False))
     _set_window(_pv_qt, cfg, 'parameter_viewer')
     return _pv_qt

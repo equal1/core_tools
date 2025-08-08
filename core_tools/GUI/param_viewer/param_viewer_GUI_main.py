@@ -22,14 +22,11 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
 
     def __init__(self, gates_object: object | None = None,
                  max_diff: float = 1000,
-                 keysight_rf: object | None = None,
                  locked=False):
         self.real_gates = list()
         self.virtual_gates = list()
-        self.rf_settings = list()
         self.station = qc.Station.default
         self.max_diff = max_diff
-        self.keysight_rf = keysight_rf
         self.locked = locked
         self._last_gui_values = {}
 
@@ -51,20 +48,6 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
 
         super(QtWidgets.QMainWindow, self).__init__()
         self.setupUi(self)
-
-        # add RF parameters
-        if hasattr(self.gates_object.hardware, 'RF_source_names'):
-            for src_name in self.gates_object.hardware.RF_source_names:
-                inst = getattr(self.station, src_name)
-                for RFpar in self.gates_object.hardware.RF_params:
-                    param = getattr(inst, RFpar)
-                    self._add_RFset(param)
-        if self.keysight_rf is not None:
-            try:
-                for ks_param in self.keysight_rf.all_params:
-                    self._add_RFset(ks_param)
-            except Exception as e:
-                logger.error(f'Failed to add keysight RF {e}')
 
         # add real gates
         for gate_name in self.gates_object.hardware.dac_gate_map.keys():
@@ -111,59 +94,6 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
     def _update_lock(self, locked):
         print('Locked:', locked)
         self.locked = locked
-
-    @qt_log_exception
-    def _add_RFset(self, parameter: qc.Parameter):
-        ''' Add a new RF.
-
-        Args:
-            parameter (QCoDeS parameter object) : parameter to add.
-        '''
-
-        i = len(self.rf_settings)
-        layout = self.layout_RF
-
-        name = parameter.full_name
-        unit = parameter.unit
-        step_size = 0.5
-        division = 1
-
-        name = name.replace('keysight_rfgen_', '')
-
-        if 'freq' in parameter.name:
-            division = 1e6
-            step_size = 0.1
-            unit = f'M{unit}'
-
-        _translate = QtCore.QCoreApplication.translate
-
-        set_name = QtWidgets.QLabel(self.RFsettings)
-        set_name.setObjectName(name)
-        set_name.setMinimumSize(QtCore.QSize(100, 0))
-        set_name.setText(_translate("MainWindow", name))
-        layout.addWidget(set_name, i, 0, 1, 1)
-
-        if 'enable' in name:
-            set_input = QtWidgets.QCheckBox(self.RFsettings)
-            set_input.setObjectName(name + "_input")
-            set_input.stateChanged.connect(lambda: self._set_bool(parameter, set_input.isChecked))
-        else:
-            set_input = QtWidgets.QDoubleSpinBox(self.RFsettings)
-            set_input.setObjectName(name + "_input")
-            set_input.setMinimumSize(QtCore.QSize(100, 0))
-            set_input.setRange(-1e9, 1e9)
-            set_input.setValue(parameter()/division)
-            set_input.valueChanged.connect(lambda: self._set_set(parameter, set_input.value, division))
-            set_input.setKeyboardTracking(False)
-            set_input.setSingleStep(step_size)
-
-        layout.addWidget(set_input, i, 1, 1, 1)
-
-        set_unit = QtWidgets.QLabel(self.RFsettings)
-        set_unit.setObjectName(name + "_unit")
-        set_unit.setText(_translate("MainWindow", unit))
-        layout.addWidget(set_unit, i, 2, 1, 1)
-        self.rf_settings.append(param_data_obj(parameter,  set_input, division, name))
 
     @qt_log_exception
     def _add_gate(self, parameter: qc.Parameter, virtual: bool):
@@ -246,25 +176,12 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
             logger.error(f"Failed to set gate {gate} to {value()}: {ex}")
 
     @qt_log_exception
-    def _set_set(self, setting, value, division):
-        logger.info(f"setting {setting} to {value():.1f} times {division:.1f}")
-        setting.set(value()*division)
-        self.gates_object.hardware.RF_settings[setting.full_name] = value()*division
-        self.gates_object.hardware.sync_data()
-
-    @qt_log_exception
-    def _set_bool(self, setting, value):
-        setting.set(value())
-        self.gates_object.hardware.RF_settings[setting.full_name] = value()
-        self.gates_object.hardware.sync_data()
-
-    @qt_log_exception
     def _finish_gates_GUI(self):
 
         for items, layout_widget in [
                 (self.real_gates, self.layout_real),
                 (self.virtual_gates, self.layout_virtual),
-                (self.rf_settings, self.layout_RF)]:
+                ]:
             i = len(items) + 1
 
             spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
@@ -273,7 +190,7 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
             spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
             layout_widget.addItem(spacerItem1, 0, 3, 1, 1)
 
-        self.setWindowTitle(f"Parameter Viewer for {self.gates_object}")
+        self.setWindowTitle("Parameter Viewer")
 
     @qt_log_exception
     def _update_parameters(self):
@@ -289,8 +206,6 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
             # if supported retrieve all voltages in 1 call. That's a lot faster.
             if hasattr(self.gates_object, "get_all_gate_voltages"):
                 all_gate_voltages = self.gates_object.get_all_gate_voltages()
-        elif idx == 2:
-            params = self.rf_settings
         else:
             return
 
