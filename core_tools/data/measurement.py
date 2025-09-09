@@ -22,17 +22,24 @@ general structure:
     The synchronization process starts in a separate thread in parallel to the measurement.
     When the last result is added, the final sync to the db is performed and you are done.
 '''
-from core_tools.data.lib.data_class import setpoint_dataclass, m_param_dataclass
-from core_tools.data.ds.data_set import create_new_data_set
 
-import qcodes as qc
-import numpy as np
 import copy
 import logging
 
+import numpy as np
+import qcodes as qc
+
+from core_tools.data.ds.data_set import create_new_data_set
+from core_tools.data.lib.data_class import setpoint_dataclass, m_param_dataclass
+
 from .name_validation import validate_dataset_name, validate_param_name
 
+
 logger = logging.getLogger(__name__)
+
+
+class AbortMeasurement(Exception):
+    pass
 
 
 class Measurement:
@@ -48,6 +55,7 @@ class Measurement:
         self.name = name
         self.snapshot = dict()
         self.void_parameters = []
+        self._abort_measurement = False
         validate_dataset_name(name)
 
     def register_set_parameter(self, parameter, n_points):
@@ -64,7 +72,7 @@ class Measurement:
         param_id = id(parameter)
 
         if param_id in self.setpoints.keys() or param_id in self.m_param.keys():
-            raise ValueError("parameter is not unique, this parameter has already been provided to this measurement.")
+            raise ValueError(f"Duplicate parameter {parameter.name} in measurement.")
 
         setpoint_parameter_spec = None
 
@@ -89,7 +97,7 @@ class Measurement:
         param_id = id(parameter)
 
         if param_id in self.setpoints.keys() or param_id in self.m_param.keys():
-            raise ValueError("parameter is not unique, this parameter has already exists in this measurement.")
+            raise ValueError(f"Duplicate parameter {parameter.name} in measurement.")
 
         for setpoint in setpoints:
             if id(setpoint) not in self.setpoints.keys():
@@ -125,7 +133,7 @@ class Measurement:
                     # this can cause in uniquess of the keys, therefore the extra multiplications
                     # (should more or less ensure uniqueness).
                     setpoint_local_parameter_spec = setpoint_dataclass(
-                        id(parameter.setpoint_names[i][j])*10*(i+1), np.NaN,
+                        id(parameter.setpoint_names[i][j])*10*(i+1), np.nan,
                         'local_var',
                         [parameter.setpoint_names[i][j]],
                         [parameter.setpoint_labels[i][j]],
@@ -174,15 +182,43 @@ class Measurement:
         if self.dataset is None:
             raise ValueError(
                 'Dataset not initialized! Start measurement using context manager, e.g. "with Measurement():')
+        if self._abort_measurement:
+            raise AbortMeasurement()
 
         args_dict = {}
         for arg in args:
             args_dict[id(arg[0])] = arg[1]
 
         self.dataset.add_result(args_dict)
+        if self._abort_measurement:
+            raise AbortMeasurement()
+
+    def skip_result(self, *args):
+        """Adds NaN values for measurement parameters.
+        The provided values for the measurement parameter are ignored. A single NaN value suffices to
+        add the right number of NaN values to the dataset.
+
+        Args:
+            *args : tuples of the parameter object submitted to the register parameter object and the get value.
+        """
+        if self._abort_measurement:
+            raise AbortMeasurement()
+        args_dict = {}
+        for arg in args:
+            args_dict[id(arg[0])] = arg[1]
+        self.dataset.skip_result(args_dict)
+
+    def abort(self):
+        """Abort measurement.
+        A running measurement will be interrrupted at the next `add_result`.
+        If abort is called before the measurement is started, then it will raise the
+        AbortMeasurement exception before creating the dataset.
+        """
+        self._abort_measurement = True
 
     def __enter__(self):
-        # generate dataset
+        if self._abort_measurement:
+            raise AbortMeasurement()
         if len(self.m_param) == 0:
             if self.void_parameters:
                 raise Exception('Measurement parameters do not return any data.')
@@ -207,3 +243,4 @@ class Measurement:
             return False
 
         return False
+

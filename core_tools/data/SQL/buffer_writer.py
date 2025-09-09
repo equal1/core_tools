@@ -2,9 +2,6 @@ import numpy as np
 
 
 class buffer_reference:
-    '''
-    object in case a user want to take a copy of the reader/writer
-    '''
     def __init__(self, data):
         self.buffer = data
         self.buffer_lambda = buffer_reference.__empty_lambda
@@ -35,17 +32,19 @@ class buffer_reference:
             return data.reshape(shape)
         return reshape
 
+
 class buffer_writer(buffer_reference):
-    def __init__(self, SQL_conn, input_buffer):
-        self.conn = SQL_conn
+    def __init__(self, db_mgr, input_buffer):
+        self.db_mgr = db_mgr
         self.buffer = input_buffer.ravel()
         self.buffer_lambda = buffer_reference.reshaper(input_buffer.shape)
 
-        self.lobject = self.conn.lobject(0,'w')
-        self.oid = self.lobject.oid
+        conn = db_mgr.connection
+        lobject = conn.lobject(0, 'w')
+        self.oid = lobject.oid
+        lobject.close()
         self.cursor = 0
         self.cursor_db = 0
-        self.blocks_written = 0
 
     def write(self, data):
         '''
@@ -58,58 +57,29 @@ class buffer_writer(buffer_reference):
         self.cursor += data.size
 
     def sync(self):
-        try:
-            if self.cursor - self.cursor_db != 0:
-                # self.__load_blocks(self.cursor - self.cursor_db)
-                self.lobject.write((self.buffer[self.cursor_db:self.cursor]).tobytes())
-                self.cursor_db += self.cursor - self.cursor_db
-        except:
-            # NOTE: After a commit the lobject is not valid anymore and must be created again.
-            #       The overhead for this is very small.
-            self.lobject = self.conn.lobject(self.oid, 'w')
-            self.lobject.seek(self.cursor_db*8)
-            self.sync()
+        if self.cursor > self.cursor_db:
+            conn = self.db_mgr.connection
+            lobject = conn.lobject(self.oid, 'w')
+            lobject.seek(self.cursor_db*8)
+            lobject.write((self.buffer[self.cursor_db:self.cursor]).tobytes())
+            lobject.close()
+            self.cursor_db += self.cursor - self.cursor_db
 
     def close(self):
-        self.lobject.close()
+        pass
 
-    '''
-    not sure if this is needed, this complicates things and makes things less clean
-    defragementation on hard drive -- TODO :: check with Sander.
-    also makes the reading of the buffer more irritating...
-    '''
-    # def __load_blocks(self, n):
-    #     '''
-    #     load empty blocks in the buffer to prevent defragmentation.
-
-    #     Args:
-    #         n (int) : number of writes to be performed
-    #     '''
-    #     if self.cursor + n > self.blocks_written:
-    #         self.lobject.seek(self.blocks_written)
-
-    #         if n > 1e6/8:
-    #             pass #write is large than the number of blocks reserved -> skip.
-    #         elif self.buffer.size - self.blocks_written <1e6/8:
-    #             scratch_data = np.full([self.buffer.size - self.blocks_written], np.nan)
-    #             self.lobject.write(scratch_data.tobytes())
-    #             self.blocks_written += scratch_data.size
-    #         else:
-    #             scratch_data = np.full([125000], np.nan)
-    #             self.lobject.write(scratch_data.tobytes())
-    #             self.blocks_written += scratch_data.size
-
-    #         # reset writing position
-    #         self.lobject.seek(self.cursor_db*8)
 
 class buffer_reader(buffer_reference):
-    def __init__(self, SQL_conn, oid, shape):
-        self.conn = SQL_conn
+    def __init__(self, db_mgr, oid, shape, remote: bool = False):
+        """Read data stream from database (large object).
+        Args:
+            remote: if True explictly use remote connection.
+        """
+        self.db_mgr = db_mgr
         self.buffer = np.full(shape, np.nan).ravel()
         self.buffer_lambda = buffer_reference.reshaper(shape)
         self.oid = oid
-
-        self.lobject = self.conn.lobject(oid,'rb')
+        self.remote = remote
         self.cursor = 0
         self.sync()
 
@@ -117,35 +87,15 @@ class buffer_reader(buffer_reference):
         '''
         update the buffer (for datasets that are still being written)
         '''
-        self.lobject = self.conn.lobject(self.oid, 'rb')
-        self.lobject.seek(self.cursor*8)
-        binary_data = self.lobject.read()
+        conn = self.db_mgr.connection if not self.remote else self.db_mgr.remote_connection
+        lobject = conn.lobject(self.oid, 'rb')
+        lobject.seek(self.cursor*8)
+        binary_data = lobject.read()
         data = np.frombuffer(binary_data)
+        lobject.close()
 
         self.buffer[self.cursor:self.cursor+data.size] = data
         self.cursor = self.cursor+data.size
 
-
-
-if __name__ == '__main__':
-    from core_tools.data.SQL.connector import SQL_conn_info_local, SQL_conn_info_remote, sample_info, set_up_local_storage
-    import psycopg2
-
-    set_up_local_storage('stephan', 'magicc', 'test', '6dot', 'XLD2', 'SQblabla12')
-
-    conn_local = psycopg2.connect(dbname=SQL_conn_info_local.dbname, user=SQL_conn_info_local.user,
-                    password=SQL_conn_info_local.passwd, host=SQL_conn_info_local.host, port=SQL_conn_info_local.port)
-
-    a = np.ones([100,100])
-
-    bw = buffer_writer(conn_local, a)
-
-    for i in range(100):
-        bw.write(a[i])
-        bw.sync()
-
-    print(bw.oid)
-    conn_local.commit()
-
-    br = buffer_reader(conn_local, bw.oid, a.shape)
-    print(br.data)
+    def close(self):
+        pass

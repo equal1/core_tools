@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from typing import List, Union
+from typing import Any
 
 import numpy as np
 from numpy import ndarray
@@ -20,7 +20,7 @@ class Axis:
     name: str
     label: str
     unit: str
-    values: Union[ndarray, List[float]]
+    values: ndarray | list[float]
 
 
 @dataclass
@@ -31,18 +31,18 @@ class Data:
     name: str
     label: str
     unit: str
-    values: Union[ndarray, List[float]]
+    values: ndarray | list[float]
 
 
 @dataclass
 class _Action:
     action: str
     param: ManualParameter
-    values: Union[ndarray, List[float]]
+    values: ndarray | list[float]
 
 
 class DataWriter:
-    def __init__(self, name, *args):
+    def __init__(self, name, *args, snapshot_data: dict[str, Any] | None = None):
         self._measurement = Measurement(name, silent=True)
         self._actions = []
         self._set_params = []
@@ -56,16 +56,19 @@ class DataWriter:
                 self._add_data(arg)
             else:
                 raise TypeError(f"Unknown argument of type {type(arg)}")
-        self._measurement.add_snapshot('data_writer', {'message': 'Data written by data writer'})
+        if snapshot_data:
+            self._measurement.add_snapshot('data_writer', snapshot_data)
+        else:
+            self._measurement.add_snapshot('data_writer', {'message': 'Data written by data writer'})
 
     def _add_axis(self, axis):
-        param  = ManualParameter(axis.name, label=axis.label, unit=axis.unit)
+        param = ManualParameter(axis.name, label=axis.label, unit=axis.unit)
         self._measurement.register_set_parameter(param, len(axis.values))
         self._set_params.append(param)
         self._actions.append(_Action('set', param, np.asarray(axis.values)))
 
     def _add_data(self, data):
-        param  = ManualParameter(data.name, label=data.label, unit=data.unit)
+        param = ManualParameter(data.name, label=data.label, unit=data.unit)
         self._measurement.register_get_parameter(param, *self._set_params)
         self._actions.append(_Action('get', param, np.asarray(data.values)))
 
@@ -91,7 +94,7 @@ class DataWriter:
             return
         action = self._actions[iaction]
         if action.action == 'set':
-            for i,value in enumerate(action.values):
+            for i, value in enumerate(action.values):
                 self._setpoints[isetpoint][1] = value
                 self._index[isetpoint] = i
                 self._loop(iaction + 1, isetpoint + 1)
@@ -101,13 +104,14 @@ class DataWriter:
             self._loop(iaction + 1, isetpoint)
 
 
-def write_data(name: str, *args):
+def write_data(name: str, *args, snapshot_data: dict[str, Any] | None = None):
     '''
     Creates a dataset `name` using the specified Axis and Data.
 
     Args:
         name: name of the dataset.
         args: list of Axis and Data objects.
+        snapshot_data: Data to be added to the snapshot.
 
     Example:
         write_data(
@@ -132,7 +136,7 @@ def write_data(name: str, *args):
             Data('z', 'z', 'a.u., <array with shape(len(values_a), len(values_b), len(values_c)>),
         )
     '''
-    return DataWriter(name, *args).run()
+    return DataWriter(name, *args, snapshot_data=snapshot_data).run()
 
 
 if __name__ == "__main__":
@@ -145,5 +149,3 @@ if __name__ == "__main__":
         Data('SD1', 'Sensor 1', 'mV', np.linspace(10, 20, 55).reshape((11, 5))),
         Data('SD1', 'Sensor 2', 'mV', np.linspace(0, -20, 55).reshape((11, 5))),
     )
-
-

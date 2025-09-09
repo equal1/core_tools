@@ -1,4 +1,3 @@
-from typing import List
 from dataclasses import dataclass
 import datetime
 
@@ -10,7 +9,7 @@ class alter_dataset:
 
     @staticmethod
     def update_name(uuid, name):
-        conn = SQL_database_manager().conn_local
+        conn = SQL_database_manager().connection
         update_table(conn, 'global_measurement_overview',
                      ('exp_name', 'table_synchronized'), (name, False),
                      condition=('uuid', uuid))
@@ -18,7 +17,7 @@ class alter_dataset:
 
     @staticmethod
     def star_measurement(uuid, state):
-        conn = SQL_database_manager().conn_local
+        conn = SQL_database_manager().connection
         update_table(conn, 'global_measurement_overview',
                      ('starred', 'table_synchronized'), (state, False),
                      condition=('uuid', uuid))
@@ -56,17 +55,15 @@ class query_for_samples():
         else:
             statement += ";"
 
-        cur = SQL_database_manager().conn_local.cursor()
+        db_mgr = SQL_database_manager()
+        con = db_mgr.connection
+        cur = con.cursor()
         cur.execute(statement)
         res = cur.fetchall()
         result = set(sum(res, ()))
         cur.close()
+        con.commit()
 
-        cur = SQL_database_manager().conn_remote.cursor()
-        cur.execute(statement)
-        res = cur.fetchall()
-        result |= set(sum(res, ()))
-        cur.close()
         return sorted(list(result))
 
 
@@ -80,7 +77,7 @@ class measurement_results:
     set_up: str
     sample: str
     starred: bool
-    _keywords: List[str] = None
+    _keywords: list[str] | None = None
 
 
 class query_for_measurement_results:
@@ -106,7 +103,7 @@ class query_for_measurement_results:
             statement += f" and keywords ?& array{keywords} "
         if starred:
             statement += f" and starred = {starred} "
-        statement += " ;"
+        statement += " order by uuid;"
         res = query_for_measurement_results._execute(statement, remote)
         return query_for_measurement_results._to_measurement_results(res)
 
@@ -116,11 +113,11 @@ class query_for_measurement_results:
         statement = "SELECT DISTINCT date(start_time) FROM global_measurement_overview "
         statement += "where 1=1 "
         if sample is not None:
-            statement += " and sample =  '{}' ".format(sample)
+            statement += f" and sample =  '{sample}' "
         if set_up is not None:
-            statement += " and set_up = '{}' ".format(set_up)
+            statement += f" and set_up = '{set_up}' "
         if project is not None:
-            statement += " and project = '{}' ".format(project)
+            statement += f" and project = '{project}' "
         if name:
             statement += f" and exp_name like '%{name}%' "
         if keywords:
@@ -137,12 +134,20 @@ class query_for_measurement_results:
         return res
 
     @staticmethod
-    def search_query(exp_id=None, uuid=None, name=None,
-                     date=None,
-                     start_time=None, end_time=None,
-                     project=None, set_up=None, sample=None,
-                     starred=False, keywords=None,
-                     remote=False):
+    def search_query(
+            exp_id=None,
+            uuid=None,
+            name=None,
+            date=None,
+            start_time=None,
+            end_time=None,
+            project=None,
+            set_up=None,
+            sample=None,
+            starred=False,
+            keywords=None,
+            remote=False,
+            ):
         statement = "SELECT id, uuid, exp_name, start_time, project, set_up, sample, starred, keywords "\
                     "FROM global_measurement_overview "
         statement += "WHERE 1=1 "
@@ -203,12 +208,39 @@ class query_for_measurement_results:
         return update, max_measurement_id
 
     @staticmethod
+    def get_new_results(min_id, sample, set_up, project, remote=False,
+                        name=None, keywords=None, starred=False):
+        if min_id is None:
+            return []
+        statement = '''
+            SELECT id, uuid, exp_name, start_time, project, set_up, sample, starred, keywords
+            FROM global_measurement_overview
+            '''
+        statement += f"WHERE id > {min_id} "
+        if sample is not None:
+            statement += f" and sample =  '{sample}' "
+        if set_up is not None:
+            statement += f" and set_up = '{set_up}' "
+        if project is not None:
+            statement += f" and project = '{project}' "
+        if name:
+            statement += f" and exp_name like '%{name}%' "
+        if keywords:
+            statement += f" and keywords ?& array{keywords} "
+        if starred:
+            statement += f" and starred = {starred} "
+        statement += " ;"
+        res = query_for_measurement_results._execute(statement, remote)
+        return query_for_measurement_results._to_measurement_results(res)
+
+    @staticmethod
     def _execute(statement, remote):
-        connection = SQL_database_manager().conn_remote if remote else SQL_database_manager().conn_local
+        connection = SQL_database_manager().remote_connection if remote else SQL_database_manager().connection
         cur = connection.cursor()
         cur.execute(statement)
         res = cur.fetchall()
         cur.close()
+        connection.commit()
         return res
 
     @staticmethod

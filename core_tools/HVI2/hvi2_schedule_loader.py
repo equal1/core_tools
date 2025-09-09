@@ -1,5 +1,4 @@
 import logging
-from typing import List, Union
 from collections.abc import Iterable
 
 from pulse_lib.base_pulse import pulselib
@@ -20,13 +19,13 @@ logger = logging.getLogger(__name__)
 class Hvi2ScheduleLoader(HardwareSchedule):
     schedule_cache = {}
     script_classes = {
-            Hvi2VideoMode,
-            Hvi2SingleShot,
-            Hvi2ContinuousMode,
-        }
+        Hvi2VideoMode,
+        Hvi2SingleShot,
+        Hvi2ContinuousMode,
+    }
 
     def __init__(self, pulse_lib: pulselib, script_name: str,
-                 digitizers: Union[None, SD_DIG, List[SD_DIG]] = None,
+                 digitizers: SD_DIG | list[SD_DIG] | None = None,
                  acquisition_delay_ns=None, switch_los=False, enabled_los=None):
         '''
         Args:
@@ -96,8 +95,13 @@ class Hvi2ScheduleLoader(HardwareSchedule):
     def set_configuration(self, hvi_params, n_waveforms):
         conf = {}
         conf['script_name'] = self._script_name
-        conf['n_waveforms'] = n_waveforms
         conf['n_triggers'] = self._get_n_measurements(hvi_params)
+
+        # If hvi queue control is not used, then do not add the information.
+        # Otherwise a new schedule will be generated when the number of waveforms changes.
+        uses_hvi_queue_control = any(getattr(awg, 'hvi_queue_control', False)
+                                     for awg in self._pulse_lib.awg_devices.values())
+        conf['n_waveforms'] = n_waveforms if uses_hvi_queue_control else -1
 
         acquisition_delay_ns = hvi_params.get('acquisition_delay_ns', self._acquisition_delay_ns)
         if acquisition_delay_ns is not None:
@@ -144,7 +148,8 @@ class Hvi2ScheduleLoader(HardwareSchedule):
             dig_conf['raw_ch'] = [channel for channel, mode in modes.items() if mode == 0]
             dig_conf['ds_ch'] = [channel for channel, mode in modes.items() if mode != 0]
             dig_conf['iq_ch'] = [channel for channel, mode in modes.items() if mode in [2, 3]]
-            dig_conf['sequencer'] = hvi_params.get(f'use_dig_sequencers_{dig.name}', hasattr(dig, 'get_sequencer'))
+            dig_conf['sequencer'] = hvi_params.get(f'use_digitizer_sequencers_{dig.name}',
+                                                   hasattr(dig, 'get_sequencer'))
             if f'dig_trigger_channels_{dig.name}' in hvi_params:
                 dig_conf['trigger_ch'] = hvi_params[f'dig_trigger_channels_{dig.name}']
 

@@ -1,0 +1,10 @@
+setup: development
+project: test
+sample: test
+scope: test
+
+local_database:
+    user: postgres
+    password: postgres
+    database: core-tools
+    address: localhost:10702

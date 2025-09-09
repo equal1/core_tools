@@ -12,22 +12,22 @@ class load_ds_queries:
 
     @staticmethod
     def check_uuid(conn, exp_uuid):
-        statement = "SELECT uuid FROM {} WHERE uuid = {};".format(load_ds_queries.table_name, exp_uuid);
+        statement = "SELECT uuid FROM {} WHERE uuid = {};".format(load_ds_queries.table_name, exp_uuid)
         return load_ds_queries.__check_exist(conn, statement)
 
     @staticmethod
     def check_id(conn, exp_id):
-        statement = "SELECT id FROM {} WHERE id = {};".format(load_ds_queries.table_name, exp_id);
+        statement = "SELECT id FROM {} WHERE id = {};".format(load_ds_queries.table_name, exp_id)
         return load_ds_queries.__check_exist(conn, statement)
 
     @staticmethod
     def check_table_name(conn, meas_table_name):
-        statement = "SELECT to_regclass('{}');".format(meas_table_name);
+        statement = "SELECT to_regclass('{}');".format(meas_table_name)
         return load_ds_queries.__check_exist(conn, statement)
 
     @staticmethod
     def id_to_uuid(conn, exp_id):
-        statement = "SELECT id, uuid FROM {} WHERE id = {};".format(load_ds_queries.table_name, exp_id);
+        statement = "SELECT id, uuid FROM {} WHERE id = {};".format(load_ds_queries.table_name, exp_id)
         return_data = execute_query(conn, statement)
 
         if len(return_data) != 0 and len(return_data[0]) == 2:
@@ -38,14 +38,19 @@ class load_ds_queries:
     @staticmethod
     def is_running(conn, exp_uuid):
         return_data = select_elements_in_table(conn, load_ds_queries.table_name, var_names=('completed', ),
-            where = ("uuid", exp_uuid))
+                                               where=("uuid", exp_uuid))
 
         return return_data[0][0]
 
     @staticmethod
-    def get_dataset_raw(conn, exp_uuid):
-        data = select_elements_in_table(conn, load_ds_queries.table_name, var_names=('*',),
-            where = ("uuid", exp_uuid))[0]
+    def get_dataset_raw(db_mgr, exp_uuid, remote: bool = False):
+        conn = db_mgr.connection if not remote else db_mgr.remote_connection
+        data = select_elements_in_table(
+            conn,
+            load_ds_queries.table_name,
+            var_names=('*',),
+            where=("uuid", exp_uuid)
+        )[0]
 
         if data['stop_time'] is None:
             data['stop_time'] = data['start_time']
@@ -56,39 +61,43 @@ class load_ds_queries:
         if data['metadata'] is not None:
             data['metadata'] = json.loads(data['metadata'].tobytes())
 
-        ds = data_set_raw(exp_id=data['id'], exp_uuid=data['uuid'], exp_name=data['exp_name'],
-            set_up = data['set_up'], project = data['project'], sample = data['sample'],
+        ds = data_set_raw(
+            exp_id=data['id'], exp_uuid=data['uuid'], exp_name=data['exp_name'],
+            set_up=data['set_up'], project=data['project'], sample=data['sample'], scope=data.get('scope'),
             UNIX_start_time=data['start_time'].timestamp(), UNIX_stop_time=data['stop_time'].timestamp(),
-            SQL_datatable=data['exp_data_location'],snapshot=data['snapshot'], metadata=data['metadata'],
+            SQL_datatable=data['exp_data_location'], snapshot=data['snapshot'], metadata=data['metadata'],
             keywords=data['keywords'], completed=data['completed'], starred=data['starred'], )
 
         # NOTE: column sync_location is abused for migration to new format
         new_format = data['sync_location'] == 'New measurement_parameters'
         exp_uuid = data['uuid']
         ds.measurement_parameters_raw = load_ds_queries.__get_dataset_raw_dataclasses(
-                conn, ds.SQL_datatable, new_format, exp_uuid)
+            db_mgr, ds.SQL_datatable, new_format, exp_uuid, remote=remote)
         return ds
 
     @staticmethod
-    def __get_dataset_raw_dataclasses(conn, table_name, new_format, exp_uuid):
-        var_names =    ("param_id", "nth_set", "nth_dim", "param_id_m_param",
-                    "setpoint", "setpoint_local", "name_gobal", "name", "label",
-                    "unit", "depencies", "shape", "total_size", "oid")
+    def __get_dataset_raw_dataclasses(db_mgr, table_name, new_format, exp_uuid, remote: bool = False):
+        var_names = ("param_id", "nth_set", "nth_dim", "param_id_m_param",
+                     "setpoint", "setpoint_local", "name_gobal", "name", "label",
+                     "unit", "depencies", "shape", "total_size", "oid")
 
+        conn = db_mgr.connection if not remote else db_mgr.remote_connection
         if new_format:
             return_data = select_elements_in_table(conn, 'measurement_parameters', var_names,
                                                    where=("exp_uuid", exp_uuid),
                                                    order_by=("param_index", "ASC"),
                                                    dict_cursor=False)
         else:
-            return_data = select_elements_in_table(conn, table_name, var_names, dict_cursor=False)
+            return_data = select_elements_in_table(conn, table_name, var_names,
+                                                   order_by=("id", "ASC"),
+                                                   dict_cursor=False)
 
         data_raw = []
         for row in return_data:
             raw_data_row = m_param_raw(*row)
-            if np.prod(raw_data_row.shape) >= 2**28:
-                raise Exception(f"Dataset too big. Var '{raw_data_row.name}'{tuple(raw_data_row.shape)} >= 2 GB.")
-            raw_data_row.data_buffer = buffer_reader(conn, raw_data_row.oid, raw_data_row.shape)
+            if np.prod(raw_data_row.shape) >= 2**27:
+                raise Exception(f"Dataset too big. Var '{raw_data_row.name}'{tuple(raw_data_row.shape)} >= 1 GB.")
+            raw_data_row.data_buffer = buffer_reader(db_mgr, raw_data_row.oid, raw_data_row.shape, remote=remote)
             data_raw.append(raw_data_row)
 
         return data_raw

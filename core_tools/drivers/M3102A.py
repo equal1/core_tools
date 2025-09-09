@@ -1,14 +1,12 @@
 
 from qcodes import Instrument, MultiParameter
 from dataclasses import dataclass
-from typing import Optional
 from packaging.version import Version
 import math
 import logging
 import time
 import copy
 import numpy as np
-from si_prefix import si_format
 
 import keysightSD1
 
@@ -146,7 +144,9 @@ class line_trace(MultiParameter):
         # Always read with a timeout to prevent infinite blocking of HW (and reboot of system).
         # Transfer rate is ~55 MSa/s. Add one second marging
         read_timeout = int((available / 50e6 + 1) * 1000)
+        start_time = time.perf_counter()
         received = self.my_instrument.SD_AIN.DAQread(ch, available, read_timeout)
+        read_duration = (time.perf_counter() - start_time) * 1000
         check_error(received)
         if isinstance(received, int) and received < 0:
             # the error has already been logged
@@ -155,9 +155,9 @@ class line_trace(MultiParameter):
         n_received = len(received)
         # logger.debug(f'DAQread ch:{ch} ready:{available} read:{n_received} offset:{offset}')
         if n_received != available:
-            if available > n_received and available - n_received < 4:
-                # It seems that M3102A only returns multiples of 4 bytes.
-                logger.warning(f'DAQread data remaining. ch:{ch} ready:{available} read:{n_received}')
+            # M3102A buffering seems to hold back 8 bytes when run is not finished
+            if read_duration >= read_timeout and 0 < available - n_received <= 8:
+                logger.info(f'DAQread not all data read after timeout. ch:{ch} ready:{available} read:{n_received}')
             else:
                 logger.error(f'DAQread failure. ch:{ch} ready:{available} read:{n_received}')
 
@@ -177,6 +177,7 @@ class line_trace(MultiParameter):
         last_read = time.perf_counter()
         has_read_timeout = False
         timeout_seconds = self.my_instrument._timeout_seconds
+        no_data_report_time = 0.5
 
         while len(channels_to_read) > 0 and not has_read_timeout and consecutive_error_count < 5:
             any_read = False
@@ -198,18 +199,21 @@ class line_trace(MultiParameter):
 
             if any_read:
                 no_data_count = 0
+                no_data_report_time = 0.5
                 last_read = time.perf_counter()
             else:
                 no_data_time = time.perf_counter() - last_read
                 no_data_count += 1
                 time.sleep(0.001)
-                # abort when no data has been received for 30 s and at least 2 checks without any data
-                # the timeout of 30 s is needed for T1 measurement of 100 ms and one flush every 256 measurements.
+                # abort when no data has been received within timeout and at least 2 checks without any data.
                 has_read_timeout = no_data_count >= 2 and (no_data_time > timeout_seconds)
-                if (no_data_time > 0.5 and no_data_count < 100) or no_data_count % 100 == 0:
+                if no_data_time > no_data_report_time:
                     logger.debug(f'no data available ({no_data_count}, {no_data_time:4.2f} s); wait...')
+                    # double time adding at most 5 seconds
+                    no_data_report_time += no_data_report_time if no_data_report_time < 5 else 5
 
-        logger.info(f'channels {channels}: retrieved {data_read} points in {(time.perf_counter()-start)*1000:3.1f} ms')
+        logger.debug(f"channels {channels}: retrieved {data_read} points "
+                     f"in {(time.perf_counter()-start)*1000:3.1f} ms")
         for ch in channels:
             if data_read[ch] != len(daq_points_per_channel[ch]):
                 logger.error(f"digitizer did not collect enough data points for channel {ch}; "
@@ -239,10 +243,7 @@ class line_trace(MultiParameter):
             if not channel_property.active:
                 continue
             if is_fpga_version_1_1:
-                # correct for digital scaling in fpga
-                fpga_scaling = channel_properties.fpga_scaling
-                if channel_property.acquisition_mode in [MODES.IQ_DEMODULATION, MODES.IQ_DEMOD_I_ONLY]:
-                    fpga_scaling *= 2.0
+                fpga_scaling = self.my_instrument.get_effective_fpga_scaling(channel_property.number)
             else:
                 fpga_scaling = 1.0
 
@@ -306,13 +307,13 @@ class line_trace(MultiParameter):
             cached = self.cached_properties[properties.name]
 
             info_changed |= (
-                    properties.active != cached.active
-                    or properties.acquisition_mode != cached.acquisition_mode
-                    or properties.data_mode != cached.data_mode
-                    or properties.cycles != cached.cycles
-                    or properties.t_measure != cached.t_measure
-                    or properties.points_per_cycle != cached.points_per_cycle
-                    )
+                properties.active != cached.active
+                or properties.acquisition_mode != cached.acquisition_mode
+                or properties.data_mode != cached.data_mode
+                or properties.cycles != cached.cycles
+                or properties.t_measure != cached.t_measure
+                or properties.points_per_cycle != cached.points_per_cycle
+            )
             self.cached_properties[properties.name] = copy.copy(properties)
 
         if info_changed:
@@ -389,11 +390,11 @@ class channel_properties:
     t_measure: float = 0  # measurement time in ns of the channel
     sample_rate: float = 500e6
     # daq configuration
-    prescaler: Optional[int] = None
-    daq_points_per_cycle: Optional[int] = None
-    daq_cycles: Optional[int] = None
+    prescaler: int | None = None
+    daq_points_per_cycle: int | None = None
+    daq_cycles: int | None = None
     # settings of downsampler-iq FPGA image
-    downsampled_rate: Optional[float] = None
+    downsampled_rate: float | None = None
     downsampling_factor: int = 1
     lo_frequency: float = 0
     lo_phase: float = 0
@@ -429,6 +430,7 @@ class SD_DIG(Instrument):
 
         self.chassis = chassis
         self.slot = slot
+        self.n_channels = n_channels
 
         self.operation_mode = OPERATION_MODES.SOFT_TRG
         self._timeout_seconds = 3
@@ -438,7 +440,7 @@ class SD_DIG(Instrument):
             inst_name=self.name,
             parameter_class=line_trace,
             raw=False
-            )
+        )
 
         self.channel_properties = dict()
         for i in range(n_channels):
@@ -463,7 +465,23 @@ class SD_DIG(Instrument):
         if params_to_skip_update is not None:
             param_to_skip += params_to_skip_update
 
-        return super().snapshot_base(update, params_to_skip_update=param_to_skip)
+        snapshot = super().snapshot_base(update, params_to_skip_update=param_to_skip)
+
+        for i in range(self.n_channels):
+            ch_name = f"ch{i+1}"
+            properties = self.channel_properties[ch_name]
+            properties_snapshot = {}
+            snapshot[ch_name] = properties_snapshot
+            properties_snapshot["acquisition_mode"] = properties.acquisition_mode
+            properties_snapshot["data_mode"] = properties.data_mode
+            properties_snapshot["full_scale"] = properties.full_scale
+            properties_snapshot["impedance"] = "50 Ohm" if properties.impedance == 1 else "1 MOhm"
+            properties_snapshot["coupling"] = "DC" if properties.coupling == 0 else "AC"
+            properties_snapshot["input_channel"] = properties.input_channel
+            properties_snapshot["fpga_scaling"] = properties.fpga_scaling
+            # NOTE: other properties will be set after the snapshot has been taken.
+
+        return snapshot
 
     def is_iq_image_loaded(self):
         return is_iq_image_loaded(self.SD_AIN)
@@ -626,6 +644,17 @@ class SD_DIG(Instrument):
         properties = self.channel_properties[f'ch{channel}']
         properties.fpga_scaling = scaling
 
+    def get_fpga_scaling(self, channel: int) -> float:
+        return self.channel_properties[f'ch{channel}'].fpga_scaling
+
+    def get_effective_fpga_scaling(self, channel: int) -> float:
+        properties = self.channel_properties[f'ch{channel}']
+        fpga_scaling = properties.fpga_scaling
+        if properties.acquisition_mode in [MODES.IQ_DEMODULATION, MODES.IQ_DEMOD_I_ONLY]:
+            # Note: a demodulated signal will have 1/2 the amplitude of the incoming signal
+            fpga_scaling *= 2.0
+        return fpga_scaling
+
     def actual_acquisition_points(self, ch, t_measure, sample_rate):
         mode = self.channel_properties[f'ch{ch}'].acquisition_mode
         # resolution in nanoseconds
@@ -681,10 +710,10 @@ class SD_DIG(Instrument):
             # The M3102A prescaler maximum value is 4.
             if prescaler > 4:
                 raise ValueError(f'Sample rate {sample_rate} not supported.'
-                                 'M3102A frequency is limited to range [100..500] MHz')
+                                 'M3102A frequency is limited to range [100..500] MSa/s')
             sample_rate = 500e6/(prescaler+1)
             if properties.sample_rate != sample_rate:
-                logger.info(f"Effective sampling frequency is set to {si_format(sample_rate, precision=1)}Sa/s "
+                logger.info(f"Effective sampling frequency is set to {sample_rate/1e6} MSa/s "
                             f"(prescaler = {prescaler})")
 
             points_per_cycle = int(t_measure*1e-9*sample_rate)
@@ -714,18 +743,15 @@ class SD_DIG(Instrument):
             eff_t_measure = points_per_cycle * downsampling_factor * 10
 
             values_per_point = (
-                    2
-                    if properties.acquisition_mode in [MODES.IQ_DEMODULATION, MODES.IQ_INPUT_SHIFTED_IQ_OUT]
-                    else 1)
+                2
+                if properties.acquisition_mode in [MODES.IQ_DEMODULATION, MODES.IQ_INPUT_SHIFTED_IQ_OUT]
+                else 1)
             daq_points_per_cycle = n_cycles * points_per_cycle * values_per_point
             daq_cycles = 1
             config_input_channel = properties.input_channel if properties.input_channel != 0 else channel
 
             if is_fpga_version_1_1:
-                fpga_scaling = properties.fpga_scaling
-                if properties.acquisition_mode in [MODES.IQ_DEMODULATION, MODES.IQ_DEMOD_I_ONLY]:
-                    # Note: a demodulated signal will have 1/2 the amplitude of the incoming signal
-                    fpga_scaling *= 2.0
+                fpga_scaling = self.get_effective_fpga_scaling(channel)
                 config_channel(self.SD_AIN, channel, properties.acquisition_mode,
                                downsampling_factor, points_per_cycle,
                                LO_f=properties.lo_frequency, phase=properties.lo_phase,
@@ -924,9 +950,7 @@ class SD_DIG(Instrument):
             logger.debug(f'ch{channel} t_measure:{properties.t_measure}')
 
             if is_fpga_version_1_1:
-                fpga_scaling = properties.fpga_scaling
-                if properties.acquisition_mode in [MODES.IQ_DEMODULATION, MODES.IQ_DEMOD_I_ONLY]:
-                    fpga_scaling *= 2.0
+                fpga_scaling = self.get_effective_fpga_scaling(channel)
                 dig_set_downsampler(self.SD_AIN, channel, downsampling_factor,
                                     properties.points_per_cycle,
                                     out_scaling=fpga_scaling)

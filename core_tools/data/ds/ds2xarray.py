@@ -1,10 +1,15 @@
-import xarray as xr
-import numpy as np
+import gzip
 import json
 import string
+
+import numpy as np
+import xarray as xr
+
 from qcodes.utils.helpers import NumpyJSONEncoder
 
-def _add_coord(ds, param):
+from core_tools import __version__
+
+def _add_coord(ds, param, added_dims):
     data = param()
     attrs = {
             'units':param.unit,
@@ -16,8 +21,9 @@ def _add_coord(ds, param):
     name = param_name
     if not name:
         name = param.name
-    while name in ds.coords:
-        if (np.array_equal(data , ds.coords[name].data, equal_nan=True)
+    while name in ds.coords or name in added_dims:
+        if (name not in added_dims
+            and np.array_equal(data , ds.coords[name].data, equal_nan=True)
             and attrs == ds.coords[name].attrs):
             # coord already added and identical
             return name
@@ -47,8 +53,7 @@ def _add_data_var(ds, var, dims, param_index):
             'param_name':var_name,
             }
 
-def ds2xarray(ct_ds):
-    snapshot_json = json.dumps(ct_ds.snapshot, cls=NumpyJSONEncoder)
+def ds2xarray(ct_ds, snapshot='gzip'):
     metadata_json = json.dumps(ct_ds.metadata, cls=NumpyJSONEncoder)
 
     if len(ct_ds) == 0:
@@ -60,14 +65,23 @@ def ds2xarray(ct_ds):
         'id':ct_ds.exp_id,
         'sample_name':ct_ds.sample_name,
         'project':ct_ds.project,
-        'set_up':ct_ds.set_up,
+        'setup':ct_ds.set_up,
+        'set_up':ct_ds.set_up, # TODO backwards compatibility. Remove in later release.
         'measurement_time':str(ct_ds.run_timestamp),
         'completed_time': str(ct_ds.completed_timestamp),
-        'snapshot': snapshot_json,
         'metadata': metadata_json,
         'keywords':ct_ds.keywords,
         'completed':int(ct_ds.completed),
+        'application': f"core-tools:{__version__}"
         }
+    if snapshot == 'gzip':
+        snapshot_json = json.dumps(ct_ds.snapshot, cls=NumpyJSONEncoder)
+        attrs['snapshot-gzip'] = np.array(bytearray(gzip.compress(bytearray(snapshot_json, 'utf-8'))))
+    elif snapshot == 'dict':
+        attrs['snapshot'] = ct_ds.snapshot
+    elif snapshot == 'json':
+        snapshot_json = json.dumps(ct_ds.snapshot, cls=NumpyJSONEncoder)
+        attrs['snapshot'] = snapshot_json
 
     ds = xr.Dataset(attrs=attrs)
 
@@ -79,18 +93,18 @@ def ds2xarray(ct_ds):
             if param.ndim <= 2:
                 if param.ndim > 0:
                     coord = param.x
-                    dim_name = _add_coord(ds, coord)
+                    dim_name = _add_coord(ds, coord, dims)
                     dims.append(dim_name)
                 if param.ndim > 1:
                     coord = param.y
-                    dim_name = _add_coord(ds, coord)
+                    dim_name = _add_coord(ds, coord, dims)
                     dims.append(dim_name)
             else:
                 for i in range(param.ndim):
                     dim_name  = string.ascii_lowercase[8+i]
 
                     coord = getattr(param, dim_name)
-                    dim_name = _add_coord(ds, coord)
+                    dim_name = _add_coord(ds, coord, dims)
                     dims.append(dim_name)
 
             _add_data_var(ds, param, dims, param_index)

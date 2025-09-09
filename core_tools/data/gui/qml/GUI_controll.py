@@ -1,13 +1,19 @@
 import logging
 from PyQt5 import QtCore, QtQuick
+from PyQt5.QtWidgets import QMessageBox
 
 from core_tools.data.SQL.connect import SQL_conn_info_local, SQL_conn_info_remote
 from core_tools.data.SQL.queries.dataset_gui_queries import (
         alter_dataset, query_for_samples, query_for_measurement_results)
 
 from core_tools.data.ds.data_set import load_by_uuid
-from core_tools.data.gui.plot_mgr import data_plotter
+from qt_dataviewer.core_tools import CoreToolsDatasetViewer
+from qt_dataviewer import DatasetList
+from packaging.version import Version
+from qt_dataviewer import __version__ as qt_dataviewer_version
+
 from core_tools.data.gui.data_browser_models.result_table_data_class import m_result_overview
+from core_tools.data.name_validation import validate_dataset_name
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +125,7 @@ class signale_handler(QtQuick.QQuickView):
         self.max_measurement_id = 0
         self.selected_date = None
         self.ignore_date_selection_changes = False
+        self.loaded_results = []
         self.plots = []
 
     def init_gui_variables(self, win):
@@ -225,6 +232,10 @@ class signale_handler(QtQuick.QQuickView):
                     keywords=self._data_filter.keywords,
                     starred=self._data_filter.starred,
                     )
+            if data == self.loaded_results:
+                # no changes
+                return
+            self.loaded_results = data
             model_data = m_result_overview(data)
             self.data_overview_model.reset_data(model_data)
         except Exception:
@@ -262,12 +273,28 @@ class signale_handler(QtQuick.QQuickView):
         except Exception:
             logger.error(f'Failed to load dataset {uuid}', exc_info=True)
             return
-        p = data_plotter(ds)
-        self.plots.append(p)
+        try:
+            if Version(qt_dataviewer_version) < Version("0.3.10"):
+                error_msg = "Update QT-DataViewer. Minimmum version 0.3.10"
+                logger.error(error_msg)
+                msg = QMessageBox()
+                msg.setIcon(QMessageBox.Critical)
+                msg.setText(error_msg)
+                msg.setWindowTitle("Update QT-DataViewer")
+                msg.setStandardButtons(QMessageBox.Ok)
+                msg.exec_()
+                raise Exception(error_msg)
 
-        for i in range(len(self.plots)-1, -1, -1):
-            if not self.plots[i].alive:
-                self.plots.pop(i)
+            datalist = DataList(self.data_overview_model, uuid)
+            p = CoreToolsDatasetViewer(ds, datalist=datalist)
+            datalist.viewer = p
+            self.plots.append(p)
+
+            for i in range(len(self.plots)-1, -1, -1):
+                if not self.plots[i].alive:
+                    self.plots.pop(i)
+        except Exception:
+            logger.error(f'Failed to show dataset {uuid}', exc_info=True)
 
     @QtCore.pyqtSlot('QString')
     def plot_ds_qml(self, uuid):
@@ -286,6 +313,18 @@ class signale_handler(QtQuick.QQuickView):
 
     @QtCore.pyqtSlot('QString', 'QString')
     def update_name_meaurement(self, uuid, name):
+        try:
+            validate_dataset_name(name)
+        except Exception as ex:
+            logging.error(f"Failed to change name to '{name}': {ex}")
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Critical)
+            msg.setText(str(ex))
+            msg.setWindowTitle("Invalid dataset name")
+            msg.setStandardButtons(QMessageBox.Ok)
+            msg.exec_()
+            return
+
         try:
             alter_dataset.update_name(uuid.replace('_', ''), name)
         except Exception:
@@ -306,3 +345,50 @@ class signale_handler(QtQuick.QQuickView):
         for plot in self.plots:
             plot.close()
         self.plots = []
+
+
+class DataList(DatasetList):
+    def __init__(self, data_overview_model, uuid):
+        self.data_overview_model = data_overview_model
+        self.uuid = uuid
+
+    def has_next(self):
+        # Note: data is ordered in descending order.
+        # So 'next' in time is lower index
+        index = self._get_index()
+        return index is not None and index > 0
+
+    def has_previous(self):
+        index = self._get_index()
+        return index is not None and index + 1 < len(self.data_overview_model._data)
+
+    def _get_index(self):
+        uuid = self.uuid
+        for i, row in enumerate(self.data_overview_model._data):
+            if row.uuid == uuid:
+                return i
+        return None
+
+    def _load_ds(self, uuid):
+        try:
+            return load_by_uuid(uuid)
+        except Exception:
+            logger.error(f'Failed to load dataset {uuid}', exc_info=True)
+            # TODO raise Exception
+            return None
+
+    def get_next(self):
+        index = self._get_index()
+        if index is not None and index > 0:
+            self.uuid = self.data_overview_model._data[index-1].uuid
+            return self._load_ds(self.uuid)
+        logger.info(f"No next data (index = {index})")
+        raise StopIteration('No more datasets') from None
+
+    def get_previous(self):
+        index = self._get_index()
+        if index is not None and index + 1 < len(self.data_overview_model._data):
+            self.uuid = self.data_overview_model._data[index+1].uuid
+            return self._load_ds(self.uuid)
+        logger.info(f"No previous data (index = {index})")
+        raise StopIteration('No more datasets') from None

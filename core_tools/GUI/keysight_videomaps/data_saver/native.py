@@ -1,5 +1,3 @@
-from typing import Dict, Tuple
-
 import logging
 from qcodes import MultiParameter
 from core_tools.data.ds.data_set_core import data_set
@@ -11,9 +9,10 @@ from core_tools.GUI.keysight_videomaps.data_saver import IDataSaver
 
 logger = logging.getLogger(__name__)
 
+
 class CoreToolsDataSaver(IDataSaver):
 
-    def save_data(self, vm_data_parameter: MultiParameter, label: str) -> Tuple[data_set, Dict[str, str]]:
+    def save_data(self, vm_data_parameter: MultiParameter, label: str) -> tuple[data_set, dict[str, str]]:
         """
         Performs a measurement using core tools and writes the data to disk.
 
@@ -29,8 +28,16 @@ class CoreToolsDataSaver(IDataSaver):
         # Calling this before initializing the database will raise a ConnectionError.
         sample_info_str = str(sample_info)
 
-        logger.info('Save')
         job = do0D(vm_data_parameter, name=label)
         dataset = job.run()
+        logger.info(f'Saved {dataset.exp_uuid}')
+        print(f'\nSaved {dataset.exp_uuid} ({label})')
 
-        return dataset, {"dataset_id": dataset.exp_id, "dataset_uuid": dataset.exp_uuid, "sample_info": sample_info_str}
+        return (
+            dataset,
+            {
+                "dataset_id": dataset.exp_id,
+                "dataset_uuid": dataset.exp_uuid,
+                "sample_info": sample_info_str,
+            }
+        )

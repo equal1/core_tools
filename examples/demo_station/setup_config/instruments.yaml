@@ -33,6 +33,24 @@ instruments:
       chassis: 1
       slot: 11
 
+  sig_gen1:
+    type: pulse_lib.tests.dummy_instrument.DummyInstrument
+    enable_forced_reconnect: true
+    init:
+      gates: ['frequency','power']
+    parameters:
+      frequency:
+        limits: [0,20e9]
+
+  sig_gen2:
+    type: pulse_lib.tests.dummy_instrument.DummyInstrument
+    enable_forced_reconnect: true
+    init:
+      gates: ['frequency','power']
+    parameters:
+      frequency:
+        limits: [0,20e9]
+
   AWG1:
     type: pulse_lib.tests.mock_m3202a.MockM3202A_fpga
     enable_forced_reconnect : True
@@ -66,8 +84,8 @@ instruments:
     enable_forced_reconnect : True
     init:
       chassis : 1
-      slot : 6  
-            
+      slot : 6
+
   AWG6:
     type: pulse_lib.tests.mock_m3202a.MockM3202A_fpga
     enable_forced_reconnect : True
@@ -80,11 +98,25 @@ instruments:
     enable_forced_reconnect : True
     init:
       chassis : 1
-      slot : 8  
-                    
+      slot : 8
+
   AWG8:
     type: pulse_lib.tests.mock_m3202a.MockM3202A_fpga
     enable_forced_reconnect : True
     init:
       chassis : 1
-      slot : 9     
+      slot : 9
+
+  Dig1:
+    type: pulse_lib.tests.mock_m3102a.MockM3102A
+    enable_forced_reconnect: true
+    init:
+      chassis: 1
+      slot: 11
+
+  Dig2:
+    type: pulse_lib.tests.mock_m3102a.MockM3102A
+    enable_forced_reconnect: true
+    init:
+      chassis: 1
+      slot: 12

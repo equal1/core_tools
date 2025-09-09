@@ -8,28 +8,31 @@ import numpy as np
 
 
 class dataclass_raw_parent:
+
     def generate_data_buffer(self, setpoint_shape=[]):
         '''
         generate the buffers that are needed to write the data to the database.
 
         Args:
-            setpoint_shape (list) : shape of the setpoints (if applicable) (measurent param is measured exactly the same amount of times than the setpoint)
+            setpoint_shape (list):
+                shape of the setpoints (if applicable)
+                (measurent param is measured exactly the same amount of times than the setpoint)
         '''
-        SQL_mgr = SQL_database_manager()
+        db_mgr = SQL_database_manager()
 
         for i in range(len(self.shapes)):
             shape = setpoint_shape + list(self.shapes[i])
-            if i <= len(self.oid): # write data
-                if len(self.data) > i: #this is statement is kinda dirty..
-                    arr=self.data[i]
+            if i <= len(self.oid):  # write data
+                if len(self.data) > i:  # this is statement is kinda dirty..
+                    arr = self.data[i]
                 else:
                     arr = np.full(shape, np.nan, order='C')
                     self.data.append(arr)
-                data_buffer = buffer_writer(SQL_mgr.conn_local, arr)
+                data_buffer = buffer_writer(db_mgr, arr)
                 self.oid.append(data_buffer.oid)
-            else: # load data
+            else:  # load data
                 oid = self.oid[i]
-                data_buffer = buffer_reader(SQL_mgr.conn_local, oid, shape)
+                data_buffer = buffer_reader(db_mgr, oid, shape)
                 arr = data_buffer.buffer
                 self.data.append(arr)
 
@@ -40,11 +43,16 @@ class dataclass_raw_parent:
         write data to memory of the measurement
 
         Args:
-            input_data (dict): dict formatted as e.g. write_data({'id(parameter_1)' : parameter_1.get(), id(parameter_2) : parameter_2.get(), ..})
+            input_data (dict):
+                dict formatted as e.g.
+                write_data({'id(parameter_1)' : parameter_1.get(), id(parameter_2) : parameter_2.get(), ..})
         '''
         if self.id_info not in input_data.keys():
-            txt = f'Key {self.id_info} not found in {input_data.keys()}. A write is attempted to a parameter that has not been declaired yet. '
-            txt += 'Please first register the parameter with register_set_parameter/register_get_parameter '
+            txt = (
+                f"Key {self.id_info} not found in {input_data.keys()}. "
+                "A write is attempted to a parameter that has not been declaired yet. "
+                "Please first register the parameter with register_set_parameter/register_get_parameter"
+                )
             raise KeyError(txt)
         data_in = input_data[self.id_info]
 
@@ -71,30 +79,35 @@ class dataclass_raw_parent:
         '''
         data_items = list()
         for i in range(len(self.data)):
-            data_items +=[m_param_raw(self.uuid_dc, i, nth_dim, m_param_id, setpoint, setpoint_local,
-                self.name, self.names[i], self.labels[i],
-                self.units[i], dependencies[i], self.data[i].shape, self.data[i].size, self.oid[i], self.data_buffer[i])]
+            data_items += [
+                m_param_raw(self.uuid_dc, i, nth_dim, m_param_id, setpoint, setpoint_local,
+                            self.name, self.names[i], self.labels[i],
+                            self.units[i], dependencies[i], self.data[i].shape, self.data[i].size,
+                            self.oid[i], self.data_buffer[i])]
 
         return data_items
 
+
 @dataclass
 class setpoint_dataclass(dataclass_raw_parent):
-    id_info : id
-    npt : np.NaN
-    name : str
-    names : list
-    labels : list
-    units : list
-    shapes : list = field(default_factory=lambda: list( ((),) ))
-    nth_set : int = 0
-    data : list = field(default_factory=lambda: [])
-    oid : list = field(default_factory=lambda: [])
-    data_buffer : list = field(default_factory=lambda: [])
-    uuid_dc : int = field(default_factory=lambda: int.from_bytes(uuid.uuid1().bytes, byteorder='big', signed=True)>>64)
+    id_info: id
+    npt: np.nan
+    name: str
+    names: list
+    labels: list
+    units: list
+    shapes: list = field(default_factory=lambda: list(((),)))
+    nth_set: int = 0
+    data: list = field(default_factory=lambda: [])
+    oid: list = field(default_factory=lambda: [])
+    data_buffer: list = field(default_factory=lambda: [])
+    uuid_dc: int = field(default_factory=lambda: int.from_bytes(
+        uuid.uuid1().bytes, byteorder='big', signed=True) >> 64)
 
     def __repr__(self):
         description = "id :: {} \tname :: {}\tnpt :: {}\n".format(self.id_info, self.name, self.npt)
-        description += "names :\t{}\tlabels :\t{}\nunits :\t{}\tshapes :\t{}\n".format(self.names, self.labels, self.units, self.shapes)
+        description += "names :\t{}\tlabels :\t{}\nunits :\t{}\tshapes :\t{}\n".format(
+            self.names, self.labels, self.units, self.shapes)
 
         return description
 
@@ -106,32 +119,43 @@ class setpoint_dataclass(dataclass_raw_parent):
         return dep_tot
 
     def __copy__(self):
-        return setpoint_dataclass(self.id_info, self.npt, self.name, self.names, self.labels, self.units, self.shapes, self.nth_set)
+        return setpoint_dataclass(
+            self.id_info, self.npt, self.name, self.names, self.labels, self.units, self.shapes, self.nth_set)
+
 
 @dataclass
 class m_param_dataclass(dataclass_raw_parent):
-    id_info : id
-    name : str
-    names : list
-    labels : list
-    units : list
-    shapes : list = field(default_factory=lambda: list(((),)))
-    setpoints : list = field(default_factory=lambda: [])
-    setpoints_local : list = field(default_factory=lambda: [])
-    data : list = field(default_factory=lambda: [])
-    oid : list = field(default_factory=lambda: [])
-    data_buffer : list = field(default_factory=lambda: [])
-    uuid_dc : int = field(default_factory=lambda: int.from_bytes(uuid.uuid1().bytes, byteorder='big', signed=True)>>64)
-    __initialized : bool = False
+    id_info: id
+    name: str
+    names: list
+    labels: list
+    units: list
+    shapes: list = field(default_factory=lambda: list(((),)))
+    setpoints: list = field(default_factory=lambda: [])
+    setpoints_local: list = field(default_factory=lambda: [])
+    data: list = field(default_factory=lambda: [])
+    oid: list = field(default_factory=lambda: [])
+    data_buffer: list = field(default_factory=lambda: [])
+    uuid_dc: int = field(default_factory=lambda: int.from_bytes(
+        uuid.uuid1().bytes, byteorder='big', signed=True) >> 64)
+    __initialized: bool = False
 
     def write_data(self, input_data):
         '''
         write data to memory of the measurement
 
         Args:
-            input_data : dict formatted as e.g. write_data({'id(parameter_1)' : parameter_1.get(), id(parameter_2) : parameter_2.get(), ..})
+            input_data : dict formatted as e.g.
+            write_data({'id(parameter_1)' : parameter_1.get(), id(parameter_2) : parameter_2.get(), ..})
         '''
         super().write_data(input_data)
+
+        for setpoint in self.setpoints:
+            setpoint.write_data(input_data)
+
+    def skip_data(self, input_data):
+        for shape, buffer in zip(self.shapes, self.data_buffer):
+            buffer.write(np.ravel(np.full(shape, np.nan)))
 
         for setpoint in self.setpoints:
             setpoint.write_data(input_data)
@@ -142,7 +166,7 @@ class m_param_dataclass(dataclass_raw_parent):
         data_items += super().to_SQL_data_structure(self.uuid_dc, False, False, -1, self.dependencies)
         for i in range(len(self.setpoints_local)):
             setpt_list = self.setpoints_local[i]
-            for j,setpt in enumerate(setpt_list):
+            for j, setpt in enumerate(setpt_list):
                 data_items += setpt.to_SQL_data_structure(self.uuid_dc, False, True, j, setpt.dependencies)
 
         for i in range(len(self.setpoints)):
@@ -167,7 +191,7 @@ class m_param_dataclass(dataclass_raw_parent):
 
     @property
     def dependencies(self):
-        dep_tot= []
+        dep_tot = []
         for i in range(len(self.data)):
             dep = []
             for setpt in self.setpoints:
@@ -182,14 +206,16 @@ class m_param_dataclass(dataclass_raw_parent):
         return dep_tot
 
     def __repr__(self):
-        description = "\n########################\nMeasurement dataset info\n########################\nid :: {} \nname :: {}\n\n".format(self.id_info, self.name)
-        description += "names :\t{}\nlabels :\t{}\nunits :\t{}\nshapes :\t{}\n".format(self.names, self.labels, self.units, self.shapes)
+        description = "\n########################\nMeasurement dataset info\n########################\n"
+        description += f"id :: {self.id_info} \nname :: {self.name}\n\n"
+        description += f"names :\t{self.names}\nlabels :\t{self.labels}\n"
+        description += f"units :\t{self.units}\nshapes :\t{self.shapes}\n"
         for i in range(len(self.setpoints_local)):
-            description += "\n##################\nlocal setpoint {}\n".format(i)
+            description += f"\n##################\nlocal setpoint {i}\n"
             description += self.setpoints_local[i].__repr__()
 
         for i in range(len(self.setpoints)):
-            description += "\n##################\nsetpoint {}\n".format(i)
+            description += f"\n##################\nsetpoint {i}\n"
             description += self.setpoints[i].__repr__()
 
         return description

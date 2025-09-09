@@ -11,6 +11,8 @@ from .hardware.virtual_gate_matrix_data import VirtualGateMatrixData
 from .hardware.virtual_gate_matrix import VirtualGateMatrix
 
 
+# @@@ TODO: delete in future
+
 # NOTE: class used for loading from and saving to shelve. Do not change name or attributes.
 @dataclass
 class virtual_gate(VirtualGateMatrixData):
@@ -128,6 +130,7 @@ class harware_parent(qc.Instrument):
     """docstring for harware_parent -- init a empy hardware object"""
     def __init__(self, sample_name, storage_location):
         super(harware_parent, self).__init__(sample_name)
+        print("WARNING: class harware_parent is deprecated and will be removed in the next release.")
         self.storage_location = storage_location
         self.sync = shelve.open(storage_location + sample_name, flag='c', writeback=True)
         self.dac_gate_map = dict()

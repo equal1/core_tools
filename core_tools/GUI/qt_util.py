@@ -1,8 +1,10 @@
 import logging
 import os
 import threading
+import traceback
 
 from PyQt5 import QtCore, QtWidgets
+from PyQt5.QtWidgets import QMessageBox
 
 try:
     import IPython.lib.guisupport as gs
@@ -12,6 +14,7 @@ except Exception:
 
 
 logger = logging.getLogger(__name__)
+
 
 is_wrapped = threading.local()
 is_wrapped.val = False
@@ -46,7 +49,7 @@ def qt_log_exception(func):
 _qt_app = None
 
 
-def qt_init():
+def qt_init(style: str | None = None) -> bool:
     '''Starts the QT application if not yet started.
     Most of the cases the QT backend is already started
     by IPython, but sometimes it is not.
@@ -54,33 +57,60 @@ def qt_init():
     # application reference must be held in global scope
     global _qt_app
 
-    if _qt_app is not None:
-        return
+    if _qt_app is None:
+    #    print(QtCore.QCoreApplication.testAttribute(QtCore.Qt.AA_EnableHighDpiScaling))
+    #    print(QtCore.QCoreApplication.testAttribute(QtCore.Qt.HighDpiScaleFactorRoundingPolicy.PassThrough))
 
-#    print(QtCore.QCoreApplication.testAttribute(QtCore.Qt.AA_EnableHighDpiScaling))
-#    print(QtCore.QCoreApplication.testAttribute(QtCore.Qt.HighDpiScaleFactorRoundingPolicy.PassThrough))
+        # Set attributes for proper scaling when display scaling is not equal to 100%
+        # This should be done before QApplication is started.
+        QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+        QtCore.QCoreApplication.setAttribute(QtCore.Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
 
-    # Set attributes for proper scaling when display scaling is not equal to 100%
-    # This should be done before QApplication is started.
-    QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
-    QtCore.QCoreApplication.setAttribute(QtCore.Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
+        ipython = get_ipython()
 
-    ipython = get_ipython()
+        if ipython:
+            if not gs.is_event_loop_running_qt4():
+                if any('SPYDER' in name for name in os.environ):
+                    logger.error("Qt5 not configured in Spyder")
+                    raise Exception('Configure Qt5 in Spyder -> Preferences -> IPython Console -> Graphics -> Backend')
+                else:
+                    logger.warning("Qt5 not configured for IPython console. Activating it now")
+                    print('Warning Qt5 not configured for IPython console. Activating it now.')
+                    ipython.run_line_magic('gui', 'qt5')
 
-    if ipython:
-        if not gs.is_event_loop_running_qt4():
-            if any('SPYDER' in name for name in os.environ):
-                raise Exception('Configure QT5 in Spyder -> Preferences -> IPython Console -> Graphics -> Backend')
+            _qt_app = QtCore.QCoreApplication.instance()
+            if _qt_app is None:
+                logger.info('Create Qt application event processor')
+                _qt_app = QtWidgets.QApplication([])
             else:
-                print('Warning Qt5 not configured for IPython console. Activating it now.')
-                ipython.run_line_magic('gui', 'qt5')
-
-        _qt_app = QtCore.QCoreApplication.instance()
-        if _qt_app is None:
-            logger.debug('Create Qt application')
-            _qt_app = QtWidgets.QApplication([])
+                logger.debug('Qt application already created')
         else:
-            logger.debug('Qt application already created')
+            _qt_app = QtCore.QCoreApplication.instance()
+            logger.debug(f"No IPython. QtApplication running = {_qt_app is not None}")
+
+    if style == "dark":
+        qt_set_darkstyle()
+
+    return _qt_app is not None
+
+
+def qt_set_darkstyle():
+    import qdarkstyle
+    import pyqtgraph as pg
+
+    qt_app = QtCore.QCoreApplication.instance()
+    if qt_app is None:
+        return
+    dark_stylesheet = qdarkstyle.load_stylesheet()
+    # patch qdarkstyle for cropped x-label on 2D graphics.
+    dark_stylesheet +=r'''
+QGraphicsView {
+    padding: 0px;
+}
+'''
+    qt_app.setStyleSheet(dark_stylesheet)
+    pg.setConfigOption('background', 'k')
+    pg.setConfigOption('foreground', 'gray')
 
 
 _qt_message_handler_installed = False
@@ -109,3 +139,44 @@ def install_qt_message_handler():
     if not _qt_message_handler_installed:
         QtCore.qInstallMessageHandler(_qt_message_handler)
         _qt_message_handler_installed = True
+
+
+def qt_show_exception(message: str, ex: Exception, extra_line: str = None):
+    # logger.error(message, exc_info=ex)
+    text = message
+    if extra_line:
+        text += "\n" + extra_line
+    text += f"\n{type(ex).__name__}: {ex}"
+    msg = QMessageBox(
+        QMessageBox.Critical,
+        message,
+        text,
+        QMessageBox.Ok,
+        )
+    msg.setDetailedText("\n".join(traceback.format_exception(ex)))
+    msg.setStyleSheet("QTextEdit{min-width:600px}")
+    msg.exec_()
+
+
+def qt_show_error(title: str, message: str):
+    # logger.error(message)
+    msg = QMessageBox(
+        QMessageBox.Critical,
+        title,
+        message,
+        QMessageBox.Ok,
+        )
+    msg.exec_()
+
+def qt_create_app() -> QtCore.QCoreApplication:
+    logger.info("Create Qt application")
+    QtCore.QCoreApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+    QtCore.QCoreApplication.setAttribute(QtCore.Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
+    app = QtWidgets.QApplication([])
+    return app
+
+
+def qt_run_app(app):
+    logger.info("Run Qt Application")
+    app.exec()
+    logger.info("Qt Application event loop exited")

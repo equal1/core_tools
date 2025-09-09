@@ -1,16 +1,27 @@
-import logging
-from core_tools.data.ds.data_set_core import  data_set
-from core_tools.data.ds.data_set_raw import data_set_raw
-from core_tools.data.SQL.SQL_dataset_creator import SQL_dataset_creator
 import json
+import logging
+from typing import Any
+
 import qcodes as qc
 from qcodes.utils.helpers import NumpyJSONEncoder
+
+from core_tools.data.ds.data_set_core import data_set
+from core_tools.data.ds.data_set_raw import data_set_raw
+from core_tools.data.SQL.SQL_dataset_creator import SQL_dataset_creator
+from core_tools.utility.software_versions import get_software_versions
+
 
 logger = logging.getLogger(__name__)
 
 DATA_POINTS_MAX = 20_000_000
 DATASET_SIZE_WARNING = 50_000_000
 DATASET_SIZE_MAX = 200_000_000
+
+REDUCE_SNAPSHOT = True
+
+
+software_versions = get_software_versions()
+
 
 def load_by_id(exp_id):
     '''
@@ -21,6 +32,7 @@ def load_by_id(exp_id):
     '''
     SQL_mgr = SQL_dataset_creator()
     return data_set(SQL_mgr.fetch_raw_dataset_by_Id(exp_id))
+
 
 def load_by_uuid(exp_uuid, copy2localdb=False):
     '''
@@ -33,6 +45,7 @@ def load_by_uuid(exp_uuid, copy2localdb=False):
     SQL_mgr = SQL_dataset_creator()
     return data_set(SQL_mgr.fetch_raw_dataset_by_UUID(exp_uuid, copy2localdb))
 
+
 def create_new_data_set(experiment_name, measurement_snapshot, *m_params):
     '''
     generates a dataclass for a given set of measurement parameters
@@ -42,14 +55,15 @@ def create_new_data_set(experiment_name, measurement_snapshot, *m_params):
         measurement_snapshot (dict[str,Any]) : snapshot of measurement parameters
         *m_params (m_param_dataset) : datasets of the measurement parameters
     '''
+    logger.info(f"creating new dataset {experiment_name}")
     SQL_mgr = SQL_dataset_creator()
-    if SQL_mgr.conn is None:
-        raise Exception('No database connection set up')
 
     ds = data_set_raw(exp_name=experiment_name)
 
     if qc.Station.default is not None:
         station_snapshot = qc.Station.default.snapshot()
+        if REDUCE_SNAPSHOT:
+            station_snapshot = _reduce_snapshot(station_snapshot)
         snapshot = {'station': station_snapshot}
     else:
         logger.warning('No station configured. No snapshot will be stored.')
@@ -72,6 +86,7 @@ def create_new_data_set(experiment_name, measurement_snapshot, *m_params):
         print(f'Dataset with {total_size} values is quite big for storage')
 
     snapshot['measurement'] = measurement_snapshot
+    snapshot["software"] = software_versions
 
     # encode and decode to convert all numpy arrays and complex numbers to jsonable lists and dictionaries
     snapshot_json = json.dumps(snapshot, cls=NumpyJSONEncoder)
@@ -83,3 +98,31 @@ def create_new_data_set(experiment_name, measurement_snapshot, *m_params):
 
     return data_set(ds)
 
+
+def _reduce_snapshot(snapshot: dict[str, Any]):
+    if "__class__" in snapshot:
+        exclude_keys = [
+            "__class__",
+            "full_name",
+            "functions",
+            "instrument",
+            "instrument_name",
+            "inter_delay",
+            "post_delay",
+            "raw_value",
+            "val_mapping",
+            "validators",
+            "vals",
+            ]
+    else:
+        exclude_keys = []
+
+    result = {}
+    for key, value in snapshot.items():
+        if key not in exclude_keys:
+            if isinstance(value, dict):
+                value = _reduce_snapshot(value)
+                if not value:
+                    continue
+            result[key] = value
+    return result

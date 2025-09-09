@@ -1,7 +1,338 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
-## \[1.4.37] - 2024-12-21
+## \[1.6.9\] - 2025-08-08
+
+- Cleanup Parameter Viewer.
+- Skip `None` arguments in `Scan`.
+
+## \[1.6.8\] - 2025-08-07
+
+- Fixed bug in sqdl-sync where all export operations would be performed before starting uploads.
+- Fixed typo in changelog.
+
+## \[1.6.7\] - 2025-08-07
+
+- Fixed bug in exporting of expired measurements through sqdl-sync.
+- Removed dead code in export model.
+
+## \[1.6.6\] - 2025-07-24
+
+- Fixed do0D, do1D, do2D implementations to reproduce old behaviour.
+- Fixed single shot HVI for case when next measurement is started just after 500 ms after end of previous measurement.
+
+## \[1.6.5\] - 2025-07-24
+
+- Changed condition for exporting sqdl preview images. Now runs every export.
+
+## \[1.6.4\] - 2025-07-23
+
+- Changed underlying implementation of doND measurements: now use Scan instead of scan-generic
+- Added integration tests for Scan
+- Added integration tests to verify Scan and scan-generic implementation of doND remain compatible
+- Added deprication warning on scan-generic: listed for later removal
+- Changed demo-station examples for Scan, with additional explanation on basic usage
+- Removed out-of-date demo-station examples for old measurements
+
+## \[1.6.3\] - 2025-07-22
+
+- Fixed single shot HVI for case when next measurement is started within 450 to 500 ms after end of previous measurement.
+
+## \[1.6.2\] - 2025-07-10
+
+- Fixed loading virtual gate matrices from snapshot.
+- Improved speed of sQDL export and upload.
+- Improved database raw data read/write.
+- Improved error reporting from measurement.
+
+## \[1.6.1\] - 2025-06-04
+
+- Fixed bug in dataset refactoring.
+
+## \[1.6.0\] - 2025-06-03
+
+### Added
+- Added optional functionality for synchronising data with a remote instance of SQDL. Note that this functionality depends on the internally developed ```sqdl_client``` and ```sqdl_uploader``` packages, and is therefor only accessible by users associated with QuTech.
+    - Added the ```SQDLSync``` class, responsible for managing the data synchronisation process.
+    - Added the ```.../sqdl/export/``` sub-module, responsible for exporting core-tools data into an SQDL-compatible format.
+    - Added the ```.../sqdl/model/``` sub-module, which defines the local database operations associated with the ```export``` sub-module.
+    - Added ```.../startup/sqdl_sync.py``` and ```.../startup/launch_sqdl_sync.py```, which fill the role of ```.../startup/db_sync.py``` and ```.../startup/launch_db_sync.py``` for the purpose of synchronising data to SQDL.
+
+- Added local database versioning.
+    - Added a ```settings``` table to the database schema, and populated it with the database version parameter ```_version```.
+    - Added a routine that checks the currently available local database version against the expectations of the current coretools version. If new database versions are available, the updates are applied automatically when connecting to the local database.
+        - These additions are still compatible with older coretools version, whether users are syncing their local database to remote using ```db_sync``` or using a direct remote connection. (See Changed section below)
+    - Added a definition for coretools database v1.0.0 (replication of the initial schema)
+    - Added a definition for coretools database v1.1.0 (development version)
+    - Added a definition for coretools database v1.2.0 (includes the SQDL functionality, as well as a new Scope column, see Changed section below)
+
+### Changed
+- Added a ```scope``` attribute to sample info.
+    - Updated ```sample_info``` class and functionality to include the optional ```scope``` parameter.
+    - Updated ```global_measurement_overview``` table with a new "Scope" column *local* database.
+    - Added a warning about setting the ```scope``` config parameter to the core-tools start-up configuration method.
+    - Note that updating your remote database to include these columns is not required at this stage. The synchronisation process as defined by ```db_sync``` allows for this discrepancy between databases, facilitating a non-breaking upgrade.
+
+- Replaced the generate-table section of the DatabaseManager (see ```SQL_database_manager``` class in ```core_tools.data.SQL.SQL_database_mgr.py```) responsible for creating tables if they did not already exist, with the new versioning routine (see the Added section above).
+
+- Added optional configuration ```address``` for local database as well, allowing for non-default PostgreSQL installations. If not specified, the config parameter defaults to ```localhost:5432```, which used to be the fixed value.
+    - Note that the connection manager uses the value ```localhost``` to distinguish between local and remote connections. In order to guarentee this funcionality, misconfiguration of local and/or remote database ```address``` values will result in an ```AssertionError``` when running ```core_tools.configure("...")```.
+
+- Updated some examples in the DemoStation to use modern Mocks.
+
+### Removed
+
+- QML GUIs.
+
+## \[1.5.18] - 2025-05-26
+
+- Fixed loading of dataset from remote server when local database is configured as well.
+- Cleanup and extra logging.
+
+## \[1.5.17] - 2025-05-22
+
+- Fixed bugs made in previous release.
+
+## \[1.5.16] - 2025-05-21
+
+- Fixed VideoMode step during play bug.
+
+## \[1.5.15] - 2025-05-21
+
+- Log KeyboardInterrupt exception to know where the measurement was interrupted.
+- Changed database connection management for connect/disconnect issues.
+
+## \[1.5.14] - 2025-05-15
+
+- Fixed ScriptRunner video mode start/stop.
+
+## \[1.5.13] - 2025-04-28
+
+- Added find_all_uuids_between to sqdl_reader
+- Removed old KeysightSD1 code
+- Added `get_effective_fpga_scaling` and added channel properties to snapshot
+
+## \[1.5.12] - 2025-03-07
+
+- Video mode: Fix general settings in favorites
+- "gates" object now uses virtual matrix as shown in GUI and not the normalized matrix.
+
+## \[1.5.11] - 2025-02-20
+
+- Added snapshot data_writer
+- Added simple HTTP server to start scripts/functions based on ScriptRunner
+- Added example of live exporter writing json files
+
+## \[1.5.10] - 2025-02-17
+
+- Removed unintended print statement.
+
+## \[1.5.9] - 2025-02-13
+
+- Update VideoMode for qcodes 0.49.
+- Added software versions to snapshot.
+
+## \[1.5.8] - 2025-02-11
+
+- Fix flip-axes in VideoMode.
+
+## \[1.5.7] - 2025-01-19
+
+- Fix update of general settings in VideoMode.
+
+## \[1.5.6] - 2025-01-14
+
+- Always use package h5netcdf to load data from HDF5 file.
+- Removed support for QT-DataViewer < 0.3.10
+- Reduce station snapshot removing useless entries.
+
+## \[1.5.5] - 2024-12-16
+
+- Fixed direct writing of measurements to remote server.
+
+## \[1.5.4] - 2024-12-02
+
+= Attempt to fix irregular arbitrary file rename failure in save hdf5.
+
+## \[1.5.3] - 2024-10-30
+
+- Fixed slow database connection setup
+
+## \[1.5.2] - 2024-10-21
+
+- Support dark style GUI.
+- Updates for qcodes 0.49
+
+## \[1.5.1] - 2024-10-14
+
+- Fixed type annotation on VideoMode
+- Changes for new Keysight HVI2/PTSE release
+
+## \[1.5.0] - 2024-10-07
+
+- "Official" release of new Video Mode.
+- Fixed Video Mode bugs of 1.4.67
+
+## \[1.4.67] - 2024-10-07
+
+- Refactored Video Mode for new features
+- Added Favorites to Video Mode
+- Added automatic recompile in Video Mode if pulse-lib settings change.
+- Added extra title text to Video Mode
+- Performance improvement setting virtual gates
+
+## \[1.4.66] - 2024-09-30
+
+- Reverted to old logic for Keysight for using digitizer channels from pulse_lib: use digitizer if specified.
+
+## \[1.4.65] - 2024-09-30
+
+- Fixed construct_1D_fast_scan and construct_2D_fast_scan (after v1.4.63 refactoring)
+
+## \[1.4.64] - 2024-09-26
+
+- Fix Set DC voltages in Video Mode (broken in v1.4.63)
+
+## \[1.4.63] - 2024-09-25
+
+- Refactored VideoMode to allow simple external scan generator.
+- Fixed database locking due to synchronization manager
+
+## \[1.4.62] - 2024-09-19
+
+- Performance improvement ParameterViewer.
+- Improved Scan and combi_parameter for better reset.
+
+## \[1.4.61] - 2024-09-17
+
+- Fix pulse_gates in VideoMode
+
+## \[1.4.60] - 2024-09-13
+
+- Added download_hdf5, download_hdf5_parallel for sQDL.
+- Huge performance improvement virtual gate matrix GUI.
+
+## \[1.4.59] - 2024-09-09
+
+- Added sqdl_query, sqdl_logout, load_uuids_parallel
+
+## \[1.4.58] - 2024-09-02
+
+- Improved error message in case COM port number change is likely cause of error.
+- Set proper GUI window titles.
+- Fixed Mac OS installation.
+- Added scan arguments to fast-scan parameter snapshots.
+- Added scan arguments to video mode snapshot.
+- Video Mode improvements:
+  - Fixed saving of wrong data when switching tabs before pressing Save.
+  - Added shortcut keys F5, Esc, Ctrl+S, Ctrl+C, Ctrl+P.
+  - Increased number of pulse gates and made it configurable.
+  - Added noise filter in 2D (Gaussian low pass).
+  - Added static methods liveplotting.stop_all and liveplotting.is_any_running
+  - Automatic stop of other running video mode gui.
+  - Added icons on buttons.
+- Reduced amount of logging on info level.
+- HVI2 (Keysight): Fixed error with multiple digitizers and not all channels active
+
+## \[1.4.57] - 2024-08-13
+
+- Fixed race conditions with db synchronization.
+- Added get_idn to D5a.
+
+## \[1.4.56] - 2024-08-07
+
+- Fixed disabling digitizer sequencer functionality in Keysight_QS
+- Automatically remove log-files older than "max_age" days (default: 90)
+
+## \[1.4.55] - 2024-07-22
+
+- Fixed databrowser QML.
+- minor fixes and cleanup.
+- Added QT-Dataset Browser (qt-dataviewer >= v0.3.0)
+
+## \[1.4.54] - 2024-06-14
+
+- Fixed refresh of DataBrowser GUI.
+
+## \[1.4.53] - 2024-06-03
+
+- Fixed unit radians for phase in video mode.
+- Fixed GUI for changes in latest matplotlib release.
+
+## \[1.4.52] - 2024-04-29
+
+- Fixed RF generators with Keysight_QS video mode
+
+## \[1.4.51] - 2024-04-29
+
+- Added resume after break to Scan.
+- Virtual Matrix Editor: Show matrix determinant and show matrix elements in bold and red when out of range
+- Parameter Viewer: Show virtual gate values in red and disable editing when value out of range due to matrix
+- Fixed bug in Scan of v1.4.49
+
+## \[1.4.50] - 2024-04-19
+
+- Fixed measurement parameters in dataset.
+
+## \[1.4.49] - 2024-04-19
+
+- Added Section to Scan to make a sequence of sweeps in a scan.
+- Fixed order of measurement parameters in dataset.
+- Fixed old dataviewer after removing si_prefix package.
+
+## \[1.4.48] - 2024-04-16
+
+- Added close to dataset to release file objects.
+
+## \[1.4.47] - 2024-04-10
+
+- Added value_after to sweep in Scan to set the value of the inner loop before the next step of the outer loop.
+- Removed dependency on package si_prefix
+- Minor correction for DC compensation on 2D scans.
+
+## \[1.4.46] - 2024-03-28
+
+- Significantly improved performance of gates.snapshot and parameter viewer.
+
+## \[1.4.45] - 2024-03-21
+
+- M3202A improved logging for long measurements
+- Avoid unnecessary HVI script regeneration when number waveforms changes
+
+## \[1.4.44] - 2024-02-08
+
+- Update for qt-dataviewer v0.3.0
+
+## \[1.4.43] - 2024-01-30
+
+- Fixed PostgreSQL data limit: 1GB per field.
+
+## \[1.4.42] - 2024-01-29
+
+- Compress snapshot in HDF5 files.
+- Added 'application' to xarray / HDF5 file.
+- Added query for new measurements.
+
+## \[1.4.41] - 2024-01-18
+
+- Fixed backward compatibility for old data viewer.
+
+## \[1.4.40] - 2024-01-18
+
+- Added new qt_dataviewer to plot datasets.
+
+## \[1.4.39] - 2024-01-12
+
+- Added SQL_database_manager.disconnect() to change database connection.
+
+## \[1.4.38] - 2024-01-10
+
+- Video mode: disabled auto SI prefix to avoid 'mmV'.
+- Improved dataset name checking.
+- Fixed warning "<gate> corrected from -0.00 to 0.00".
+- Added argument snapshot_extra to Scan.
+
+## \[1.4.37] - 2023-12-21
 
 - Change segment HVI variables to sequence.schedule_params (preparation pulse-lib v1.8)
 - Fixed sample/project/setup name validation. Allow 0-9_ as first character.

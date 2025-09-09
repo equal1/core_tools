@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 # reference to running data_browser to avoid diposal and garbage collection
 _browser_instance = None
 
+
 def run_app(name, app_init, app_main):
     '''
     Starts databrowser.
@@ -20,8 +21,10 @@ def run_app(name, app_init, app_main):
         print('usage: <app> config-file [--detached]')
 
     config_file = sys.argv[1]
-    if nargs > 1:
+    if nargs > 2:
         detached = sys.argv[2] == '--detached'
+    else:
+        detached = False
     cfg = load_configuration(config_file)
 
     _configure_logging(cfg, name)
@@ -33,6 +36,7 @@ def run_app(name, app_init, app_main):
         _stop_console_output()
     try:
         app_main()
+        logger.info("Exit")
     except:
         logger.error("Fatal exception", exc_info=True)
         raise
@@ -61,13 +65,10 @@ def _configure_logging(cfg, app_name):
     path = os.path.expanduser(path)
     filename = cfg.get(f'{app_name}.logging.file_name', f'{app_name}.log')
     file_level = cfg.get(f'{app_name}.logging.file_level', 'INFO')
-    file_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    file_format = '%(asctime)s | %(name)s | %(levelname)s | %(module)s | %(funcName)s:%(lineno)d | %(message)s'
     os.makedirs(path, exist_ok=True)
     file = os.path.join(path, filename)
     print('Logging to: ', file)
-#    logging.basicConfig(filename=file, filemode='w',
-#                        format=,
-#                        level = getattr(logging, level))
 
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.DEBUG)
@@ -86,6 +87,12 @@ def _configure_logging(cfg, app_name):
     file_handler.setLevel(file_level)
     file_handler.setFormatter(logging.Formatter(file_format))
     root_logger.addHandler(file_handler)
+
+    # Logging to stderr is only active until detach.
+    stream_handler = logging.StreamHandler(stream=sys.stderr)
+    stream_handler.setLevel("INFO")
+    stream_handler.setFormatter(logging.Formatter(file_format))
+    root_logger.addHandler(stream_handler)
 
     logger.info(f'Start {app_name} logging')
 

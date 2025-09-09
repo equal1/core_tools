@@ -1,4 +1,5 @@
 import core_tools as ct
+from core_tools.GUI.keysight_videomaps import liveplotting
 
 from setup_config.init_pulse_lib import init_pulse_lib
 from setup_config.init_station import init_station
@@ -15,18 +16,15 @@ pulse = init_pulse_lib()
 ct.start_parameter_viewer()
 ct.start_virtual_matrix_gui(pulse)
 
-ct.start_parameter_viewer_qml()
-ct.start_virtual_matrix_gui_qml()
-
 # Example ScriptRunner
-def set_gate_voltage(gate_name:str, value:float):
-    station.gates.set(gate_name, value)
+def set_gate_voltage(gate_name:str, value:float = 1.0):
+    station.gates.parameters[gate_name].set(value)
 
 script_gui = ct.start_script_runner()
 script_gui.add_function(set_gate_voltage, 'Set voltage', gate_name='P1')
 
 # start in separate processes
-ct.launch_databrowser()
+ct.launch_qt_databrowser()
 ct.launch_db_sync(kill=True, close_at_exit=True)
 
 
@@ -35,3 +33,7 @@ ct.launch_db_sync(kill=True, close_at_exit=True)
 
 #from core_tools.GUI.voltage_gui.voltage_gui import voltage_plotter_pyqt
 #pq = voltage_plotter_pyqt(station.gates, 'SQ21_68')
+
+
+# Start Video Mode
+plotting = liveplotting.liveplotting(pulse, station.Dig1, "Virtual")

@@ -15,6 +15,18 @@ class Hvi2SingleShot():
     The start time of this schedule is 5 to 10 ms faster for repeated starts than the original Hvi2SingleShot schedule,
     because it keeps the HVI running and uses a start flag to restart the schedule.
     The gain is bigger when more modules are being used.
+
+    Note on HVI register usage:
+        * All modules: 5 general registers (start, stop, n_rep, rep_counter, ticks)
+        * AWG: 1 duration
+        * AWG LO: 2 per trigger
+        * AWG queue control: 4 + 1 (n_waveforms)
+        * Digitizer: 1 (channel state) + 1 per trigger
+
+        Max triggers digitizer: 10
+        Max triggers AWG LO: 5
+        Max triggers AWG LO + queueing: 3
+
     '''
     verbose = True
 
@@ -29,7 +41,6 @@ class Hvi2SingleShot():
                 'n_triggers' (int): number of digitizer triggers
                 'acquisition_delay_ns' (int):
                 Time in ns between AWG output change and digitizer acquisition start.
-                This also increases the gap between acquisitions.
                 'digitizer_name':
                     'all_ch' (List[int]): all channels
                     'raw_ch' (List[int]): channels in raw mode
@@ -165,6 +176,8 @@ class Hvi2SingleShot():
                             all_ch = self._module_config(dig_seq, 'all_ch')
                             ds_ch = self._module_config(dig_seq, 'ds_ch')
                             iq_ch = self._module_config(dig_seq, 'iq_ch')
+                            if len(all_ch) == 0:
+                                break
 
                             dig_seq.sys.clear_ticks()
                             dig_seq.log.write(1)
@@ -236,6 +249,9 @@ class Hvi2SingleShot():
 
                             for dig_seq in dig_seqs:
                                 iq_ch = self._module_config(dig_seq, 'iq_ch')
+                                all_ch = self._module_config(dig_seq, 'all_ch')
+                                if len(all_ch) == 0:
+                                    break
                                 # # phase reset of AWG and Dig must be at the same clock tick.
                                 dig_seq.log.write(2)
                                 if len(iq_ch) > 0:
@@ -298,7 +314,7 @@ class Hvi2SingleShot():
     def start(self, hvi_exec, waveform_duration, n_repetitions, hvi_params):
         if self.started != hvi_exec.is_running():
             logger.debug(f'HVI running: {not self.started}; started: {self.started}')
-            self.started = not self.started
+            self.stop(hvi_exec)
         if self.started:
             if self.use_systicks:
                 sys_ticks = self.hardware.awgs[0].get_sys_ticks()//200_000
@@ -309,7 +325,7 @@ class Hvi2SingleShot():
             if sys_ticks > StartTimeout - 50:
                 self.stop(hvi_exec)
         if not self.started:
-            logger.info('start hvi')
+            logger.debug('start hvi')
             hvi_exec.start()
             self.started = True
 
@@ -366,10 +382,9 @@ class Hvi2SingleShot():
         hvi_exec.write_register(self.r_start, 1)
 
     def stop(self, hvi_exec):
-        logger.info('stop HVI')
-        if self.started != hvi_exec.is_running():
-            logger.warning(f'HVI running-1: {hvi_exec.is_running()}; started: {self.started}')
-        self.started = False
+        logger.debug('stop HVI')
         hvi_exec.write_register(self.r_stop, 1)
+        hvi_exec.stop()
+        self.started = False
         if self.started != hvi_exec.is_running():
-            logger.warning(f'HVI running-2: {hvi_exec.is_running()}; started: {self.started}')
+            logger.warning(f'HVI running after stop: {hvi_exec.is_running()}; started: {self.started}')

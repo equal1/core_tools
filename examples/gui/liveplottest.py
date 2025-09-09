@@ -1,63 +1,40 @@
-import qcodes
-
 from core_tools.GUI.keysight_videomaps import liveplotting
 from core_tools.GUI.keysight_videomaps.data_saver.qcodes import QCodesDataSaver
-from core_tools.GUI.keysight_videomaps.data_getter.scan_generator_Virtual import fake_digitizer
 from core_tools.GUI.qt_util import qt_init
 
 
 from pulse_lib.base_pulse import pulselib
 
 
-#start_all_logging()
-#logger.get_file_handler().setLevel(logging.DEBUG)
-
-try:
-    qcodes.Instrument.close_all()
-except: pass
-
-class DummyAwg(qcodes.Instrument):
-    def __init__(self, name):
-        super().__init__(name)
-
-    def release_waveform_memory(self):
-        pass
-
-
-def create_pulse_lib(awgs):
+def create_pulse_lib(awg_channels, dig_channels):
     pulse = pulselib()
 
-    for awg in awgs:
+    for num, ch_name in enumerate(awg_channels):
+        pulse.define_channel(ch_name, "AWG_X", num)
 
-        pulse.add_awg(awg)
+    for num, ch_name in enumerate(dig_channels):
+        pulse.define_digitizer_channel(ch_name, "Digitizer", num)
 
-        # define channels
-        for ch in range(1,5):
-            pulse.define_channel(f'{awg.name}.{ch}', awg.name, ch)
-
-    pulse.finish_init()
+    # do not initialize backend
+    # pulse.finish_init()
     return pulse
 
+
 if __name__ == '__main__':
-    station = qcodes.Station()
 
-    awg_slots = [2, 3]
-    awgs = []
-    for i, slot in enumerate(awg_slots):
-        awg = DummyAwg(f'AWG{slot}')
-        awgs.append(awg)
-        station.add_component(awg)
-
-    dig = fake_digitizer("fake_digitizer")
-    station.add_component(dig)
-
-
-    pulse = create_pulse_lib(awgs)
+    pulse = create_pulse_lib(
+        [f"P{i}" for i in range(1, 9)],
+        [f"SD{i}" for i in range(1, 3)],
+        )
 
     defaults = {
-        'gen': {'n_columns': 2}
+        'gen': {
+            'n_columns': 2,
+            'bias_T_RC': 5, # bias-T RC time [ms] only used for warnings in GUI.
+            },
         }
 
+    # Initialize Qt5 if running in IPython console
     qt_init()
 
     # Using the qcodes datasaver since that can be used without establishing the connection to the database.
@@ -65,4 +42,8 @@ if __name__ == '__main__':
     liveplotting.set_data_saver(QCodesDataSaver())
 
     # Start the liveplotting
-    plotting = liveplotting.liveplotting(pulse, dig, "Virtual", cust_defaults=defaults)
+    plotting = liveplotting.liveplotting(
+            pulse,
+            scan_type="Virtual",
+            cust_defaults=defaults,
+            )

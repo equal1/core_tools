@@ -1,4 +1,5 @@
 from datetime import datetime
+import gzip
 import json
 
 from core_tools.data.SQL.buffer_writer import buffer_reference
@@ -47,7 +48,10 @@ def get_coord_param_id(coord_names, name):
 
 def xarray2ds(xr_ds):
     attrs = xr_ds.attrs
-    snapshot = json.loads(attrs['snapshot'])
+    if 'snapshot-gzip' in attrs:
+        snapshot = json.loads(gzip.decompress(attrs['snapshot-gzip']))
+    else:
+        snapshot = json.loads(attrs['snapshot'])
     try:
         metadata = json.loads(attrs['metadata'])
     except KeyError:
@@ -57,9 +61,11 @@ def xarray2ds(xr_ds):
             exp_id=attrs['id'],
             exp_uuid=attrs['uuid'],
             exp_name=attrs['title'],
-            set_up = attrs['set_up'],
+            # Note: old incorrect attribute was 'set_up'.
+            set_up = attrs.get('setup', attrs.get('set_up')),
             project = attrs['project'],
             sample = attrs['sample_name'],
+            scope = attrs.get('scope'),
             UNIX_start_time=datetime.fromisoformat(attrs['measurement_time']).timestamp(),
             UNIX_stop_time=datetime.fromisoformat(attrs['completed_time']).timestamp(),
             SQL_datatable='',
@@ -68,8 +74,6 @@ def xarray2ds(xr_ds):
             keywords=attrs['keywords'],
             completed=bool(attrs['completed']),
             )
-
-    # load metadata and snapshot from file.
 
     coord_names = [name for name in xr_ds.coords]
     data_names = [name for name in xr_ds.data_vars]

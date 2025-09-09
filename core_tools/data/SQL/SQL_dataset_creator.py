@@ -1,3 +1,8 @@
+import time
+from dataclasses import dataclass
+
+from core_tools.data.SQL.connect import SQL_conn_info_local
+from core_tools.data.SQL.SQL_connection_mgr import SQL_database_manager
 from core_tools.data.SQL.queries.dataset_creation_queries import (
         sample_info_queries,
         measurement_overview_queries,
@@ -6,44 +11,39 @@ from core_tools.data.SQL.queries.dataset_creation_queries import (
 from core_tools.data.SQL.queries.dataset_loading_queries import load_ds_queries
 from core_tools.data.SQL.queries.dataset_sync_queries import sync_mgr_queries
 
-from core_tools.data.SQL.SQL_connection_mgr import SQL_database_manager
 
-import time
-
-
-class SQL_dataset_creator(object):
-    def __init__(self):
-        self.conn = SQL_database_manager().conn_local
+class SQL_dataset_creator:
 
     def register_measurement(self, ds):
         '''
         Args:
             ds (data_set_raw) : raw dataset
         '''
+        conn = SQL_database_manager().connection
         try:
             # add a new entry in the measurements overiew table
-            sample_info_queries.add_sample(self.conn)
+            sample_info_queries.add_sample(conn)
 
             ds.UNIX_start_time = time.time()
             ds.exp_id, ds.exp_uuid = measurement_overview_queries.new_measurement(
-                    self.conn, ds.exp_name, ds.UNIX_start_time)
+                    conn, ds.exp_name, ds.UNIX_start_time)
             ds.running = True
 
             measurement_overview_queries.update_measurement(
-                    self.conn, ds.exp_uuid,
+                    conn, ds.exp_uuid,
                     metadata=ds.metadata,
                     snapshot=ds.snapshot,
                     keywords=ds.generate_keywords(),
                     table_synchronized=False)
 
             # store of the getters/setters parameters
-            measurement_parameters_queries.insert_measurement_params(self.conn, ds.exp_uuid,
+            measurement_parameters_queries.insert_measurement_params(conn, ds.exp_uuid,
                                                                      ds.measurement_parameters_raw)
 
-            self.conn.commit()
+            conn.commit()
         except BaseException:
-            if not self.conn.closed:
-                self.conn.rollback()
+            if not conn.closed:
+                conn.rollback()
             raise
 
     def update_write_cursors(self, ds):
@@ -53,10 +53,20 @@ class SQL_dataset_creator(object):
         Args:
             ds (dataset_raw)
         '''
-        measurement_parameters_queries.update_cursors_in_meas_tab(self.conn, ds.exp_uuid,
+        conn = SQL_database_manager().connection
+        measurement_parameters_queries.update_cursors_in_meas_tab(conn, ds.exp_uuid,
                                                                   ds.measurement_parameters_raw)
-        measurement_overview_queries.update_measurement(self.conn, ds.exp_uuid, data_synchronized=False)
-        self.conn.commit()
+        # Update update count for synchronization process.
+        # Only needed for local connection. Not available on server.
+        if SQL_conn_info_local.host == 'localhost':
+            ds.data_update_count += 1
+            update_count = ds.data_update_count
+        else:
+            update_count = None
+        measurement_overview_queries.update_measurement(conn, ds.exp_uuid,
+                                                        data_synchronized=False,
+                                                        data_update_count=update_count)
+        conn.commit()
 
     def is_completed(self, exp_uuid):
         '''
@@ -65,7 +75,8 @@ class SQL_dataset_creator(object):
         Args:
             exp_uuid (int) : uuid of the experiment to check
         '''
-        return measurement_overview_queries.is_completed(self.conn, exp_uuid)
+        conn = SQL_database_manager().connection
+        return measurement_overview_queries.is_completed(conn, exp_uuid)
 
     def finish_measurement(self, ds):
         '''
@@ -75,24 +86,25 @@ class SQL_dataset_creator(object):
         Args:
             ds (dataset_raw)
         '''
+        conn = SQL_database_manager().connection
         ds.UNIX_stop_time = time.time()
 
         measurement_parameters_queries.update_cursors_in_meas_tab(
-            self.conn, ds.exp_uuid,
+            conn, ds.exp_uuid,
             ds.measurement_parameters_raw)
         measurement_overview_queries.update_measurement(
-            self.conn, ds.exp_uuid,
+            conn, ds.exp_uuid,
             stop_time=ds.UNIX_stop_time,
             completed=True,
             data_size=ds.size(),
             table_synchronized=False,
             data_synchronized=False)
 
-        self.conn.commit()
-
         # close the connection with the buffer to the database
         for data_item in ds.measurement_parameters_raw:
             data_item.data_buffer.close()
+
+        conn.commit()
 
     def fetch_raw_dataset_by_Id(self, exp_id):
         '''
@@ -101,10 +113,12 @@ class SQL_dataset_creator(object):
         Args:
             exp_id (int) : id of the measurment you want to get
         '''
-        if load_ds_queries.check_id(self.conn, exp_id) is False:
-            raise ValueError("The id {}, does not exist in this database.".format(exp_id))
+        conn = SQL_database_manager().connection
 
-        uuid = load_ds_queries.id_to_uuid(self.conn, exp_id)
+        if load_ds_queries.check_id(conn, exp_id) is False:
+            raise ValueError(f"id {exp_id}, does not exist in this database.")
+
+        uuid = load_ds_queries.id_to_uuid(conn, exp_id)
 
         return self.fetch_raw_dataset_by_UUID(uuid)
 
@@ -116,21 +130,29 @@ class SQL_dataset_creator(object):
             exp_uuid (int) : uuid of the measurment you want to get
             sync2local (bool): sync measurement to local database
         '''
+        db_mgr = SQL_database_manager()
         sync = False
-        if load_ds_queries.check_uuid(self.conn, exp_uuid):
-            conn = self.conn
-        elif load_ds_queries.check_uuid(SQL_database_manager().conn_remote, exp_uuid):
-            conn = SQL_database_manager().conn_remote
-            sync = sync2local
-        else:
-            raise ValueError("the uuid {}, does not exist in the local/remote database.".format(exp_uuid))
+        remote = False
+        if not load_ds_queries.check_uuid(db_mgr.connection, exp_uuid):
+            if (db_mgr.remote_connection_configured
+                    and load_ds_queries.check_uuid(db_mgr.remote_connection, exp_uuid)):
+                remote = True
+                sync = sync2local
+            else:
+                raise ValueError(f"uuid {exp_uuid}, does not exist in the local/remote database.")
 
-        ds_raw = load_ds_queries.get_dataset_raw(conn, exp_uuid)
+        ds_raw = load_ds_queries.get_dataset_raw(db_mgr, exp_uuid, remote=remote)
         if sync:
-            conn_mgr = SQL_database_manager()
-            sample_info_list = sync_mgr_queries.get_sample_info_list(conn_mgr.conn_local)
-            sync_mgr_queries.sync_raw_data(conn_mgr, exp_uuid, to_local=True)
-            sync_mgr_queries.sync_table(conn_mgr, exp_uuid, to_local=True,
+            sample_info_list = sync_mgr_queries.get_sample_info_list(db_mgr.connection)
+            sync_agent = _SyncAgent(db_mgr.connection, db_mgr.remote_connection)
+            sync_mgr_queries.sync_raw_data(sync_agent, exp_uuid, to_local=True)
+            sync_mgr_queries.sync_table(sync_agent, exp_uuid, to_local=True,
                                         sample_info_list=sample_info_list)
 
         return ds_raw
+
+
+@dataclass
+class _SyncAgent:
+    conn_local: object
+    conn_remote: object

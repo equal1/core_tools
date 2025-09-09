@@ -15,6 +15,7 @@ class gates(qc.Instrument):
     gates class, generate qcodes parameters for the real gates and the virtual gates
     It also manages the virtual gate matrix.
     """
+
     def __init__(self, name, hardware, dac_sources, dc_gain={}):
         '''
         gates object
@@ -37,25 +38,29 @@ class gates(qc.Instrument):
             logger.info('Detected old hardware class')
 
         self.hardware = hardware
-        self.dac_sources = dac_sources
         self.dc_gain = dc_gain.copy()
 
+        self._dac_params = {}
         self._gv = dict()
         self._real_gates = list()
         self._virtual_gates = list()
+        self._virt_gate_convertors = list()
         self._all_gate_names = list()
 
         # add gates:
         for gate_name, dac_location in self.hardware.dac_gate_map.items():
+            source_index, ch_num = dac_location
+            self._dac_params[gate_name] = dac_sources[source_index].parameters[f'dac{int(ch_num)}']
             self._all_gate_names.append(gate_name)
             self._real_gates.append(gate_name)
-            self.add_parameter(gate_name, set_cmd = partial(self._set_voltage,  gate_name),
+            self.add_parameter(gate_name, set_cmd=partial(self._set_voltage,  gate_name),
                                get_cmd=partial(self._get_voltage,  gate_name),
-                               unit = "mV")
+                               unit="mV")
 
         # make virtual gates:
         for virt_gate_set in self.hardware.virtual_gates:
             virt_gate_convertor = virt_gate_set.get_view(available_gates=self._all_gate_names)
+            self._virt_gate_convertors.append(virt_gate_convertor)
             self._all_gate_names += virt_gate_convertor.virtual_gates
             self._virtual_gates += virt_gate_convertor.virtual_gates
             for v_gate_name in virt_gate_convertor.virtual_gates:
@@ -64,6 +69,8 @@ class gates(qc.Instrument):
                                    get_cmd=partial(self._get_voltage_virt, v_gate_name, virt_gate_convertor),
                                    unit="mV")
 
+        self._projection_cache_matrices = []
+        self._projection_cache_projection = None
 
     def get_idn(self):
         return dict(vendor='CoreTools',
@@ -86,7 +93,6 @@ class gates(qc.Instrument):
             voltage (double) : voltage to set
             gate_name (str) : name of the gate to set
         '''
-        dac_location = self.hardware.dac_gate_map[gate_name]
         if gate_name in self.hardware.boundaries.keys():
             min_voltage, max_voltage = self.hardware.boundaries[gate_name]
             if voltage < min_voltage or voltage > max_voltage:
@@ -99,7 +105,7 @@ class gates(qc.Instrument):
         else:
             dac_voltage = voltage
             logger.info(f'set {gate_name} {voltage:.1f} mV')
-        self.dac_sources[dac_location[0]].set(f'dac{int(dac_location[1])}', dac_voltage)
+        self._dac_params[gate_name](dac_voltage)
 
     def _get_voltage(self, gate_name):
         '''
@@ -107,8 +113,7 @@ class gates(qc.Instrument):
         Args:
             gate_name (str) : name of the gate to set
         '''
-        dac_location = self.hardware.dac_gate_map[gate_name]
-        voltage = getattr(self.dac_sources[dac_location[0]], f'dac{int(dac_location[1])}').cache()
+        voltage = self._dac_params[gate_name].cache()
         if gate_name in self.dc_gain:
             return voltage * self.dc_gain[gate_name]
         else:
@@ -121,23 +126,19 @@ class gates(qc.Instrument):
             voltage (double) : voltage to set
             gate_name : name of the virtual gate
         '''
-        real_voltages = self._get_voltages(virt_gate_convertor.real_gates)
-        virtual_voltages =  np.matmul(virt_gate_convertor.r2v_matrix, real_voltages)
+        old_voltages = self.get_all_gate_voltages()
+        projection = self.get_virtual_gate_projection()
+        delta = voltage - old_voltages[gate_name]
+        logger.info(f'set {gate_name} {old_voltages[gate_name]:.1f} -> {voltage:.1f} mV')
 
-        voltage_key = virt_gate_convertor.virtual_gates.index(gate_name)
-        virtual_voltages[voltage_key] = voltage
-        new_voltages = np.matmul(np.linalg.inv(virt_gate_convertor.r2v_matrix), virtual_voltages)
-
-        logger.info(f'set {gate_name} {voltage:.1f} mV')
         try:
-            for i,gate_name in enumerate(virt_gate_convertor.real_gates):
-                if new_voltages[i] != real_voltages[i]:
-                    self.set(gate_name, new_voltages[i])
+            for real_gate, ratio in projection[gate_name].items():
+                self.parameters[real_gate].set(old_voltages[real_gate] + ratio * delta)
         except Exception as ex:
             logger.warning(f'Failed to set virtual gate voltage to {voltage:.1f} mV; Reverting all voltages. '
-                            f'Exception: {ex}')
-            for i,gate_name in enumerate(virt_gate_convertor.real_gates):
-                self.set(gate_name, real_voltages[i])
+                           f'Exception: {ex}')
+            for real_gate, ratio in projection[gate_name].items():
+                self.set(real_gate, old_voltages[real_gate])
             raise
 
     def _get_voltage_virt(self, gate_name, virt_gate_convertor):
@@ -146,12 +147,7 @@ class gates(qc.Instrument):
         Args:
             gate_name : name of the virtual gate
         '''
-        real_voltages = self._get_voltages(virt_gate_convertor.real_gates)
-        virtual_voltages =  np.matmul(virt_gate_convertor.r2v_matrix, real_voltages)
-
-        voltage_key = virt_gate_convertor.virtual_gates.index(gate_name)
-
-        return virtual_voltages[voltage_key]
+        return self.get_all_gate_voltages()[gate_name]
 
     def _get_voltages(self, gates):
         return [self.get(gate_name) for gate_name in gates]
@@ -194,58 +190,79 @@ class gates(qc.Instrument):
             res[gate_name] = f'{self.get(gate_name):.2f}'
         return res
 
+    def get_all_gate_voltages(self):
+        # NOTE: also set all cached values for snapshot!
+        v = {}
+        for name in self._real_gates:
+            v_real = self._get_voltage(name)
+            v[name] = v_real
+            self.parameters[name].cache.set(v_real)
+
+        for virt_gate_convertor in self._virt_gate_convertors:
+            real_voltages = [v[name] for name in virt_gate_convertor.real_gates]
+            virtual_voltages = np.matmul(virt_gate_convertor.r2v_matrix, real_voltages)
+            for vg_name, vg_voltage in zip(virt_gate_convertor.virtual_gates, virtual_voltages):
+                v[vg_name] = vg_voltage
+                self.parameters[vg_name].cache.set(vg_voltage)
+
+        return v
+
+    def get_virtual_gate_projection(self):
+        '''
+        Returns a dictionary with per virtual gate name a dictionary
+        with real gate names and multipliers.
+        Example:
+             'vP1': {'P1': 1.0, 'P2': -0.12},
+             'vP2': {'P1': -0.10, 'P2': 1.0},
+        '''
+        # cache physical channels and matrices. Do not recompute if nothing changed.
+        if (len(self._virt_gate_convertors) == len(self._projection_cache_matrices)):
+            for i, vm in enumerate(self._virt_gate_convertors):
+                if not np.array_equal(vm.r2v_matrix, self._projection_cache_matrices[i]):
+                    break
+            else:
+                # nothing has changed.
+                return self._projection_cache_projection
+
+        gates = list(self._real_gates)
+        projection_matrix = np.eye(len(gates))
+
+        for vm in self._virt_gate_convertors:
+
+            real_gates = vm.real_gates
+            v2r = np.linalg.inv(vm.r2v_matrix)
+            # select real gate columns from projection matrix
+            col_indices = [gates.index(gate) for gate in real_gates]
+            m = projection_matrix[:, col_indices]
+            # multiply and concatenate
+            p_new = m @ v2r
+
+            projection_matrix = np.concatenate([projection_matrix, p_new], axis=-1)
+            # add virtual gates to gate list
+            gates += vm.virtual_gates
+
+        # return map
+        result = {}
+        for i, gate in enumerate(gates):
+            if gate in self._real_gates:
+                # Only project virtual gates to physical gates. Skip real gates.
+                continue
+            gate_values = {}
+            result[gate] = gate_values
+            for j, real_gate in enumerate(self._real_gates):
+                value = projection_matrix[j, i]
+                if np.abs(value) > 1e-5:
+                    gate_values[real_gate] = value
+
+        self._projection_cache_matrices = []
+        for vm in self._virt_gate_convertors:
+            self._projection_cache_matrices.append(vm.r2v_matrix.copy())
+        self._projection_cache_projection = result
+
+        return result
+
     def snapshot_base(self, update=False, params_to_skip_update=None):
         # update real and virtual gates cached values by getting them.
-        for gate_name in self._all_gate_names:
-            self.get(gate_name)
+        self.get_all_gate_voltages()
 
         return super().snapshot_base(update, params_to_skip_update)
-
-
-if __name__ == '__main__':
-    from core_tools.drivers.virtual_dac import virtual_dac
-    from core_tools.drivers.hardware.hardware import hardware
-    my_dac_1 = virtual_dac("dac_a", "virtual")
-    my_dac_2 = virtual_dac("dac_b", "virtual")
-    my_dac_3 = virtual_dac("dac_c", "virtual")
-    my_dac_4 = virtual_dac("dac_d", "virtual")
-
-    from core_tools.data.SQL.connect import set_up_local_storage, set_up_remote_storage, set_up_local_and_remote_storage
-    set_up_local_storage('stephan', 'magicc', 'test', 'test_project1', 'test_set_up', 'test_sample')
-
-    hw =  hardware()
-
-    hw.dac_gate_map = {
-        # dacs for creating the quantum dots -- syntax, "gate name": (dac module number, dac index)
-        'B0': (0, 1), 'P1': (0, 2),
-        'B1': (0, 3), 'P2': (0, 4),
-        'B2': (0, 5), 'P3': (0, 6),
-        'B3': (0, 7), 'P4': (0, 8),
-        'B4': (0, 9), 'P5': (0, 10),
-        'B5': (0, 11),'P6': (0, 12),
-        'B6': (0, 13), 'S6' : (0,14,),
-        'SD1_P': (1, 1), 'SD2_P': (1, 2),
-        'SD1_B1': (1, 3), 'SD2_B1': (1, 4),
-        'SD1_B2': (1, 5), 'SD2_B2': (1, 6),}
-
-    hw.boundaries = {'B0' : (0, 2000), 'B1' : (0, 2500)}
-    hw.awg2dac_ratios.add(['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'B0', 'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'S6', 'SD1_P', 'SD2_P'])
-    hw.virtual_gates.add('test', ['B0', 'P1', 'B1', 'P2', 'B2', 'P3', 'B3', 'P4', 'B4', 'P5', 'B5', 'P6', 'B6', 'S6', 'SD1_P', 'SD2_P', 'COMP1'])
-
-    my_gates = gates("my_gates", hw, [my_dac_1, my_dac_2, my_dac_3, my_dac_4])
-    my_gates.vB0(1200)
-    my_gates.vB0(1800)
-    print(my_gates.vB0())
-    print(my_gates.B0())
-    # print(my_gates.v_gates)
-
-    gv = my_gates.gv
-    # print(my_gates.vB0())
-    my_gates.set_all_zero()
-    my_gates.gv = gv
-    # print(my_gates.vB0())
-
-    from core_tools.GUI.parameter_viewer_qml.param_viewer import param_viewer
-
-    # if gates are not names gates, it needs to be provided as an argument.
-    ui = param_viewer(my_gates)
