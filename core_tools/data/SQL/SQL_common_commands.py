@@ -1,9 +1,14 @@
 import sqlite3
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from psycopg2 import sql
 
-from core_tools.data.SQL.SQL_utility import sql_name_formatter, sql_value_formatter, name_value_formatter
+import psycopg2
+from psycopg2 import sql
+from psycopg2.extras import RealDictCursor
+
+from core_tools.data.SQL.SQL_utility import (
+    name_value_formatter,
+    sql_name_formatter,
+    sql_value_formatter,
+)
 
 
 class sqlite_helper:
@@ -87,7 +92,9 @@ def execute_statement(conn, statement, placeholders=[], close_on_error=True):
         cursor = conn.cursor()
         if sqlite_helper.is_active(cursor):
             statement = sqlite_helper.convert_to_string(statement)
-            for statement, placeholders in sqlite_helper.split_multiple_statements(statement, placeholders):
+            for statement, placeholders in sqlite_helper.split_multiple_statements(
+                statement, placeholders
+            ):
                 cursor.execute(statement, placeholders)
         else:
             cursor.execute(statement, placeholders)
@@ -111,6 +118,7 @@ def execute_query(conn, query, dict_cursor=False, placeholders=[]):
                 cursor = conn.cursor(cursor_factory=RealDictCursor)
             else:
                 if dict_cursor is not False:
+
                     def dict_factory(cursor, row):
                         d = {}
                         for idx, col in enumerate(cursor.description):
@@ -140,8 +148,10 @@ def execute_query(conn, query, dict_cursor=False, placeholders=[]):
         raise
 
 
-def select_elements_in_table(conn, table_name, var_names, where=None, order_by=None, limit=None, dict_cursor=True):
-    '''
+def select_elements_in_table(
+    conn, table_name, var_names, where=None, order_by=None, limit=None, dict_cursor=True
+):
+    """
     execute a query on a table
 
     Args:
@@ -152,26 +162,32 @@ def select_elements_in_table(conn, table_name, var_names, where=None, order_by=N
         order_by (tuple, str) : order results (e.g. ('uuid',  'DESC')
         limit (int) : limit the amount of results
         dict_cursor (bool) : return result as an ordered dict
-    '''
+    """
     var_names_SQL = sql_name_formatter(var_names)
 
     query = sql.SQL("select {0} from {1} ").format(
-                sql.SQL(', ').join(var_names_SQL),
-                sql.SQL(table_name))
+        sql.SQL(", ").join(var_names_SQL), sql.SQL(table_name)
+    )
     # SQL.Identifier does not work with underscore names for tables?
 
     if where is not None:
-        query += sql.SQL("WHERE {0} = {1} ").format(sql.Identifier(where[0]), sql.Literal(where[1]))
+        query += sql.SQL("WHERE {0} = {1} ").format(
+            sql.Identifier(where[0]), sql.Literal(where[1])
+        )
     if order_by is not None:
-        query += sql.SQL("ORDER BY {0} {1} ").format(sql.Identifier(order_by[0]), sql.SQL(order_by[1]))
+        query += sql.SQL("ORDER BY {0} {1} ").format(
+            sql.Identifier(order_by[0]), sql.SQL(order_by[1])
+        )
     if limit is not None:
         query += sql.SQL("LIMIT {0} ").format(sql.SQL(str(int(limit))))
 
     return execute_query(conn, query, dict_cursor)
 
 
-def insert_row_in_table(conn, table_name, var_names, var_values, returning=None, custom_statement=''):
-    '''
+def insert_row_in_table(
+    conn, table_name, var_names, var_values, returning=None, custom_statement=""
+):
+    """
     insert a row in a table
 
     Args:
@@ -180,26 +196,43 @@ def insert_row_in_table(conn, table_name, var_names, var_values, returning=None,
         var_names (tuple<str>) : variable names of the table
         var_values (tuple<str>) : values corresponding to the variable names
         returning (tuple<str>) : name of a variables you want returned
-    '''
+    """
     var_values_SQL, placeholders = sql_value_formatter(var_values)
     var_names_SQL = sql_name_formatter(var_names)
 
-    statement = sql.SQL(
-        "INSERT INTO {} ({}) VALUES ({}) ").format(
-            sql.SQL(table_name),
-            sql.SQL(', ').join(var_names_SQL),
-            sql.SQL(', ').join(var_values_SQL))
+    statement = sql.SQL("INSERT INTO {} ({}) VALUES ({}) ").format(
+        sql.SQL(table_name),
+        sql.SQL(", ").join(var_names_SQL),
+        sql.SQL(", ").join(var_values_SQL),
+    )
 
     if returning is None:
-        return execute_statement(conn, statement + sql.SQL(custom_statement), placeholders)
+        return execute_statement(
+            conn, statement + sql.SQL(custom_statement), placeholders
+        )
+    elif isinstance(conn, sqlite3.Connection):
+        cursor = conn.cursor()
+        try:
+            stmt = sqlite_helper.convert_to_string(
+                statement + sql.SQL(custom_statement)
+            )
+            cursor.execute(stmt, sqlite_helper.convert_placeholders(placeholders))
+            return cursor.lastrowid
+        finally:
+            cursor.close()
     else:
-        statement += sql.SQL(" RETURNING {} ").format(sql.SQL(", ").join([sql.Identifier(i) for i in returning]))
-        return execute_query(conn, statement + sql.SQL(custom_statement), placeholders=placeholders)
+        statement += sql.SQL(" RETURNING {} ").format(
+            sql.SQL(", ").join([sql.Identifier(i) for i in returning])
+        )
+        return execute_query(
+            conn, statement + sql.SQL(custom_statement), placeholders=placeholders
+        )
 
 
-def update_table(conn, table_name, var_names, var_values, condition=None,
-                 conditions=None):
-    '''
+def update_table(
+    conn, table_name, var_names, var_values, condition=None, conditions=None
+):
+    """
     generate statement for updating an existing stable
 
     Args:
@@ -209,7 +242,7 @@ def update_table(conn, table_name, var_names, var_values, condition=None,
         var_values (tuple<str>) : values corresponding to the variable names
         condition (tuple<str, any>) : condition for the update (e.g. ('id', 5))
         conditions (list(tuple<str, any>)) : conditiosn for the update (e.g. [('id', 5), ('version', 10)] )
-    '''
+    """
 
     statement = sql.SQL("UPDATE {} SET ").format(sql.SQL(table_name))
 
@@ -217,22 +250,30 @@ def update_table(conn, table_name, var_names, var_values, condition=None,
     if len(names_values) == 0:
         return ""
 
-    statement += sql.SQL(', ').join(sql.SQL("{} = {} ").format(i, j) for i, j in names_values.var_name_pairs)
+    statement += sql.SQL(", ").join(
+        sql.SQL("{} = {} ").format(i, j) for i, j in names_values.var_name_pairs
+    )
 
     if condition is not None:
-        statement += sql.SQL("WHERE {0} = {1} ").format(sql.Identifier(condition[0]), sql.Literal(condition[1]))
+        statement += sql.SQL("WHERE {0} = {1} ").format(
+            sql.Identifier(condition[0]), sql.Literal(condition[1])
+        )
 
     if conditions is not None and len(conditions) > 0:
         condition = conditions[0]
-        statement += sql.SQL("WHERE {0} = {1} ").format(sql.Identifier(condition[0]), sql.Literal(condition[1]))
+        statement += sql.SQL("WHERE {0} = {1} ").format(
+            sql.Identifier(condition[0]), sql.Literal(condition[1])
+        )
         for condition in conditions[1:]:
-            statement += sql.SQL("AND {0} = {1} ").format(sql.Identifier(condition[0]), sql.Literal(condition[1]))
+            statement += sql.SQL("AND {0} = {1} ").format(
+                sql.Identifier(condition[0]), sql.Literal(condition[1])
+            )
 
     return execute_statement(conn, statement, placeholders=names_values.placeholders)
 
 
 def alter_table(conn, table_name, colums, dtypes):
-    '''
+    """
     add columns to a table
 
     Args:
@@ -240,10 +281,11 @@ def alter_table(conn, table_name, colums, dtypes):
         table_name (str) : name of the table to update
         colums (tuple<str>) : names of the columns
         dtypes (tuple<str>) : type of the column's
-    '''
+    """
     statement = sql.SQL("ALTER TABLE {} ADD COLUMN ").format(sql.SQL(table_name))
-    statement += sql.SQL(
-        " , ADD COLUMN ").join(sql.SQL(" {0} {1} ").format(
-            sql.Identifier(i), sql.SQL(j)) for i, j in zip(colums, dtypes))
+    statement += sql.SQL(" , ADD COLUMN ").join(
+        sql.SQL(" {0} {1} ").format(sql.Identifier(i), sql.SQL(j))
+        for i, j in zip(colums, dtypes)
+    )
 
     return execute_statement(conn, statement)
