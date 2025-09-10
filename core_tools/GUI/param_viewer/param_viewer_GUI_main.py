@@ -1,11 +1,13 @@
-from typing import Any
-from core_tools.GUI.param_viewer.param_viewer_GUI_window import Ui_MainWindow
-from PyQt5 import QtCore, QtWidgets
-import qcodes as qc
-from dataclasses import dataclass
-from ..qt_util import qt_log_exception
-
 import logging
+from dataclasses import dataclass
+from typing import Any
+
+import qcodes as qc
+from PyQt5 import QtCore, QtWidgets
+
+from core_tools.GUI.param_viewer.param_viewer_GUI_window import Ui_MainWindow
+
+from ..qt_util import qt_log_exception
 
 logger = logging.getLogger(__name__)
 
@@ -19,10 +21,9 @@ class param_data_obj:
 
 
 class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
-
-    def __init__(self, gates_object: object | None = None,
-                 max_diff: float = 1000,
-                 locked=False):
+    def __init__(
+        self, gates_object: object | None = None, max_diff: float = 1000, locked=False
+    ):
         self.real_gates = list()
         self.virtual_gates = list()
         self.station = qc.Station.default
@@ -36,7 +37,9 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
             try:
                 self.gates_object = self.station.gates
             except AttributeError:
-                raise ValueError('`gates` must be set in qcodes.station or supplied as argument')
+                raise ValueError(
+                    "`gates` must be set in qcodes.station or supplied as argument"
+                )
         self._step_size = 1  # [mV]
         instance_ready = True
 
@@ -49,13 +52,28 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
         super(QtWidgets.QMainWindow, self).__init__()
         self.setupUi(self)
 
+        try:
+            opx_instr = self.station.get_component("opx_instr")
+        except Exception:
+            opx_instr = None
+
+        def _find_opx_element(opx_instr: Any, search_name: str) -> Any | None:
+            """Check if search_name exists in opx_instr elements configuration."""
+            if opx_instr and search_name in opx_instr.config.get("elements", {}):
+                return opx_instr
+            return None
+
         # add real gates
         for gate_name in self.gates_object.hardware.dac_gate_map.keys():
+            if _find_opx_element(opx_instr, gate_name):
+                continue
             param = getattr(self.gates_object, gate_name)
             self._add_gate(param, False)
 
         # add virtual gates
         for gate_name in self.gates_object.v_gates:
+            if _find_opx_element(opx_instr, gate_name):
+                continue
             param = getattr(self.gates_object, gate_name)
             self._add_gate(param, True)
 
@@ -66,7 +84,9 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
 
         self.lock.setChecked(self.locked)
         self.lock.stateChanged.connect(lambda: self._update_lock(self.lock.isChecked()))
-        self.step_size.currentIndexChanged.connect(lambda: self.update_step(float(self.step_size.currentText())))
+        self.step_size.currentIndexChanged.connect(
+            lambda: self.update_step(float(self.step_size.currentText()))
+        )
         self._finish_gates_GUI()
 
         self.timer = QtCore.QTimer()
@@ -83,7 +103,7 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
 
     @qt_log_exception
     def update_step(self, value: float):
-        """ Update step size of the parameter GUI elements with the specified value """
+        """Update step size of the parameter GUI elements with the specified value"""
         self._step_size = value
         for gate in self.real_gates:
             gate.gui_input_param.setSingleStep(value)
@@ -92,18 +112,18 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
 
     @qt_log_exception
     def _update_lock(self, locked):
-        print('Locked:', locked)
+        print("Locked:", locked)
         self.locked = locked
 
     @qt_log_exception
     def _add_gate(self, parameter: qc.Parameter, virtual: bool):
-        '''
+        """
         add a new gate.
 
         Args:
             parameter (QCoDeS parameter object) : parameter to add.
             virtual (bool) : True in case this is a virtual gate.
-        '''
+        """
 
         i = len(self.real_gates)
         layout = self.layout_real
@@ -133,7 +153,9 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
             # QDoubleSpinBox needs a limit. Set it high for virtual voltage
             voltage_input.setRange(-99999.99, 99999.99)
         voltage_input.setValue(parameter())
-        voltage_input.valueChanged.connect(lambda: self._set_gate(parameter, voltage_input.value, voltage_input))
+        voltage_input.valueChanged.connect(
+            lambda: self._set_gate(parameter, voltage_input.value, voltage_input)
+        )
         voltage_input.setKeyboardTracking(False)
         layout.addWidget(voltage_input, i, 1, 1, 1)
 
@@ -141,7 +163,7 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
         gate_unit.setObjectName(name + "_unit")
         gate_unit.setText(_translate("MainWindow", unit))
         layout.addWidget(gate_unit, i, 2, 1, 1)
-        param_data = param_data_obj(parameter,  voltage_input, 1, name)
+        param_data = param_data_obj(parameter, voltage_input, 1, name)
         if not virtual:
             self.real_gates.append(param_data)
         else:
@@ -153,7 +175,9 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
             new_text = voltage_input.text()
             current_value_text = voltage_input.textFromValue(gate())
             if new_text != current_value_text:
-                logger.warning(f"ParameterViewer is locked! Voltage of {gate.name} not changed.")
+                logger.warning(
+                    f"ParameterViewer is locked! Voltage of {gate.name} not changed."
+                )
                 voltage_input.setValue(gate())
             return
         if not voltage_input.isEnabled():
@@ -161,8 +185,10 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
             return
         delta = abs(value() - gate())
         if self.max_diff is not None and delta > self.max_diff:
-            logger.warning(f"Not setting {gate} to {value():.1f}mV. "
-                           f"Difference {delta:.0f} mV > {self.max_diff:.0f} mV")
+            logger.warning(
+                f"Not setting {gate} to {value():.1f}mV. "
+                f"Difference {delta:.0f} mV > {self.max_diff:.0f} mV"
+            )
             return
 
         try:
@@ -170,33 +196,38 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
             new_text = voltage_input.text()
             current_text = voltage_input.textFromValue(last_value)
             if new_text != current_text:
-                logger.info(f"GUI value changed: set gate {gate.name} {current_text} -> {new_text}")
+                logger.info(
+                    f"GUI value changed: set gate {gate.name} {current_text} -> {new_text}"
+                )
                 gate.set(value())
         except Exception as ex:
             logger.error(f"Failed to set gate {gate} to {value()}: {ex}")
 
     @qt_log_exception
     def _finish_gates_GUI(self):
-
         for items, layout_widget in [
-                (self.real_gates, self.layout_real),
-                (self.virtual_gates, self.layout_virtual),
-                ]:
+            (self.real_gates, self.layout_real),
+            (self.virtual_gates, self.layout_virtual),
+        ]:
             i = len(items) + 1
 
-            spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+            spacerItem = QtWidgets.QSpacerItem(
+                20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding
+            )
             layout_widget.addItem(spacerItem, i, 0, 1, 1)
 
-            spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+            spacerItem1 = QtWidgets.QSpacerItem(
+                40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
+            )
             layout_widget.addItem(spacerItem1, 0, 3, 1, 1)
 
         self.setWindowTitle("Parameter Viewer")
 
     @qt_log_exception
     def _update_parameters(self):
-        '''
+        """
         updates the values of all the gates in the parameter viewer periodically
-        '''
+        """
         idx = self.tab_menu.currentIndex()
         all_gate_voltages = {}
         if idx == 0:
@@ -213,9 +244,9 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
             try:
                 name = param.name
                 if name in all_gate_voltages:
-                    new_value = all_gate_voltages[name]/param.division
+                    new_value = all_gate_voltages[name] / param.division
                 else:
-                    new_value = param.param_parameter()/param.division
+                    new_value = param.param_parameter() / param.division
 
                 old_value = self._last_gui_values.get(name, None)
 
@@ -226,7 +257,10 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
                 gui_input = param.gui_input_param
                 if not gui_input.hasFocus():
                     if isinstance(gui_input, QtWidgets.QDoubleSpinBox):
-                        if idx == 1 and (new_value < gui_input.minimum() or new_value > gui_input.maximum()):
+                        if idx == 1 and (
+                            new_value < gui_input.minimum()
+                            or new_value > gui_input.maximum()
+                        ):
                             gui_input.setEnabled(False)
                             gui_input.setStyleSheet("color : red;")
                             new_text = gui_input.textFromValue(new_value)
@@ -241,14 +275,21 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
                             current_text = gui_input.text()
                             new_text = gui_input.textFromValue(new_value)
                             if current_text != new_text:
-                                logger.info(f'Update GUI {param.param_parameter.name} {current_text} -> {new_text}')
+                                logger.info(
+                                    f"Update GUI {param.param_parameter.name} {current_text} -> {new_text}"
+                                )
                                 gui_input.setValue(new_value)
                                 # Note: additional check on 0.0, because "-0.00 " and "0.00" are numerically equal.
-                                if gui_input.text() != new_text and gui_input.valueFromText(new_text) != 0.0:
-                                    print(f'WARNING: {param.param_parameter.name} corrected from '
-                                          f'{new_text} to {gui_input.text()}')
+                                if (
+                                    gui_input.text() != new_text
+                                    and gui_input.valueFromText(new_text) != 0.0
+                                ):
+                                    print(
+                                        f"WARNING: {param.param_parameter.name} corrected from "
+                                        f"{new_text} to {gui_input.text()}"
+                                    )
                     elif isinstance(gui_input, QtWidgets.QCheckBox):
                         gui_input.setChecked(bool(new_value))
                     self._last_gui_values[name] = new_value
             except Exception:
-                logger.error(f'Error updating {param}', exc_info=True)
+                logger.error(f"Error updating {param}", exc_info=True)
