@@ -6,6 +6,7 @@ setup(
     packages=find_packages(),
     python_requires=">=3.10",
     install_requires=[
+        "qtpy",
         'pyqt5 >= 5.15.1',
         'pyqtgraph >= 0.13',
         'matplotlib',
