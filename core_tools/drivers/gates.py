@@ -1,11 +1,14 @@
+import copy
+import json
+import logging
+import os
 from functools import partial
+
+import numpy as np
+import qcodes as qc
+
 from core_tools import __version__ as ct_version
 from core_tools.drivers.hardware.hardware import hardware as hw_parent
-
-import qcodes as qc
-import numpy as np
-import copy
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +114,7 @@ class gates(qc.Instrument):
         '''
         get a voltage to the dac
         Args:
-            gate_name (str) : name of the gate to set
+            gate_name (str) : name of the gate to get
         '''
         voltage = self._dac_params[gate_name].cache()
         if gate_name in self.dc_gain:
@@ -138,7 +141,7 @@ class gates(qc.Instrument):
             logger.warning(f'Failed to set virtual gate voltage to {voltage:.1f} mV; Reverting all voltages. '
                            f'Exception: {ex}')
             for real_gate, ratio in projection[gate_name].items():
-                self.set(real_gate, old_voltages[real_gate])
+                self.parameters[real_gate].set(old_voltages[real_gate])
             raise
 
     def _get_voltage_virt(self, gate_name, virt_gate_convertor):
@@ -158,15 +161,12 @@ class gates(qc.Instrument):
         '''
         print("In progress ..")
         for gate_name, dac_location in self.hardware.dac_gate_map.items():
-            self.set(gate_name, 0)
+            self.parameters[gate_name].set(0)
         print("All gates set to 0!")
 
     @property
-    def gv(self):
-        '''
-        get a dict with all the gate value of dacs (real values).
-        Return:
-            real_voltages (dict<str, double>): dict with gate name as key and the corresponding voltage as value
+    def gv(self) -> dict[str, float]:
+        '''Returns voltages of all real gates.
         '''
         for gate_name, my_dac_location in self.hardware.dac_gate_map.items():
             self._gv[gate_name] = self._get_voltage(gate_name)
@@ -174,24 +174,26 @@ class gates(qc.Instrument):
         return copy.copy(self._gv)
 
     @gv.setter
-    def gv(self, my_gv):
+    def gv(self, gate_voltages: dict[str, float]):
         '''
-        setter for voltages
+        Set gate voltages
         '''
-        names = list(my_gv.keys())
-        voltages = list(my_gv.values())
+        for name, voltage in gate_voltages.items():
+            self._set_voltage(name, voltage)
 
-        for i in range(len(names)):
-            self._set_voltage(names[i], voltages[i])
-
-    def get_gate_voltages(self):
+    def get_gate_voltages(self) -> dict[str, str]:
         res = {}
         for gate_name in self._all_gate_names:
-            res[gate_name] = f'{self.get(gate_name):.2f}'
+            v = self.get(gate_name)
+            res[gate_name] = f'{v:.2f}'
         return res
 
-    def get_all_gate_voltages(self):
-        # NOTE: also set all cached values for snapshot!
+    def get_all_gate_voltages(self) -> dict[str, float]:
+        """ Returns voltages of real and virtual gates.
+
+        NOTE:
+            Also sets all cached values for virtual gates used in snapshot!
+        """
         v = {}
         for name in self._real_gates:
             v_real = self._get_voltage(name)
@@ -266,3 +268,98 @@ class gates(qc.Instrument):
         self.get_all_gate_voltages()
 
         return super().snapshot_base(update, params_to_skip_update)
+
+    def save(self, filename: str, mode: str = "real"):
+        """Saves gate voltages to file in json format.
+        Args:
+            filename: file to write to.
+            mode: "real", "virtual" or "real and virtual" for gates to save.
+        """
+        if mode not in ["real", "virtual", "real and virtual"]:
+            raise ValueError(f"Unknown mode '{mode}'")
+        gate_voltages = self.get_all_gate_voltages()
+        if mode == "real":
+            for gate in self._virtual_gates:
+                del gate_voltages[gate]
+        if mode == "virtual":
+            for gate in self._real_gates:
+                del gate_voltages[gate]
+
+        dir_name = os.path.dirname(filename)
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
+        with open(filename, "w") as fp:
+            json.dump(gate_voltages, fp, indent=2)
+
+    def load(
+            self,
+            filename: str,
+            mode: str = "real",
+            gate_names: list[str] | None = None,
+            max_delta: float = 100,
+            min_delta: float = 0.01,
+            force: bool = False,
+    ):
+        """Loads gate voltages from file (json format).
+
+        A confirmation will be asked before applying the voltages, unless `force` is True.
+
+        Args:
+            filename: file to read from.
+            mode: "real" or "virtual" for gates to set.
+            gate_names: specific gates to set. Ignores `mode`.
+            max_delta:
+                maximum allowed voltage difference in mV when setting gates.
+                No gate will be set if any gate exceeds the specified maximum delta.
+            min_delta:
+                minimum difference in mV to apply voltage. This is a threshold to avoid
+                changing voltage with less than DAC resolution.
+            force: If True applies voltages without asking confirmation.
+
+        Notes:
+            If a gate voltage is not specified in the file it will be ignored.
+        """
+        if mode not in ["real", "virtual"]:
+            raise ValueError(f"Unsuported mode '{mode}'")
+
+        if gate_names is None:
+            if mode == "real":
+                gate_names = self._real_gates
+            else:
+                gate_names = self._virtual_gates
+
+        current_voltages = self.get_all_gate_voltages()
+        with open(filename, "r") as fp:
+            new_voltages = json.load(fp)
+
+        changed_gates: list[str] = []
+        for name in gate_names:
+            if name not in new_voltages:
+                print(f"gate {name} not specified in file")
+                continue
+            abs_delta = abs(current_voltages[name] - new_voltages[name])
+            if abs_delta > max_delta:
+                raise Exception(f"Voltage change for gate {name} from {current_voltages[name]:.2f} mV to "
+                                f"{new_voltages[name]:.2f} exceeds delta of {max_delta:.2f} mV")
+            if abs_delta > min_delta:
+                changed_gates.append(name)
+        for name in changed_gates:
+            print(f"gate {name}: {current_voltages[name]:7.2f} mV -> {new_voltages[name]:7.2f}")
+        if len(changed_gates) == 0:
+            print("No differences with current voltages")
+        else:
+            if force or confirm("Apply these voltages?"):
+                for name in changed_gates:
+                    self.parameters[name].set(new_voltages[name])
+
+
+def confirm(prompt_text):
+    """
+    Ask user to enter Y or N (case-insensitive).
+    :return: True if the answer is Y.
+    :rtype: bool
+    """
+    answer = "_"
+    while answer not in ["", "y", "n"]:
+        answer = input(prompt_text + ' [y]/n').lower()
+    return answer == "y" or answer == ''
