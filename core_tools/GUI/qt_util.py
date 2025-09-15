@@ -58,8 +58,8 @@ def qt_init(style: str | None = None) -> bool:
     global _qt_app
 
     if _qt_app is None:
-    #    print(QtCore.QCoreApplication.testAttribute(QtCore.Qt.AA_EnableHighDpiScaling))
-    #    print(QtCore.QCoreApplication.testAttribute(QtCore.Qt.HighDpiScaleFactorRoundingPolicy.PassThrough))
+        # print(QtCore.QCoreApplication.testAttribute(QtCore.Qt.AA_EnableHighDpiScaling))
+        # print(QtCore.QCoreApplication.testAttribute(QtCore.Qt.HighDpiScaleFactorRoundingPolicy.PassThrough))
 
         # Set attributes for proper scaling when display scaling is not equal to 100%
         # This should be done before QApplication is started.
@@ -103,11 +103,11 @@ def qt_set_darkstyle():
         return
     dark_stylesheet = qdarkstyle.load_stylesheet()
     # patch qdarkstyle for cropped x-label on 2D graphics.
-    dark_stylesheet +=r'''
+    dark_stylesheet += r"""
 QGraphicsView {
     padding: 0px;
 }
-'''
+"""
     qt_app.setStyleSheet(dark_stylesheet)
     pg.setConfigOption('background', 'k')
     pg.setConfigOption('foreground', 'gray')
@@ -167,6 +167,7 @@ def qt_show_error(title: str, message: str):
         QMessageBox.Ok,
         )
     msg.exec_()
+
 
 def qt_create_app() -> QtCore.QCoreApplication:
     logger.info("Create Qt application")
