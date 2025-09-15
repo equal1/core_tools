@@ -13,6 +13,13 @@ from core_tools.data.measurement import Measurement, AbortMeasurement
 from core_tools.sweeps.progressbar import progress_bar
 from core_tools.job_mgnt.job_mgmt import queue_mgr, ExperimentJob
 
+try:
+    from qtpy.QtCore import QCoreApplication
+    _qapplication = True
+except Exception:
+    _qapplication = False
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -185,6 +192,42 @@ class ArraySetter(Setter):
             yield value
 
 
+class Sweep(ArraySetter):
+
+    def __init__(
+            self,
+            parameter,
+            data,
+            stop=None,
+            n_points=None,
+            delay=0.0,
+            resetable=True,
+            value_after: str | float | None = None,
+            endpoint=True,
+            label=None):
+        """ Sweeps parameter over specified values.
+
+        If stop is None, then data is assumed to be an array, otherwise data is the start value.
+
+        Args:
+            parameter (Parameter): qcodes parameter to sweep.
+            data (array or float): array of values to sweep or start value of the sweep.
+            stop (None or float): stop value of the sweep (inclusive is endpoint is True).
+            n_points (int): number of points for sweep.
+            delay (float): wait time in seconds after setting the parameter.
+            resetable (bool): if True the parameter will be reset to its value before the scan.
+            value_after (None, str or float):
+                if not None it specifies the value set after the sweep before changing the value of the outer loop.
+                value_after == 'start' sets the value to the first value of the sweep.
+            endpoint (bool): if True the stop value is inclusive, otherwise it is excluded.
+            label (str): Label to use for resume after break.
+        """
+        if stop is not None:
+            start = data
+            data = np.linspace(start, stop, n_points, endpoint=endpoint)
+        super().__init__(parameter, data, delay, resetable, value_after, label=label)
+
+
 def sweep(parameter, data, stop=None, n_points=None, delay=0.0,
           resetable=True,
           value_after: str | float | None = None,
@@ -205,11 +248,10 @@ def sweep(parameter, data, stop=None, n_points=None, delay=0.0,
             if not None it specifies the value set after the sweep before changing the value of the outer loop.
             value_after == 'start' sets the value to the first value of the sweep.
         endpoint (bool): if True the stop value is inclusive, otherwise it is excluded.
+        label (str): Label to use for resume after break.
     """
-    if stop is not None:
-        start = data
-        data = np.linspace(start, stop, n_points, endpoint=endpoint)
-    return ArraySetter(parameter, data, delay, resetable, value_after, label=label)
+    return Sweep(parameter, data,
+                 stop=stop, n_points=n_points, delay=delay, resetable=resetable, endpoint=endpoint, label=label)
 
 
 class Section:
@@ -256,10 +298,12 @@ class _Block:
 class Scan:
     verbose = False
 
-    def __init__(self, *args, name='', reset_param=False, silent=False, snapshot_extra=None):
+    def __init__(self, *args, name='', reset_param=False, silent=False, snapshot_extra=None,
+                 update_gui: bool = False):
         self.name = name
         self.reset_param = reset_param
         self.silent = silent
+        self.update_gui = update_gui
 
         self.set_params: list[Parameter] = []
         self.m_params: list[_MParam] = []
@@ -392,7 +436,7 @@ class Scan:
         try:
             start = time.perf_counter()
             with self._meas as m:
-                runner = Runner(m, self._root, self._n_pts, self.set_params)
+                runner = Runner(m, self._root, self._n_pts, self.set_params, self.update_gui)
                 runner.run(self.reset_param, self.silent)
             duration = time.perf_counter() - start
             logger.info(f'Total duration: {duration:5.2f} s ({duration/self._n_pts*1000:5.1f} ms/pt)')
@@ -429,11 +473,14 @@ class Scan:
 
 
 class Runner:
-    def __init__(self, measurement, root_block, n_pts, set_params):
+    def __init__(self, measurement, root_block, n_pts, set_params,
+                 update_gui: bool = False):
         self._measurement = measurement
         self._root = root_block
         self._n_pts = n_pts
         self._set_params = set_params
+        self._update_gui = update_gui
+        self._next_gui_update = time.perf_counter()
         # stack with setpoints
         self._setpoints = []
         self._m_values = {}
@@ -442,7 +489,7 @@ class Runner:
         self._exception_at = None
         self._skipped_setters = set()
 
-    def run(self, reset_param=False, silent=False):
+    def run(self, reset_param=False, silent=False, ):
         if reset_param:
             start_values = self._get_start_values()
         self._n = 0
@@ -500,6 +547,7 @@ class Runner:
     def _loop(self, actions: list[Action]):
         n_setters = 0
         for action in actions:
+            self._process_gui_events()
             try:
                 if isinstance(action, _Block):
                     n_setters += 1
@@ -533,7 +581,7 @@ class Runner:
                         raise Exception(
                             f"Failure getting {m_param.name}: {value}\n"
                             "Scroll back for root cause."
-                            ) from ex
+                        ) from ex
 
                 elif isinstance(action, SequenceStart):
                     play_time = action.play()
@@ -636,6 +684,14 @@ class Runner:
             n = self._n
             if n % 100 == 0:
                 logger.debug(f'Stats ({n}): {self.stats}')
+
+    def _process_gui_events(self):
+        if not self._update_gui or not _qapplication:
+            return
+        if self._next_gui_update < time.perf_counter():
+            QCoreApplication.processEvents()
+            # process once every 100 ms
+            self._next_gui_update = time.perf_counter() + 0.1
 
 
 # def run_stats():
