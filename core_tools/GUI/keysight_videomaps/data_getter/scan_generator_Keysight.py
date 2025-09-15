@@ -487,9 +487,10 @@ def construct_1D_scan_fast(
         pulse_lib : pulse library object, needed to make the sweep.
         digitizer : digitizer object
         channels (list[str] or list[int]) : digitizer channels to read
-        iq_mode (optional str): for digitizer IQ channels this parameter specifies how the
-                complex I/Q value should be plotted: 'I', 'Q', 'abs', 'angle', 'angle_deg'. A string applies to
-                all channels.
+        iq_mode:
+            [optional] for digitizer IQ channels this parameter specifies how the
+            complex I/Q value should be plotted: 'I', 'Q', 'I+Q', 'amplitude', 'phase', 'amplitude+phase'.
+            If None defaults to "I".
         acquisition_delay_ns (float):
                 Time in ns between AWG output change and digitizer acquisition start.
                 This also increases the gap between acquisitions.
@@ -540,9 +541,10 @@ def construct_2D_scan_fast(
         pulse_lib : pulse library object, needed to make the sweep.
         digitizer: digitizer object
         channels (list[str] or list[int]) : digitizer channels to read
-        iq_mode (optional str): for digitizer IQ channels this parameter specifies how the
-                complex I/Q value should be plotted: 'I', 'Q', 'abs', 'angle', 'angle_deg'. A string applies to
-                all channels.
+        iq_mode:
+            [optional] for digitizer IQ channels this parameter specifies how the
+            complex I/Q value should be plotted: 'I', 'Q', 'I+Q', 'amplitude', 'phase', 'amplitude+phase'.
+            If None defaults to "I".
         acquisition_delay_ns (float):
                 Time in ns between AWG output change and digitizer acquisition start.
                 This also increases the gap between acquisitions.

@@ -289,7 +289,7 @@ class FastScanGeneratorBase:
                 [optional] digitizer channels to read. if not specified all channels will be used.
             iq_mode:
                 [optional] for digitizer IQ channels this parameter specifies how the
-                complex I/Q value should be plotted: 'I', 'Q', 'abs', 'angle', 'angle_deg'.
+                complex I/Q value should be plotted: 'I', 'Q', 'I+Q', 'amplitude', 'phase', 'amplitude+phase'.
                 If None defaults to "I".
         """
         self.iq_mode = iq_mode
@@ -378,15 +378,10 @@ class FastScanGeneratorBase:
             swing: swing to apply on the AWG gate. [mV]
             n_pt: number of points to measure
             t_step: time in ns to measure per point. [ns]
-            biasT_corr: correct for biasT by taking data in different order.
-            channel_map:
-                defines new list of derived channels to display. Dictionary entries name: (channel_number, func, unit).
-                E.g. {('ch1-I':(1, np.real, 'mV'), 'ch1-Q':(1, np.imag, 'mV'), 'ch3-Amp':(3, np.abs, 'mV'), 'ch3-Phase':(3, np.angle, 'rad')}
-                The default channel_map is:
-                    {'ch1':(1, np.real, 'mV'), 'ch2':(2, np.real, 'mV'), 'ch3':(3, np.real, 'mV'), 'ch4':(4, np.real, 'mV')}
             pulse_gates (Dict[str, float]):
                 Gates to pulse during scan with pulse voltage in mV.
                 E.g. {'vP1': 10.0, 'vB2': -29.1}
+            biasT_corr: correct for biasT by taking data in different order.
 
         Returns:
             Parameter that can be used as input in a scan/measurement functions.
@@ -412,10 +407,10 @@ class FastScanGeneratorBase:
             swing2 (double) : swing to apply on the AWG gates.
             n_pt2 (int) : number of points to measure (current firmware limits to 1000)
             t_step (double) : time in ns to measure per point.
-            biasT_corr (bool) : correct for biasT by taking data in different order.
             pulse_gates (Dict[str, float]):
                 Gates to pulse during scan with pulse voltage in mV.
                 E.g. {'vP1': 10.0, 'vB2': -29.1}
+            biasT_corr (bool) : correct for biasT by taking data in different order.
 
         Returns:
             Parameter that can be used as input in a scan/measurement functions.
