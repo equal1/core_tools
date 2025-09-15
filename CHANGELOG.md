@@ -1,6 +1,14 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[1.6.10\] - 2025-09-15
+
+- Added `update_gui parameter` to `Scan` to update GUIs during measurement.
+- Added `Repeat`, `Periodic` to `Scan`.
+- Added `load_gate_voltages_from_ds_uuid` to gates_utility.
+- Added `save` and `load` to gates object to persist gate voltages in json format.
+- Added `core_tools.set_log_file_level(level)`, example: `core_tools.set_log_file_level("DEBUG")`
+
 ## \[1.6.9\] - 2025-08-08
 
 - Cleanup Parameter Viewer.
