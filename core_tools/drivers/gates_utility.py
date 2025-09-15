@@ -1,6 +1,25 @@
-from core_tools.data.ds.data_set import load_by_id
+from core_tools.data.ds.data_set import load_by_id, load_by_uuid
 
 import qcodes as qc
+
+
+def load_gate_voltages_from_ds_uuid(
+        ds_uuid, gates_name='gates', hardware_name='hardware', force=False
+        ):
+    '''
+    load gate voltages from an existing dataset.
+
+    Args:
+        ds_uuid (int) : uuid of the dataset to load
+        gates_name (str) : name of gates instrument in the snapshot present in the dataset
+        harware_name (str) : name of the hardware in the snapshot
+        force (bool) : if True overwrite without asking, else ask confirmation before changing voltage
+    '''
+    load_gate_voltages_from_snapshot(load_by_uuid(ds_uuid).snapshot,
+                                     gates_name=gates_name,
+                                     hardware_name=hardware_name,
+                                     force=force)
+
 
 def load_gate_voltages_from_ds(ds_id, gates_name='gates', hardware_name='hardware',
                                force=False):
@@ -35,14 +54,14 @@ def load_gate_voltages_from_snapshot(snapshot, gates_name='gates', hardware_name
 
     try:
         gate_params = instruments[gates_name]['parameters']
-    except:
+    except Exception:
         raise ValueError(f'no gate parameter {gates_name} found in snapshot')
 
     try:
         vgates = ['IDN']
         for key, val in instruments[hardware_name]['virtual_gates'].items():
             vgates += val['virtual_gate_names']
-    except:
+    except Exception:
         raise ValueError('cannot detect virtual gates, not restoring voltages')
 
     for key, val in gate_params.items():
@@ -69,4 +88,3 @@ def confirm(prompt_text):
     while answer not in ["", "y", "n"]:
         answer = input(prompt_text + ' [y]/n').lower()
     return answer == "y" or answer == ''
-
