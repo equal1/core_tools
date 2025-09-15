@@ -1,7 +1,8 @@
 import numpy as np
 
 import core_tools as ct
-from core_tools.sweeps.scans import Scan, sweep, Function, Break
+from core_tools.sweeps.scans import Scan, sweep, Function, Break, Sweep
+from core_tools.sweeps.scan_utilities import Repeat, Periodic
 
 from qcodes import ManualParameter
 from qcodes.parameters.specialized_parameters import ElapsedTimeParameter
@@ -53,7 +54,8 @@ scan1 = Scan(
     # identical: sweep(x, np.linspace(-20, 20, 11), delay=0.1)
     t,
     name="test_scan",
-    silent=True,
+    # silent=True,
+    # update_gui=True,
 )
 
 t.reset_clock()  # Don't forget to reset the timer before measurement.
@@ -104,12 +106,54 @@ retrieved_dataset = load_by_uuid(dataset_uuid)
 
 print(retrieved_dataset)
 
+# %% -- Example with Repetitions --
+
+# Do 10 times a Sweep of X and measure t.
+
+t.reset_clock()  # Reset the timer before measurement.
+
+ds = Scan(
+    Repeat("n", 10, param_label="repetitions"),
+    Sweep(x, -20, 20, 11),
+    t,
+    name="repeated_scan",
+).run()
+
+
+# %% -- Example with Periodic measurement --
+
+# Measure t and y periodically during 2.0 seconds with a 0.2 s interval.
+
+t.reset_clock()  # Reset the timer before measurement.
+
+ds = Scan(
+    Periodic("t", interval=0.2, duration=2.0, param_label="time"),
+    t,
+    y,
+    name="periodic_scan",
+).run()
+
+
+# %% -- Repeat periodic measurement --
+
+t.reset_clock()  # Reset the timer before measurement.
+
+ds = Scan(
+    Repeat("n", 10, param_label="repetitions"),
+    Periodic("t_loop", interval=0.2, duration=2.0, param_label="time"),
+    t,
+    y,
+    name="repeated_periodic_scan",
+).run()
+
 # %% -- Example Scans: Nested Scans --
 # ...
 
 t.reset_clock()
 
 ds_inner = []
+
+
 def inner_scan():
     ds = Scan(
         sweep(x, -20, 20, 11, delay=0.01),
@@ -187,6 +231,8 @@ from core_tools.sweeps.sweeps import do1D
 t.reset_clock()
 
 ds_inner2 = []
+
+
 def inner_scan_do1D():
     ds = do1D(
         x, -20, 20, 11, 0.01,
@@ -286,4 +332,3 @@ ds11 = Scan(
 
 
 ds11
-
