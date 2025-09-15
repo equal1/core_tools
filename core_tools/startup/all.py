@@ -116,3 +116,10 @@ def _configure_logging(cfg):
 
     for name, level in logger_levels.items():
         logging.getLogger(name).setLevel(level)
+
+
+def set_log_file_level(level: str):
+    root = logging.getLogger()
+    for handler in root.handlers:
+        if isinstance(handler, logging.FileHandler):
+            handler.setLevel(level)
