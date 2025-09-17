@@ -1,11 +1,16 @@
-from typing import Any
-from core_tools.GUI.param_viewer.param_viewer_GUI_window import Ui_MainWindow
-from PyQt5 import QtCore, QtWidgets
-import qcodes as qc
-from dataclasses import dataclass
-from ..qt_util import qt_log_exception
-
 import logging
+import os
+from collections import defaultdict
+from typing import Any
+from dataclasses import dataclass
+
+import qcodes as qc
+from qtpy import QtCore, QtWidgets
+from ruamel.yaml import YAML
+
+from core_tools.GUI.qt_util import qt_log_exception
+from core_tools.GUI.resources.icons import add_icons_to_checkbox
+
 
 logger = logging.getLogger(__name__)
 
@@ -14,21 +19,21 @@ logger = logging.getLogger(__name__)
 class param_data_obj:
     param_parameter: Any
     gui_input_param: Any
-    division: Any
     name: str
+    cb_star: QtWidgets.QCheckBox
 
 
-class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
+class param_viewer(QtWidgets.QMainWindow):
 
     def __init__(self, gates_object: object | None = None,
                  max_diff: float = 1000,
                  locked=False):
-        self.real_gates = list()
-        self.virtual_gates = list()
+        self.tab_gates: dict[str, list] = defaultdict(list)
         self.station = qc.Station.default
         self.max_diff = max_diff
         self.locked = locked
-        self._last_gui_values = {}
+        self.favorite_gates: list[str] = []
+        self._last_gui_values: dict[str, dict[str, float]] = defaultdict(dict)
 
         if gates_object:
             self.gates_object = gates_object
@@ -47,17 +52,27 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
             self.app = QtWidgets.QApplication([])
 
         super(QtWidgets.QMainWindow, self).__init__()
-        self.setupUi(self)
+        self.setup_ui()
+
+        self.load_favorites()
+
+        self.add_tab("Real")
+        self.add_tab("All virtual")
+        self.layout_favorites = self.add_tab("Favorites")
 
         # add real gates
-        for gate_name in self.gates_object.hardware.dac_gate_map.keys():
-            param = getattr(self.gates_object, gate_name)
-            self._add_gate(param, False)
+        self._add_gates("Real", gates_object.hardware.dac_gate_map.keys())
 
         # add virtual gates
-        for gate_name in self.gates_object.v_gates:
-            param = getattr(self.gates_object, gate_name)
-            self._add_gate(param, True)
+        self._add_gates("All virtual", gates_object.v_gates)
+
+        # add virtual gates per matrix
+        for virt_gate_set in gates_object.hardware.virtual_gates:
+            vgm_name = virt_gate_set.name
+            self.add_tab(vgm_name)
+            self._add_gates(vgm_name, virt_gate_set.virtual_gate_names)
+
+        self.recreate_favorites_controls()
 
         self.step_size.clear()
         items = [100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1]
@@ -67,7 +82,6 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
         self.lock.setChecked(self.locked)
         self.lock.stateChanged.connect(lambda: self._update_lock(self.lock.isChecked()))
         self.step_size.currentIndexChanged.connect(lambda: self.update_step(float(self.step_size.currentText())))
-        self._finish_gates_GUI()
 
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(lambda: self._update_parameters())
@@ -77,6 +91,79 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
         if not instance_ready:
             self.app.exec()
 
+    def setup_ui(self):
+        self.tabs = {}
+        self.tab_layout = {}
+        self.resize(650, 1200)
+        self.centralwidget = QtWidgets.QWidget(self)
+        self.gridLayout = QtWidgets.QGridLayout(self.centralwidget)
+        self.gridLayout.setContentsMargins(-1, -1, -1, 0)
+        self.tab_menu = QtWidgets.QTabWidget(self.centralwidget)
+        self.gridLayout.addWidget(self.tab_menu, 0, 0, 1, 1)
+        self.tab_menu.currentChanged.connect(lambda: self._tab_changed())
+
+        horizontalLayout_2 = QtWidgets.QHBoxLayout()
+        horizontalLayout_2.setContentsMargins(-1, -1, -1, 0)
+        horizontalLayout_2.setSpacing(4)
+        self.lock = QtWidgets.QCheckBox(self.centralwidget)
+        self.lock.setText("Lock parameter viewer")
+        horizontalLayout_2.addWidget(self.lock)
+        spacerItem = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        horizontalLayout_2.addItem(spacerItem)
+        label = QtWidgets.QLabel(self.centralwidget)
+        label.setText("Voltage step")
+        horizontalLayout_2.addWidget(label)
+        self.step_size = QtWidgets.QComboBox(self.centralwidget)
+        self.step_size.setEnabled(True)
+        horizontalLayout_2.addWidget(self.step_size)
+        label_2 = QtWidgets.QLabel(self.centralwidget)
+        label_2.setText("mV")
+        horizontalLayout_2.addWidget(label_2)
+        self.gridLayout.addLayout(horizontalLayout_2, 1, 0, 1, 1)
+        self.setCentralWidget(self.centralwidget)
+        statusbar = QtWidgets.QStatusBar()
+        self.setStatusBar(statusbar)
+        self.setWindowTitle("Parameter Viewer")
+
+    def _tab_changed(self):
+        self._update_parameters()
+
+    def add_tab(self, name):
+        tab = QtWidgets.QWidget()
+        gridLayout = QtWidgets.QGridLayout(tab)
+        scrollArea = QtWidgets.QScrollArea(tab)
+        scrollArea.setWidgetResizable(True)
+        scrollAreaWidgetContents = QtWidgets.QWidget()
+        # scrollAreaWidgetContents.setGeometry(QtCore.QRect(0, 0, 756, 495))
+        scroll_layout = QtWidgets.QGridLayout(scrollAreaWidgetContents)
+        layout = QtWidgets.QGridLayout()
+        layout.setSpacing(2)
+        scroll_layout.addLayout(layout, 0, 0, 1, 1)
+        scrollArea.setWidget(scrollAreaWidgetContents)
+        gridLayout.addWidget(scrollArea, 0, 0, 1, 1)
+        self.tabs[name] = tab
+        self.tab_layout[name] = layout
+        self.tab_menu.addTab(tab, name)
+        return layout
+
+    def recreate_favorites_controls(self):
+        layout = self.tab_layout["Favorites"]
+        parameters = self.tab_gates["Favorites"]
+        n_rows = len(parameters)
+        parameters.clear()
+        for row in range(n_rows+1):
+            for col in range(5):
+                item = layout.itemAtPosition(row, col)
+                if item is None:
+                    continue
+                widget = item.widget()
+                if widget is not None:
+                    layout.removeWidget(widget)
+                    widget.deleteLater()
+                else:
+                    layout.removeItem(item)
+        self._add_gates("Favorites", self.favorite_gates)
+
     @qt_log_exception
     def closeEvent(self, event):
         self.timer.stop()
@@ -85,10 +172,9 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
     def update_step(self, value: float):
         """ Update step size of the parameter GUI elements with the specified value """
         self._step_size = value
-        for gate in self.real_gates:
-            gate.gui_input_param.setSingleStep(value)
-        for gate in self.virtual_gates:
-            gate.gui_input_param.setSingleStep(value)
+        for gates in self.tab_gates.values():
+            for gate in gates:
+                gate.gui_input_param.setSingleStep(value)
 
     @qt_log_exception
     def _update_lock(self, locked):
@@ -96,7 +182,14 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
         self.locked = locked
 
     @qt_log_exception
-    def _add_gate(self, parameter: qc.Parameter, virtual: bool):
+    def _add_gates(self, tab_name: str, gate_names: list[str]):
+        for gate_name in gate_names:
+            param = self.gates_object.parameters[gate_name]
+            self._add_gate(param, tab_name)
+        self._add_spacers(tab_name)
+
+    @qt_log_exception
+    def _add_gate(self, parameter: qc.Parameter, tab_name: str):
         '''
         add a new gate.
 
@@ -105,27 +198,25 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
             virtual (bool) : True in case this is a virtual gate.
         '''
 
-        i = len(self.real_gates)
-        layout = self.layout_real
-
-        if virtual:
-            i = len(self.virtual_gates)
-            layout = self.layout_virtual
+        layout = self.tab_layout[tab_name]
+        row = len(self.tab_gates[tab_name])
 
         name = parameter.name
         unit = parameter.unit
 
         _translate = QtCore.QCoreApplication.translate
 
-        gate_name = QtWidgets.QLabel(self.virtualgates)
+        gate_name = QtWidgets.QLabel()
         gate_name.setObjectName(name)
         gate_name.setMinimumSize(QtCore.QSize(100, 0))
         gate_name.setText(_translate("MainWindow", name))
-        layout.addWidget(gate_name, i, 0, 1, 1)
+        layout.addWidget(gate_name, row, 0, 1, 1)
 
-        voltage_input = QtWidgets.QDoubleSpinBox(self.virtualgates)
+        voltage_input = QtWidgets.QDoubleSpinBox()
         voltage_input.setObjectName(name + "_input")
         voltage_input.setMinimumSize(QtCore.QSize(100, 0))
+
+        virtual = parameter.name in self.gates_object.v_gates
 
         if not virtual:
             voltage_input.setRange(-4000.0, 4000.0)
@@ -133,64 +224,95 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
             # QDoubleSpinBox needs a limit. Set it high for virtual voltage
             voltage_input.setRange(-99999.99, 99999.99)
         voltage_input.setValue(parameter())
-        voltage_input.valueChanged.connect(lambda: self._set_gate(parameter, voltage_input.value, voltage_input))
+        voltage_input.valueChanged.connect(lambda: self._set_gate(parameter, voltage_input))
         voltage_input.setKeyboardTracking(False)
-        layout.addWidget(voltage_input, i, 1, 1, 1)
+        layout.addWidget(voltage_input, row, 1, 1, 1)
 
-        gate_unit = QtWidgets.QLabel(self.virtualgates)
+        gate_unit = QtWidgets.QLabel()
         gate_unit.setObjectName(name + "_unit")
         gate_unit.setText(_translate("MainWindow", unit))
-        layout.addWidget(gate_unit, i, 2, 1, 1)
-        param_data = param_data_obj(parameter,  voltage_input, 1, name)
-        if not virtual:
-            self.real_gates.append(param_data)
-        else:
-            self.virtual_gates.append(param_data)
+        layout.addWidget(gate_unit, row, 2, 1, 1)
+
+        cb_star = QtWidgets.QCheckBox("  ")
+        cb_star.setCheckState(QtCore.Qt.Checked if name in self.favorite_gates else QtCore.Qt.Unchecked)
+        add_icons_to_checkbox(cb_star, "Starred.png", "StarWhite.png", 18)
+        cb_star.stateChanged.connect(lambda state: self._star_changed(name, state))
+        layout.addWidget(cb_star, row, 3, 1, 1)
+
+        param_data = param_data_obj(parameter,  voltage_input, name, cb_star)
+        self.tab_gates[tab_name].append(param_data)
 
     @qt_log_exception
-    def _set_gate(self, gate, value, voltage_input):
+    def _star_changed(self, gate_name: str, state: QtCore.Qt.CheckState):
+        update = False
+        if state == QtCore.Qt.Checked:
+            if gate_name not in self.favorite_gates:
+                self.favorite_gates.append(gate_name)
+            update = True
+        else:
+            if gate_name in self.favorite_gates:
+                self.favorite_gates.remove(gate_name)
+            update = True
+        if update:
+            self.save_favorites()
+            self.recreate_favorites_controls()
+
+    def _get_favorites_filename(self):
+        path = "~/.core_tools/parameter_viewer"
+        name = "favorites.yaml"
+        path = os.path.expanduser(path)
+        os.makedirs(path, exist_ok=True)
+        return os.path.join(path, name)
+
+    def load_favorites(self):
+        filename = self._get_favorites_filename()
+        if not os.path.exists(filename):
+            return
+        yaml = YAML()
+        with open(filename) as fp:
+            self.favorite_gates = yaml.load(fp)
+
+    def save_favorites(self):
+        filename = self._get_favorites_filename()
+        yaml = YAML()
+        with open(filename, "w") as fp:
+            yaml.dump(self.favorite_gates, fp)
+
+    @qt_log_exception
+    def _set_gate(self, gate, voltage_input):
+        current_voltage = gate()
+        new_value = voltage_input.value()
+        new_text = voltage_input.text()
+        old_text = voltage_input.textFromValue(current_voltage)
+        if new_text == old_text:
+            return
         if self.locked:
-            new_text = voltage_input.text()
-            current_value_text = voltage_input.textFromValue(gate())
-            if new_text != current_value_text:
-                logger.warning(f"ParameterViewer is locked! Voltage of {gate.name} not changed.")
-                voltage_input.setValue(gate())
+            logger.warning(f"ParameterViewer is locked! Voltage of {gate.name} not changed.")
+            voltage_input.setValue(current_voltage)
             return
         if not voltage_input.isEnabled():
-            logger.info(f"Ignoring out of range value {gate.name}: {value()}")
+            logger.info(f"Ignoring out of range value {gate.name}: {new_value}")
             return
-        delta = abs(value() - gate())
+        delta = abs(new_value - current_voltage)
         if self.max_diff is not None and delta > self.max_diff:
-            logger.warning(f"Not setting {gate} to {value():.1f}mV. "
+            logger.warning(f"Not setting {gate} to {new_value:.1f}mV. "
                            f"Difference {delta:.0f} mV > {self.max_diff:.0f} mV")
             return
-
         try:
-            last_value = gate()
-            new_text = voltage_input.text()
-            current_text = voltage_input.textFromValue(last_value)
-            if new_text != current_text:
-                logger.info(f"GUI value changed: set gate {gate.name} {current_text} -> {new_text}")
-                gate.set(value())
+            logger.info(f"GUI value changed: set gate {gate.name} {old_text} -> {new_text}")
+            gate.set(new_value)
         except Exception as ex:
-            logger.error(f"Failed to set gate {gate} to {value()}: {ex}")
+            logger.error(f"Failed to set gate {gate.name} to {new_value}: {ex}")
 
-    @qt_log_exception
-    def _finish_gates_GUI(self):
+    def _add_spacers(self, tab_name: str):
+        layout = self.tab_layout[tab_name]
+        row = len(self.tab_gates[tab_name])
 
-        for items, layout_widget in [
-                (self.real_gates, self.layout_real),
-                (self.virtual_gates, self.layout_virtual),
-                ]:
-            i = len(items) + 1
+        spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        layout.addItem(spacerItem, row, 0, 1, 1)
 
-            spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-            layout_widget.addItem(spacerItem, i, 0, 1, 1)
-
-            spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-            layout_widget.addItem(spacerItem1, 0, 3, 1, 1)
-
-        self.setWindowTitle("Parameter Viewer")
+        spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        layout.addItem(spacerItem1, 0, 4, 1, 1)
 
     @qt_log_exception
     def _update_parameters(self):
@@ -198,26 +320,23 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
         updates the values of all the gates in the parameter viewer periodically
         '''
         idx = self.tab_menu.currentIndex()
+        tab_name = self.tab_menu.tabText(idx)
         all_gate_voltages = {}
-        if idx == 0:
-            params = self.real_gates
-        elif idx == 1:
-            params = self.virtual_gates
-            # if supported retrieve all voltages in 1 call. That's a lot faster.
-            if hasattr(self.gates_object, "get_all_gate_voltages"):
-                all_gate_voltages = self.gates_object.get_all_gate_voltages()
-        else:
-            return
+        params = self.tab_gates[tab_name]
+        # if supported retrieve all voltages in 1 call. That's a lot faster.
+        if hasattr(self.gates_object, "get_all_gate_voltages"):
+            all_gate_voltages = self.gates_object.get_all_gate_voltages()
 
         for param in params:
             try:
                 name = param.name
                 if name in all_gate_voltages:
-                    new_value = all_gate_voltages[name]/param.division
+                    new_value = all_gate_voltages[name]
                 else:
-                    new_value = param.param_parameter()/param.division
+                    new_value = param.param_parameter()
 
-                old_value = self._last_gui_values.get(name, None)
+                old_value = self._last_gui_values[tab_name].get(name, None)
+                param.cb_star.setCheckState(QtCore.Qt.Checked if name in self.favorite_gates else QtCore.Qt.Unchecked)
 
                 if old_value == new_value:
                     continue
@@ -249,6 +368,6 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
                                           f'{new_text} to {gui_input.text()}')
                     elif isinstance(gui_input, QtWidgets.QCheckBox):
                         gui_input.setChecked(bool(new_value))
-                    self._last_gui_values[name] = new_value
+                    self._last_gui_values[tab_name][name] = new_value
             except Exception:
                 logger.error(f'Error updating {param}', exc_info=True)
