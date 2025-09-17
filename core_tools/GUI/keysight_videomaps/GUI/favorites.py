@@ -142,7 +142,7 @@ class Favorites:
             data['gen'] = self._parse_settings_text(self._ui_settings_gen, "gen")
         yaml = YAML()
         with open(path, "w") as fp:
-            self._config = yaml.dump(data, fp)
+            yaml.dump(data, fp)
         self._load_favorites()
 
     @qt_log_exception
