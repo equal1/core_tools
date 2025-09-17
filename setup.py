@@ -25,5 +25,6 @@ setup(
     package_data={
         "core_tools": ["py.typed"],
         "": ["*.qml", "*.png"],
+        "core_tools.GUI.resources": ["*.png"],
     },
 )
