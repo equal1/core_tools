@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[1.6.11\] - 2025-09-17
+
+- Added virtual gates per matrix in a tab in Parameter Viewer.
+- Added Favorites to Parameter Viewer.
+
 ## \[1.6.10\] - 2025-09-15
 
 - Added `update_gui parameter` to `Scan` to update GUIs during measurement.
