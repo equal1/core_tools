@@ -2,16 +2,19 @@ from ruamel.yaml import YAML
 
 _configuration = None
 
+
 def get_configuration():
     if _configuration is None:
         raise Exception('core-tools configuration not loaded')
     return _configuration
+
 
 def load_configuration(filename):
     global _configuration
 
     _configuration = Configuration(filename)
     return _configuration
+
 
 class Configuration:
     def __init__(self, filename):

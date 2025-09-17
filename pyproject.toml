@@ -1,0 +1,95 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "core_tools"
+version = "1.6.10" # tbump: version
+authors = [
+  { name="Sander de Snoo", email="s.l.desnoo@tudelft.nl" },
+]
+description = "Core-tools is set of GUI and storage solution supporting common spin-qubit measurement practices"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "qtpy",
+    'pyqt5 >= 5.15.1',
+    'pyqtgraph >= 0.13',
+    'matplotlib',
+    'psycopg2; platform_system != "Darwin"',
+    'psycopg2-binary; platform_system == "Darwin"',
+    'xarray',
+    'h5netcdf',
+    'qcodes',
+    'numpy >= 1.24',
+    'ruamel-yaml',
+    # 'pulse_lib',
+    'qdarkstyle',
+    'requests',
+    'qt-dataviewer',
+]
+license = "MIT"
+license-files = [
+    "LICENSE",
+]
+
+[tool.setuptools.package-data]
+"core_tools" = ["py.typed", "*.qml", "*.png"]
+
+[project.urls]
+# Homepage = "https://example.com"
+Documentation = "https://gitlab.tudelft.nl/qutech-qdlabs/core_tools/-/blob/main/README.md"
+Repository = "https://gitlab.tudelft.nl/qutech-qdlabs/core_tools"
+# Issues = "https://github.com/me/spam/issues"
+Changelog = "https://gitlab.tudelft.nl/qutech-qdlabs/core_tools/-/blob/main/CHANGELOG.md"
+
+[tool.tbump]
+# Uncomment this if your project is hosted on GitHub:
+# github_url = "https://github.com/<user or organization>/<project>/"
+
+[tool.tbump.version]
+current = "1.6.10"
+
+# Example of a semver regexp.
+# Make sure this matches current_version before
+# using tbump
+regex = '''
+  (?P<major>\d+)
+  \.
+  (?P<minor>\d+)
+  \.
+  (?P<patch>\d+)
+  '''
+
+[tool.tbump.git]
+message_template = "Bump to {new_version}"
+tag_template = "v{new_version}"
+
+# For each file to patch, add a [[tool.tbump.file]] config
+# section containing the path of the file, relative to the
+# tbump.toml location.
+[[tool.tbump.file]]
+src = "pyproject.toml"
+search = 'version = "{current_version}" # tbump: version'
+
+[[tool.tbump.file]]
+src = "core_tools/__init__.py"
+search = '__version__ = "{current_version}"'
+
+# You can specify a list of commands to
+# run after the files have been patched
+# and before the git commit is made
+
+#  [[tool.tbump.before_commit]]
+#  name = "check changelog"
+#  cmd = "grep -q {new_version} Changelog.rst"
+
+# Or run some commands after the git tag and the branch
+# have been pushed:
+#  [[tool.tbump.after_push]]
+#  name = "publish"
+#  cmd = "./publish.sh"
