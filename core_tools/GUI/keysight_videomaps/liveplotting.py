@@ -664,14 +664,14 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
                 on_mouse_moved=self._on_mouse_moved_1D,
                 on_mouse_clicked=self._on_mouse_clicked_1D)
             self.update_plot_properties_1D()
-            self._set_metadata(1)
+            metadata = self._get_metadata(1)
             settings.update_scan = False
             self._pulselib_settings.store()
+            self.vm_data_param_1D = vm_data_param(self._param1D, self._plot1D, metadata)
         else:
             self._param1D.restart()
 
         self._update_gui_1D()
-        self.vm_data_param_1D = vm_data_param(self._param1D, self._plot1D, self.metadata)
 
     @qt_log_exception
     def _start_1D(self):
@@ -732,15 +732,15 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
             self._plot2D.set_cross(settings["cross"])  # TODO make dynamic
             self._plot2D.set_colorbar(settings["colorbar"])  # TODO make dynamic
             self.update_plot_properties_2D()
-            self._set_metadata(2)
+            metadata = self._get_metadata(2)
             settings.update_scan = False
             self._pulselib_settings.store()
+            self.vm_data_param_2D = vm_data_param(self._param2D, self._plot2D, metadata)
             logger.debug('Finished init currentplot and current_param')
         else:
             self._param2D.restart()
 
         self._update_gui_2D()
-        self.vm_data_param_2D = vm_data_param(self._param2D, self._plot2D, self.metadata)
 
     @qt_log_exception
     def _start_2D(self):
@@ -969,7 +969,7 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
             logger.error("Oops! Error in liveplotting administration")
         logger.info('Window closed')
 
-    def _set_metadata(self, dim: int):
+    def _get_metadata(self, dim: int):
         metadata = {}
         if dim == 1:
             metadata['measurement_type'] = '1D_scan'
@@ -978,7 +978,7 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
             metadata['measurement_type'] = '2D_scan'
             metadata.update(self._2D_settings.to_dict())
         metadata.update(self._gen_settings.to_dict())
-        self.metadata = metadata
+        return metadata
 
     @property
     def vm_data_param(self):
@@ -996,9 +996,11 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         if self.vm_data_param is None:
             print('no data to plot')
             return
+        vm_data_param = self.vm_data_param
+        metadata = vm_data_param.metadata
 
         _, dataset_descriptor = self.save_data()
-        notes = self.metadata.copy()
+        notes = metadata.copy()
         notes.update(dataset_descriptor)
         if self.gates:
             try:
@@ -1011,18 +1013,16 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
 
         if self.tab_id == 0:  # 1D
             figure_hand = self._plot1D.plot_widgets[0].plot_widget.parent()
-            settings = self._1D_settings
-            gate_x = settings["gate_name"]
-            range_x = settings["V_swing"]
+            gate_x = notes["gate_name"]
+            range_x = notes["V_swing"]
             channels = ','.join(self._param1D.channel_names)
             title = f'{gate_x} ({range_x:.0f} mV), m:{channels}'
         elif self.tab_id == 1:  # 2D
             figure_hand = self._plot2D.plot_widgets[0].plot_widget.parent()
-            settings = self._2D_settings
-            gate_y = settings["gate2_name"]
-            gate_x = settings["gate1_name"]
-            range_y = settings["V2_swing"]
-            range_x = settings["V1_swing"]
+            gate_y = notes["gate2_name"]
+            gate_x = notes["gate1_name"]
+            range_y = notes["V2_swing"]
+            range_x = notes["V1_swing"]
             channels = ','.join(self._param2D.channel_names)
             title = f'{inp_title} {gate_y} ({range_y:.0f} mV) vs. {gate_x} ({range_x:.0f} mV), m:{channels}'
         else:
@@ -1052,20 +1052,20 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         if self.vm_data_param is None:
             print('no data to save')
             return
+        vm_data_param = self.vm_data_param
+        metadata = vm_data_param.metadata
         if self.tab_id == 0:  # 1D
-            label = self._1D_settings["gate_name"]
+            label = metadata["gate_name"]
         elif self.tab_id == 1:  # 2D
-            settings = self._2D_settings
-            label = settings["gate1_name"] + '_vs_' + settings["gate2_name"]
+            label = metadata["gate1_name"] + '_vs_' + metadata["gate2_name"]
         else:
             raise Exception(f"Cannot save data from tab {self.tab_id}")
 
         update = {
-            "average": self.vm_data_param.plot.average_scans,
-            "differentiate":  self.vm_data_param.plot.gradient
+            "average": vm_data_param.plot.average_scans,
+            "differentiate":  vm_data_param.plot.gradient
         }
-        self.metadata.update(update)
-        self.vm_data_param.load_metadata(update)
+        vm_data_param.load_metadata(update)
 
         try:
             return data_saver.save_data(self.vm_data_param, label)
@@ -1083,7 +1083,8 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
     @qt_log_exception
     def _on_mouse_clicked_1D(self, x):
         if self._1D_set_DC.isChecked():
-            gate_name = self._1D_settings["gate_name"]
+            metadata = self.vm_data_param.metadata
+            gate_name = metadata["gate_name"]
             vx = self._plot1D.gate_x_voltage + x
             self.gates.set(gate_name, vx)
             msg = (f'Set {gate_name}:{vx:6.3f} mV')
@@ -1098,7 +1099,8 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
             x_total = f' ({dc_x+x:7.2f})'
         else:
             x_total = ''
-        gate_name = self._1D_settings["gate_name"]
+        metadata = self.vm_data_param.metadata
+        gate_name = metadata["gate_name"]
         self.cursor_value_label.setText(
             f'{gate_name}:{x:7.2f}{x_total} mV, '
             f'{ch}:{v:7.2f} mV')
@@ -1106,13 +1108,13 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
     @qt_log_exception
     def _on_mouse_clicked_2D(self, x, y):
         if self._2D_set_DC.isChecked():
-            settings = self._2D_settings
+            metadata = self.vm_data_param.metadata
             vx = self._plot2D.gate_x_voltage + x
             vy = self._plot2D.gate_y_voltage + y
-            self.gates.set(settings["gate1_name"], vx)
-            self.gates.set(settings["gate2_name"], vy)
-            msg = (f'Set {settings["gate1_name"]}:{vx:6.3f} mV, '
-                   f'{settings["gate2_name"]}:{vy:6.3f} mV')
+            self.gates.set(metadata["gate1_name"], vx)
+            self.gates.set(metadata["gate2_name"], vy)
+            msg = (f'Set {metadata["gate1_name"]}:{vx:6.3f} mV, '
+                   f'{metadata["gate2_name"]}:{vy:6.3f} mV')
             print(msg)
             self.cursor_value_label.setText(msg)
             self._plot2D.clear_buffers()
@@ -1129,10 +1131,10 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
             y_total = f' ({dc_y+y:7.2f})'
         else:
             y_total = ''
-        settings = self._2D_settings
+        metadata = self.vm_data_param.metadata
         self.cursor_value_label.setText(
-            f'{settings["gate1_name"]}:{x:7.2f}{x_total} mV, '
-            f'{settings["gate2_name"]}:{y:7.2f}{y_total} mV, '
+            f'{metadata["gate1_name"]}:{x:7.2f}{x_total} mV, '
+            f'{metadata["gate2_name"]}:{y:7.2f}{y_total} mV, '
             f'{ch}:{v:7.2f} mV')
 
 
