@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[1.6.12\] - 2025-09-25
+
+- Fixed "Set DC Voltage", labels on PPT, and saved dataset after changing plot settings.
+
 ## \[1.6.11\] - 2025-09-17
 
 - Added virtual gates per matrix in a tab in Parameter Viewer.
