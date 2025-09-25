@@ -10,6 +10,7 @@ from PyQt5 import QtGui, QtWidgets
 
 logger = logging.getLogger(__name__)
 
+
 def _convert_rgb_color_to_integer(rgb_color):
     if not isinstance(rgb_color, tuple) or not all(isinstance(i, int) for i in rgb_color):
         raise ValueError('Color should be an RGB integer tuple.')
@@ -69,7 +70,7 @@ def _ppt_determine_image_position(ppt, figsize, fname, verbose=0):
             import cv2
             shape = cv2.imread(fname).shape
             imwh = shape[1], shape[0]
-        except:
+        except Exception:
             imwh = None
         if imwh is not None:
             imratio = imwh[0] / imwh[1]
@@ -247,7 +248,7 @@ try:
             elif isinstance(fig, QtWidgets.QWidget):
                 try:
                     figtemp = QtGui.QPixmap.grabWidget(fig)
-                except:
+                except Exception:
                     # new Qt style
                     figtemp = fig.grab()
                 figtemp.save(fname)
@@ -292,7 +293,7 @@ try:
         if activate_slide:
             idx = int(slide.SlideIndex)
             if verbose >= 2:
-                print(f'addPPTslide: goto slide {idx}' )
+                print(f'addPPTslide: goto slide {idx}')
             Application.ActiveWindow.View.GotoSlide(idx)
         return ppt, slide
 
