@@ -225,7 +225,7 @@ class Measurement:
             else:
                 raise Exception('No measurement parameters specified')
         self.dataset = create_new_data_set(self.name, self.snapshot, *self.m_param.values())
-        msg = f'Starting measurement with id : {self.dataset.exp_id} - {self.name}'
+        msg = f'Starting measurement with uuid : {self.dataset.exp_uuid} - {self.name}'
         logger.info(msg)
         if not self.silent:
             print(f'\n{msg}', flush=True)
