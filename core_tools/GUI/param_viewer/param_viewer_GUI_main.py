@@ -56,9 +56,9 @@ class param_viewer(QtWidgets.QMainWindow):
 
         self.load_favorites()
 
+        self.layout_favorites = self.add_tab("Favorites")
         self.add_tab("Real")
         self.add_tab("All virtual")
-        self.layout_favorites = self.add_tab("Favorites")
 
         # add real gates
         self._add_gates("Real", gates_object.hardware.dac_gate_map.keys())
@@ -72,7 +72,8 @@ class param_viewer(QtWidgets.QMainWindow):
             self.add_tab(vgm_name)
             self._add_gates(vgm_name, virt_gate_set.virtual_gate_names)
 
-        self.recreate_favorites_controls()
+        self.refill_favorite_gates_tab()
+        self.tab_menu.setCurrentIndex(1)
 
         self.step_size.clear()
         items = [100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1]
@@ -146,7 +147,7 @@ class param_viewer(QtWidgets.QMainWindow):
         self.tab_menu.addTab(tab, name)
         return layout
 
-    def recreate_favorites_controls(self):
+    def refill_favorite_gates_tab(self):
         layout = self.tab_layout["Favorites"]
         parameters = self.tab_gates["Favorites"]
         n_rows = len(parameters)
@@ -184,7 +185,11 @@ class param_viewer(QtWidgets.QMainWindow):
     @qt_log_exception
     def _add_gates(self, tab_name: str, gate_names: list[str]):
         for gate_name in gate_names:
-            param = self.gates_object.parameters[gate_name]
+            try:
+                param = self.gates_object.parameters[gate_name]
+            except KeyError:
+                print(f"Ignoring gate '{gate_name}'. It does not exist.")
+                continue
             self._add_gate(param, tab_name)
         self._add_spacers(tab_name)
 
@@ -255,7 +260,7 @@ class param_viewer(QtWidgets.QMainWindow):
             update = True
         if update:
             self.save_favorites()
-            self.recreate_favorites_controls()
+            self.refill_favorite_gates_tab()
 
     def _get_favorites_filename(self):
         path = "~/.core_tools/parameter_viewer"
@@ -270,7 +275,9 @@ class param_viewer(QtWidgets.QMainWindow):
             return
         yaml = YAML()
         with open(filename) as fp:
-            self.favorite_gates = yaml.load(fp)
+            gates = yaml.load(fp)
+        # Only keep known gates.
+        self.favorite_gates = [name for name in gates if name in self.gates_object.parameters]
 
     def save_favorites(self):
         filename = self._get_favorites_filename()
