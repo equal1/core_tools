@@ -64,9 +64,13 @@ class gates(qc.Instrument):
         for virt_gate_set in self.hardware.virtual_gates:
             virt_gate_convertor = virt_gate_set.get_view(available_gates=self._all_gate_names)
             self._virt_gate_convertors.append(virt_gate_convertor)
-            self._all_gate_names += virt_gate_convertor.virtual_gates
-            self._virtual_gates += virt_gate_convertor.virtual_gates
-            for v_gate_name in virt_gate_convertor.virtual_gates:
+            virtual_gates = virt_gate_convertor.virtual_gates
+            unknown_gates = [name for name in virt_gate_set.virtual_gate_names if name not in virtual_gates]
+            self._all_gate_names += virtual_gates
+            self._virtual_gates += virtual_gates
+            for name in unknown_gates:
+                print(f"WARNING: unknown gate '{name}' defined in matrix '{virt_gate_set.name}'")
+            for v_gate_name in virtual_gates:
                 self.add_parameter(v_gate_name,
                                    set_cmd=partial(self._set_voltage_virt, v_gate_name, virt_gate_convertor),
                                    get_cmd=partial(self._get_voltage_virt, v_gate_name, virt_gate_convertor),
