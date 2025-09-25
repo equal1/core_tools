@@ -13,9 +13,9 @@ from core_tools.utility.software_versions import get_software_versions
 
 logger = logging.getLogger(__name__)
 
-DATA_POINTS_MAX = 20_000_000
+DATA_POINTS_MAX = 125_000_000
 DATASET_SIZE_WARNING = 50_000_000
-DATASET_SIZE_MAX = 200_000_000
+DATASET_SIZE_MAX = 250_000_000
 
 REDUCE_SNAPSHOT = True
 
@@ -64,10 +64,10 @@ def create_new_data_set(experiment_name, measurement_snapshot, *m_params):
         station_snapshot = qc.Station.default.snapshot()
         if REDUCE_SNAPSHOT:
             station_snapshot = _reduce_snapshot(station_snapshot)
-        snapshot = {'station': station_snapshot}
+        snapshot = {"station": station_snapshot}
     else:
-        logger.warning('No station configured. No snapshot will be stored.')
-        snapshot = {'station': None}
+        logger.warning("No station configured. No snapshot will be stored.")
+        snapshot = {"station": None}
 
     # intialize the buffers for the measurement
     for m_param in m_params:
@@ -78,14 +78,16 @@ def create_new_data_set(experiment_name, measurement_snapshot, *m_params):
     total_size = 0
     for m_param_raw in ds.measurement_parameters_raw:
         if m_param_raw.size > DATA_POINTS_MAX:
-            raise Exception(f'Measurement with shape {m_param_raw.shape} is too big for storage')
+            raise Exception(
+                f"Measurement with shape {m_param_raw.shape} is too big for storage "
+                f"({m_param_raw.size*8/2**20:.0f} MB)")
         total_size += m_param_raw.size
     if total_size > DATASET_SIZE_MAX:
-        raise Exception(f'Dataset with {total_size} values is too big for storage')
+        raise Exception(f"Dataset with {total_size} values is too big for storage ({total_size*8/2**20:.0f} MB)")
     if total_size > DATASET_SIZE_WARNING:
-        print(f'Dataset with {total_size} values is quite big for storage')
+        print(f"Warning: Dataset with {total_size} values is quite big for storage ({total_size*8/2**20:.0f} MB)")
 
-    snapshot['measurement'] = measurement_snapshot
+    snapshot["measurement"] = measurement_snapshot
     snapshot["software"] = software_versions
 
     # encode and decode to convert all numpy arrays and complex numbers to jsonable lists and dictionaries
