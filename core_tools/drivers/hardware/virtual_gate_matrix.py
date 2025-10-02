@@ -1,7 +1,12 @@
+import logging
+
 import numpy as np
 
+logger = logging.getLogger(__name__)
+
+
 class VirtualGateMatrixView:
-    '''
+    """
     Data to convert real gate voltages to virtual gate voltages and v.v.
 
     Args:
@@ -9,7 +14,8 @@ class VirtualGateMatrixView:
         real_gates (list[str]): names of real gates
         virtual_gates (list[str]): names of virtual gates
         r2v_matrix (2D array-like): matrix to convert voltages of real gates to voltages of virtual gates.
-    '''
+    """
+
     def __init__(self, name, real_gates, virtual_gates, r2v_matrix, indices):
         self.name = name
         self._real_gates = real_gates
@@ -19,61 +25,16 @@ class VirtualGateMatrixView:
 
     @property
     def real_gates(self):
-        '''
+        """
         Names of real gates
-        '''
+        """
         return self._real_gates
 
     @property
-    def virtual_gates(self):
-        '''
-        Names of virtual gates
-        '''
-        return self._virtual_gates
-
-    @property
-    def r2v_matrix(self):
-        # note: self._r2v_matrix may be changed externally. Create indexed copy here.
-        r2v_matrix = self._r2v_matrix[self._indices][:,self._indices]
-        return r2v_matrix
-
-
-class VirtualGateMatrix:
-
-    def __init__(self, persistent_object, normalization=False):
-        '''
-        generate a virtual gate object.
-        Args:
-            real_gate_names (list<str>) : list with the names of real gates
-            virtual_gate_names (list<str>) :
-                (optional) names of the virtual gates set. If not provided a "v" is inserted before the gate name.
-            normalization (bool or str): normalize matrix.
-        '''
-        self._persistent_object = persistent_object
-        self._normalization = normalization
-        # store matrix and inverse to minimize conversions back and forth during editing.
-        self._r2v_matrix = self._persistent_object.r2v_matrix_no_norm
-        self._v2r_matrix = np.linalg.inv(self._r2v_matrix)
-        # object shared with outside world reflecting the 'normalized' r2v matrix.
-        self._norm_r2v_matrix = np.zeros(self._r2v_matrix.shape)
-        self._calc_normalized()
-
-    @property
-    def name(self):
-        return self._persistent_object.name
-
-    @property
-    def real_gate_names(self):
-        '''
-        Names of real gates
-        '''
-        return self._persistent_object.real_gate_names
-
-    @property
     def virtual_gate_names(self):
-        '''
+        """
         Names of virtual gates
-        '''
+        """
         return self._persistent_object.virtual_gate_names
 
     @property
@@ -95,6 +56,31 @@ class VirtualGateMatrix:
         matrix.setflags(write=False)
         return matrix
 
+    def _set_matrix(self, value, *, persist: bool) -> None:
+        value = np.asarray(value)
+        if value.shape != self._r2v_matrix.shape:
+            raise ValueError(
+                f"Matrix shape {value.shape} does not match current shape {self._r2v_matrix.shape}."
+            )
+
+        self._r2v_matrix[:] = value
+        self._v2r_matrix[:] = np.linalg.inv(self._r2v_matrix)
+        self._calc_normalized()
+
+        if persist:
+            try:
+                self._persistent_object.save()
+            except ConnectionError as exc:
+                logger.debug("Skipping virtual-gate persistence: %s", exc)
+
+    @matrix.setter
+    def matrix(self, value):
+        self._set_matrix(value, persist=True)
+
+    def update_matrix(self, value, *, persist: bool = False) -> None:
+        """Update the virtual gate matrix, optionally skipping persistence."""
+        self._set_matrix(value, persist=persist)
+
     @matrix.setter
     def matrix(self, value):
         self._r2v_matrix[:] = value
@@ -112,16 +98,16 @@ class VirtualGateMatrix:
 
     def get_element(self, i, j, v2r=True):
         if v2r:
-            return self._v2r_matrix[i,j]
+            return self._v2r_matrix[i, j]
         else:
-            return self._r2v_matrix[i,j]
+            return self._r2v_matrix[i, j]
 
     def set_element(self, i, j, value, v2r=True):
         if v2r:
-            self._v2r_matrix[i,j] = value
+            self._v2r_matrix[i, j] = value
             self._r2v_matrix[:] = np.linalg.inv(self._v2r_matrix)
         else:
-            self._r2v_matrix[i,j] = value
+            self._r2v_matrix[i, j] = value
             self._v2r_matrix[:] = np.linalg.inv(self._r2v_matrix)
 
         self._calc_normalized()
@@ -145,7 +131,7 @@ class VirtualGateMatrix:
 
         if self._normalization:
             # divide rows by diagonal value
-            norm = no_norm/np.diag(no_norm)[:,None]
+            norm = no_norm / np.diag(no_norm)[:, None]
         else:
             norm = no_norm
 
@@ -156,15 +142,16 @@ class VirtualGateMatrix:
         real_gate_names = []
         virtual_gate_names = []
 
-        for i,name in enumerate(self.real_gate_names):
+        for i, name in enumerate(self.real_gate_names):
             if name in available_gates:
                 gate_indices.append(i)
                 real_gate_names.append(name)
                 virtual_gate_names.append(self.virtual_gate_names[i])
 
-        return VirtualGateMatrixView(self.name,
-                                     real_gate_names,
-                                     virtual_gate_names,
-                                     self._norm_r2v_matrix,
-                                     gate_indices)
-
+        return VirtualGateMatrixView(
+            self.name,
+            real_gate_names,
+            virtual_gate_names,
+            self._norm_r2v_matrix,
+            gate_indices,
+        )
