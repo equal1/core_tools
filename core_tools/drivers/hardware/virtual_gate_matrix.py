@@ -31,6 +31,50 @@ class VirtualGateMatrixView:
         return self._real_gates
 
     @property
+    def virtual_gates(self):
+        """
+        Names of virtual gates
+        """
+        return self._virtual_gates
+
+    @property
+    def r2v_matrix(self):
+        # note: self._r2v_matrix may be changed externally. Create indexed copy here.
+        r2v_matrix = self._r2v_matrix[self._indices][:, self._indices]
+        return r2v_matrix
+
+
+class VirtualGateMatrix:
+    def __init__(self, persistent_object, normalization=False):
+        """
+        generate a virtual gate object.
+        Args:
+            real_gate_names (list<str>) : list with the names of real gates
+            virtual_gate_names (list<str>) :
+                (optional) names of the virtual gates set. If not provided a "v" is inserted before the gate name.
+            normalization (bool or str): normalize matrix.
+        """
+        self._persistent_object = persistent_object
+        self._normalization = normalization
+        # store matrix and inverse to minimize conversions back and forth during editing.
+        self._r2v_matrix = self._persistent_object.r2v_matrix_no_norm
+        self._v2r_matrix = np.linalg.inv(self._r2v_matrix)
+        # object shared with outside world reflecting the 'normalized' r2v matrix.
+        self._norm_r2v_matrix = np.zeros(self._r2v_matrix.shape)
+        self._calc_normalized()
+
+    @property
+    def name(self):
+        return self._persistent_object.name
+
+    @property
+    def real_gate_names(self):
+        """
+        Names of real gates
+        """
+        return self._persistent_object.real_gate_names
+
+    @property
     def virtual_gate_names(self):
         """
         Names of virtual gates
