@@ -1,8 +1,4 @@
-import logging
-
 import numpy as np
-
-logger = logging.getLogger(__name__)
 
 
 class VirtualGateMatrixView:
@@ -99,31 +95,6 @@ class VirtualGateMatrix:
         matrix = self._r2v_matrix[:]
         matrix.setflags(write=False)
         return matrix
-
-    def _set_matrix(self, value, *, persist: bool) -> None:
-        value = np.asarray(value)
-        if value.shape != self._r2v_matrix.shape:
-            raise ValueError(
-                f"Matrix shape {value.shape} does not match current shape {self._r2v_matrix.shape}."
-            )
-
-        self._r2v_matrix[:] = value
-        self._v2r_matrix[:] = np.linalg.inv(self._r2v_matrix)
-        self._calc_normalized()
-
-        if persist:
-            try:
-                self._persistent_object.save()
-            except ConnectionError as exc:
-                logger.debug("Skipping virtual-gate persistence: %s", exc)
-
-    @matrix.setter
-    def matrix(self, value):
-        self._set_matrix(value, persist=True)
-
-    def update_matrix(self, value, *, persist: bool = False) -> None:
-        """Update the virtual gate matrix, optionally skipping persistence."""
-        self._set_matrix(value, persist=persist)
 
     @matrix.setter
     def matrix(self, value):
