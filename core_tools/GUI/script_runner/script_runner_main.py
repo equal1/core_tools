@@ -34,7 +34,7 @@ class ScriptRunner(QtWidgets.QMainWindow, Ui_MainWindow):
         script_gui.add_cell('Say Hi', path+'/test_script.py')
         script_gui.add_cell(2, path+'/test_script.py'),
     '''
-    def __init__(self):
+    def __init__(self, parent=None, *, embedded: bool = False):
         # set graphical user interface
         self.app = QtCore.QCoreApplication.instance()
         if self.app is None:
@@ -43,7 +43,8 @@ class ScriptRunner(QtWidgets.QMainWindow, Ui_MainWindow):
         else:
             instance_ready = True
 
-        super(QtWidgets.QMainWindow, self).__init__()
+        super(QtWidgets.QMainWindow, self).__init__(parent)
+        self._embedded = embedded or parent is not None
         self.setupUi(self)
         self.video_mode_running = False
         self.video_mode_label = QtWidgets.QLabel("VideoMode: <unknown")
@@ -60,9 +61,10 @@ class ScriptRunner(QtWidgets.QMainWindow, Ui_MainWindow):
         self.timer.timeout.connect(lambda:self._update_video_mode_status())
         self.timer.start(500)
 
-        self.show()
-        if instance_ready == False:
-            self.app.exec()
+        if not self._embedded:
+            self.show()
+            if not instance_ready:
+                self.app.exec()
 
     def add_function(self, func:Any, command_name:str=None, **kwargs):
         '''
