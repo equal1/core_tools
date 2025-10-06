@@ -60,11 +60,6 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
             self.app.exec()
 
     # ------------------------------------------------------------------
-    @staticmethod
-    def _normalize_gate_name(name: str) -> str:
-        return name[:-1] if name.endswith("P") else name
-
-    # ------------------------------------------------------------------
     def _select_indices(self, real_gate_names: Sequence[str]) -> list[int]:
         if self._allowed_gate_keys is None:
             return list(range(len(real_gate_names)))
