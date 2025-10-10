@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from collections.abc import Callable, Sequence
 
 import numpy as np
@@ -11,6 +12,89 @@ from ..script_runner.script_runner_main import ScriptRunner
 from .virt_gate_matrix_window import Ui_MainWindow
 
 logger = logging.getLogger(__name__)
+
+# add near your imports
+
+
+class AutoStretchTable(QtWidgets.QTableWidget):
+    def __init__(self, *args, min_col=70, row_h=32, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._min_col = min_col
+
+        # no "adjust to contents" flicker
+        self.setSizeAdjustPolicy(QtWidgets.QAbstractScrollArea.AdjustIgnored)
+        self.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding
+        )
+
+        self.horizontalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Fixed)
+        self.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Fixed)
+        self.verticalHeader().setDefaultSectionSize(row_h)
+
+        # do an initial pass after the first layout
+        QtCore.QTimer.singleShot(0, self._stretch_now)
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        self._stretch_now()
+
+    def _stretch_now(self):
+        cols = self.columnCount()
+        if cols <= 0:
+            return
+        # available pixels in the viewport (minus a scrollbar if visible)
+        avail = self.viewport().width()
+        if self.verticalScrollBar().isVisible():
+            avail -= self.verticalScrollBar().width()
+        w = max(self._min_col, int(avail / cols))
+        for c in range(cols):
+            self.setColumnWidth(c, w)
+
+
+class AutoFitDoubleSpinBox(QtWidgets.QDoubleSpinBox):
+    """QDoubleSpinBox that scales its font to fit the current cell size."""
+
+    def __init__(self, parent=None, *, min_px=10, max_px=28, side_pad=6, top_pad=4):
+        super().__init__(parent)
+        self._min_px = min_px
+        self._max_px = max_px
+        self._side_pad = side_pad
+        self._top_pad = top_pad
+        self.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
+        self.setFrame(False)
+        self.setAlignment(QtCore.Qt.AlignCenter)
+        self.lineEdit().textChanged.connect(self.refit_font)
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        self.refit_font()
+
+    def refit_font(self):
+        # choose a representative string (current text or a template)
+        txt = self.text() or "−0.000"
+        cr = self.contentsRect()
+        avail_w = max(0, cr.width() - self._side_pad)
+        avail_h = max(0, cr.height() - self._top_pad)
+
+        # upper bound by height; binary search the largest pixel size that fits width+height
+        low = self._min_px
+        high = min(self._max_px, int(avail_h * 0.85)) or self._min_px
+        best = low
+        while low <= high:
+            mid = (low + high) // 2
+            f = self.font()
+            f.setPixelSize(mid)
+            fm = QtGui.QFontMetrics(f)
+            if fm.horizontalAdvance(txt) <= avail_w and fm.height() <= avail_h:
+                best = mid
+                low = mid + 1
+            else:
+                high = mid - 1
+
+        f = self.font()
+        f.setPixelSize(best)
+        self.setFont(f)
+        self.lineEdit().setFont(f)
 
 
 class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
@@ -59,6 +143,10 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         if not instance_ready:
             self.app.exec()
 
+    def _intensity(self, x: float, k: float = 0.01) -> float:
+        """Saturating intensity: emphasizes small |x|, then levels off."""
+        return 1.0 - math.exp(-abs(x) / k)
+
     # ------------------------------------------------------------------
     def _select_indices(self, real_gate_names: Sequence[str]) -> list[int]:
         if self._allowed_gate_keys is None:
@@ -102,7 +190,7 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         grid_layout.setSpacing(4)
         grid_layout.setContentsMargins(2, 2, 2, 2)
 
-        table = QtWidgets.QTableWidget(matrix_widget)
+        table = AutoStretchTable(matrix_widget)
         table.setObjectName("virtgates")
         table.setRowCount(len(indices))
         table.setColumnCount(len(indices))
@@ -118,7 +206,7 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         grid_layout.addWidget(table, 0, 0, 1, 1)
 
         state = {"v2r": False}
-        update_list: list[tuple[int, int, QtWidgets.QDoubleSpinBox]] = []
+        update_list: list[tuple[int, int, AutoFitDoubleSpinBox]] = []
 
         for col_pos, col_idx in enumerate(indices):
             header_item = QtWidgets.QTableWidgetItem()
@@ -131,7 +219,7 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
             table.setVerticalHeaderItem(row_pos, header_item)
 
             for col_pos, col_idx in enumerate(indices):
-                spin_box = QtWidgets.QDoubleSpinBox()
+                spin_box = AutoFitDoubleSpinBox()
                 spin_box.setDecimals(3)
                 spin_box.setSingleStep(0.001)
                 spin_box.setMinimum(-5.0)
@@ -176,6 +264,8 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         invert_btn.clicked.connect(
             lambda: self.invert(virtual_gate_set, refresh, table, state)
         )
+        invert_btn.setEnabled(False)
+        invert_btn.setVisible(False)
         bar_layout.addWidget(invert_btn)
 
         if getattr(virtual_gate_set, "normalization", False):
@@ -278,13 +368,25 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         if not self._coloring:
             return
         if value == 0.0:
-            r = g = b = 255
-        elif value > 0:
+            spin_box.setStyleSheet("background-color:rgb(255,255,255);")
+            return
+
+        # emphasize small contributions; saturate for larger
+        intensity = self._intensity(value, k=0.01)  # tweak k to taste
+
+        min_channel = 150  # deepest tint channel value
+        delta = 255 - min_channel
+        shade = int(255 - intensity * delta)
+
+        if value > 0:
+            # positive -> blue tint
+            r = g = shade
             b = 255
-            r = g = max(150, int(255 - value * 200))
         else:
+            # negative -> red tint
             r = 255
-            g = b = max(150, int(255 - abs(value) * 200))
+            g = b = shade
+
         spin_box.setStyleSheet(f"background-color:rgb({r},{g},{b});")
 
     # ------------------------------------------------------------------
