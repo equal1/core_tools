@@ -1,10 +1,11 @@
+import ast
 import inspect
+import json
 import logging
 import os
-from enum import Enum
-from typing import Any
-
 from abc import ABC, abstractmethod
+from enum import Enum
+from typing import Any, Union, get_args, get_origin
 
 try:
     from spyder_kernels.customize.spydercustomize import runcell
@@ -25,6 +26,33 @@ except KeyError:
 
 
 logger = logging.getLogger(__name__)
+
+
+def pretty_type_str(anno) -> str:
+    try:
+        origin = get_origin(anno)
+        args = get_args(anno)
+
+        if origin is None:
+            # Plain types or Enums
+            return getattr(anno, "__name__", str(anno).replace("typing.", ""))
+
+        if origin in (list, tuple, set, frozenset):
+            inner = ", ".join(pretty_type_str(a) for a in args) or "Any"
+            return f"{origin.__name__}[{inner}]"
+
+        if origin is dict:
+            k, v = (args + ("Any", "Any"))[:2]
+            return f"dict[{pretty_type_str(k)}, {pretty_type_str(v)}]"
+
+        if origin is Union:
+            # Optional[T] shows as "T | None"
+            return " | ".join(pretty_type_str(a) for a in args)
+
+        # Fallback
+        return str(anno).replace("typing.", "")
+    except Exception:
+        return str(anno).replace("typing.", "")
 
 
 class Command(ABC):
@@ -113,29 +141,124 @@ class Function(Command):
         self.func = func
 
     def _convert_arg(self, param_name, value):
-        annotation = self.parameters[param_name].annotation
+        parameter = self.parameters[param_name]
+        annotation = parameter.annotation
         if annotation is inspect._empty:
             # no type specified. Pass string.
             return value
         if isinstance(annotation, str):
             raise Exception('Cannot convert to type specified as a string')
-        if issubclass(annotation, bool):
-            return value in [True, 1, 'True', 'true', '1']
-        if issubclass(annotation, Enum):
-            return annotation[value]
-        return annotation(value)
+
+        def _coerce(val, anno):
+            if anno is inspect._empty:
+                return val
+
+            if isinstance(anno, str):
+                raise Exception('Cannot convert to type specified as a string')
+
+            origin = get_origin(anno)
+            args = get_args(anno)
+
+            # Simple classes
+            if origin is None:
+                if inspect.isclass(anno):
+                    if issubclass(anno, bool):
+                        return val in [True, 1, 'True', 'true', '1']
+                    if issubclass(anno, Enum):
+                        if isinstance(val, anno):
+                            return val
+                        try:
+                            return anno(val)
+                        except Exception:
+                            return anno[str(val)]
+                    return anno(val)
+                return val
+
+            # Sequences: list[T], tuple[T], set[T], frozenset[T]
+            if origin in (list, tuple, set, frozenset):
+                subtype = args[0] if args else Any
+                if isinstance(val, str):
+                    v = val.strip()
+                    parsed = None
+                    try:
+                        parsed = json.loads(v)
+                    except Exception:
+                        try:
+                            parsed = ast.literal_eval(v)
+                        except Exception:
+                            parsed = [x.strip() for x in v.split(',') if x.strip()]
+                else:
+                    parsed = val
+
+                if isinstance(parsed, (list, tuple, set, frozenset)):
+                    seq = [_coerce(item, subtype) for item in parsed]
+                else:
+                    seq = [_coerce(parsed, subtype)]
+                return origin(seq)
+
+            # Dicts: dict[K,V]
+            if origin is dict and len(args) == 2:
+                k_t, v_t = args
+                if isinstance(val, dict):
+                    items = val.items()
+                else:
+                    v = str(val).strip()
+                    try:
+                        parsed = json.loads(v)
+                    except Exception:
+                        parsed = ast.literal_eval(v)
+                    if not isinstance(parsed, dict):
+                        raise ValueError('Not a dict')
+                    items = parsed.items()
+                return {_coerce(k, k_t): _coerce(v, v_t) for k, v in items}
+
+            # Union types, try each option in order
+            if origin is Union:
+                for sub in args:
+                    try:
+                        return _coerce(val, sub)
+                    except Exception:
+                        continue
+                raise ValueError(f'Value {val!r} does not match any allowed type')
+
+            # Fallback: call the origin on the coerced value
+            coerced = _coerce(val, origin or anno)
+            return coerced
+
+        try:
+            return _coerce(value, annotation)
+        except Exception as e:
+            expected = pretty_type_str(annotation)
+            raise ValueError(
+                f"Invalid value for '{param_name}': {value!r} (expected {expected})"
+            ) from e
 
     def __call__(self, **kwargs):
         call_args = {}
+
         for name in self.parameters:
-            try:
+            value_set = False
+
+            if name in kwargs:
+                raw_value = kwargs[name]
+                if isinstance(raw_value, str):
+                    raw_value = raw_value.strip()
+                    if raw_value == '':
+                        raw_value = None
+
+                if raw_value is not None:
+                    call_args[name] = self._convert_arg(name, raw_value)
+                    value_set = True
+
+            if not value_set and name in self.defaults:
                 call_args[name] = self.defaults[name]
-            except KeyError:
-                pass
-            try:
-                call_args[name] = self._convert_arg(name, kwargs[name])
-            except KeyError:
-                pass
+                value_set = True
+
+            if not value_set:
+                param = self.parameters[name]
+                if getattr(param, 'default', inspect._empty) is inspect._empty:
+                    call_args[name] = None
+
         args_list = [f'{name}={repr(value)}' for name, value in call_args.items()]
         command = f'{self.func.__name__}({", ".join(args_list)})'
         print(command)

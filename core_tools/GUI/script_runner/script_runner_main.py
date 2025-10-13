@@ -8,12 +8,102 @@ from PyQt5 import QtCore, QtWidgets
 
 from core_tools.GUI.keysight_videomaps.liveplotting import liveplotting
 from core_tools.GUI.script_runner.script_runner_gui import Ui_MainWindow
-from core_tools.GUI.script_runner.commands import Function, Cell
+from core_tools.GUI.script_runner.commands import Function, Cell, pretty_type_str
 from core_tools.GUI.script_runner.web_server import run_web_server
 from core_tools.GUI.qt_util import qt_log_exception
 
 
 logger = logging.getLogger(__name__)
+
+
+class FlowLayout(QtWidgets.QLayout):
+    """A layout that arranges widgets in a flow, wrapping to new lines when needed."""
+
+    def __init__(self, parent=None, margin=0, spacing=-1):
+        super().__init__(parent)
+        if parent is not None:
+            self.setContentsMargins(margin, margin, margin, margin)
+        self.setSpacing(spacing)
+        self.itemList = []
+
+    def __del__(self):
+        item = self.takeAt(0)
+        while item:
+            item = self.takeAt(0)
+
+    def addItem(self, item):
+        self.itemList.append(item)
+
+    def count(self):
+        return len(self.itemList)
+
+    def itemAt(self, index):
+        if 0 <= index < len(self.itemList):
+            return self.itemList[index]
+        return None
+
+    def takeAt(self, index):
+        if 0 <= index < len(self.itemList):
+            return self.itemList.pop(index)
+        return None
+
+    def expandingDirections(self):
+        return QtCore.Qt.Orientations(0)
+
+    def hasHeightForWidth(self):
+        return True
+
+    def heightForWidth(self, width):
+        height = self._do_layout(QtCore.QRect(0, 0, width, 0), True)
+        return height
+
+    def setGeometry(self, rect):
+        super().setGeometry(rect)
+        self._do_layout(rect, False)
+
+    def sizeHint(self):
+        return self.minimumSize()
+
+    def minimumSize(self):
+        size = QtCore.QSize()
+        for item in self.itemList:
+            size = size.expandedTo(item.minimumSize())
+        margin, _, _, _ = self.getContentsMargins()
+        size += QtCore.QSize(2 * margin, 2 * margin)
+        return size
+
+    def _do_layout(self, rect, testOnly):
+        x = rect.x()
+        y = rect.y()
+        lineHeight = 0
+        spacing = self.spacing()
+
+        for item in self.itemList:
+            wid = item.widget()
+            spaceX = spacing + wid.style().layoutSpacing(
+                QtWidgets.QSizePolicy.PushButton,
+                QtWidgets.QSizePolicy.PushButton,
+                QtCore.Qt.Horizontal,
+            )
+            spaceY = spacing + wid.style().layoutSpacing(
+                QtWidgets.QSizePolicy.PushButton,
+                QtWidgets.QSizePolicy.PushButton,
+                QtCore.Qt.Vertical,
+            )
+            nextX = x + item.sizeHint().width() + spaceX
+            if nextX - spaceX > rect.right() and lineHeight > 0:
+                x = rect.x()
+                y = y + lineHeight + spaceY
+                nextX = x + item.sizeHint().width() + spaceX
+                lineHeight = 0
+
+            if not testOnly:
+                item.setGeometry(QtCore.QRect(QtCore.QPoint(x, y), item.sizeHint()))
+
+            x = nextX
+            lineHeight = max(lineHeight, item.sizeHint().height())
+
+        return y + lineHeight - rect.y()
 
 
 class ScriptRunner(QtWidgets.QMainWindow, Ui_MainWindow):
@@ -33,7 +123,7 @@ class ScriptRunner(QtWidgets.QMainWindow, Ui_MainWindow):
         script_gui.add_cell(2, path+'/test_script.py'),
     '''
 
-    def __init__(self):
+    def __init__(self, parent=None, *, embedded: bool = False):
         # set graphical user interface
         self.app = QtCore.QCoreApplication.instance()
         if self.app is None:
@@ -42,8 +132,39 @@ class ScriptRunner(QtWidgets.QMainWindow, Ui_MainWindow):
         else:
             instance_ready = True
 
-        super(QtWidgets.QMainWindow, self).__init__()
+        super().__init__(parent)
+        self._embedded = embedded or parent is not None
         self.setupUi(self)
+
+        # Overall polish
+        self.setStyleSheet(
+            """
+        QWidget#CommandCard {
+            background: #fafafa;
+            border: 1px solid #e1e1e1;
+            border-radius: 10px;
+        }
+        QPushButton {
+            padding: 8px 14px;
+            border-radius: 8px;
+        }
+        QPushButton:hover {
+            background: #f2f2f2;
+        }
+        QLineEdit {
+            padding: 6px 8px;
+            border: 1px solid #d0d0d0;
+            border-radius: 6px;
+        }
+        QLabel {
+            color: #333;
+        }
+        """
+        )
+
+        self.commands_layout.setHorizontalSpacing(12)
+        self.commands_layout.setVerticalSpacing(12)
+        self.commands_layout.setContentsMargins(10, 10, 10, 10)
 
         self.video_mode_running = False
         self.video_mode_label = QtWidgets.QLabel("VideoMode: <unknown")
@@ -60,9 +181,10 @@ class ScriptRunner(QtWidgets.QMainWindow, Ui_MainWindow):
         self.timer.timeout.connect(lambda: self._update_video_mode_status())
         self.timer.start(500)
 
-        self.show()
-        if not instance_ready:
-            self.app.exec()
+        if not self._embedded:
+            self.show()
+            if not instance_ready:
+                self.app.exec()
 
     def add_function(self, func: Any, command_name: str | None = None, **kwargs):
         '''
@@ -108,6 +230,7 @@ class ScriptRunner(QtWidgets.QMainWindow, Ui_MainWindow):
 
     @qt_log_exception
     def _run_command(self, command, arg_inputs):
+        running = False
         try:
             self._update_video_mode_status()
             running = self.video_mode_running
@@ -118,10 +241,23 @@ class ScriptRunner(QtWidgets.QMainWindow, Ui_MainWindow):
                 self.app.processEvents()
 
             kwargs = {
-                name: (inp.currentText() if isinstance(inp, QtWidgets.QComboBox) else inp.text())
+                name: (
+                    inp.currentText() if isinstance(inp, QtWidgets.QComboBox) else inp.text()
+                )
                 for name, inp in arg_inputs.items()
             }
-            command_result = command(**kwargs)
+            try:
+                command_result = command(**kwargs)
+            except ValueError as vex:
+                QtWidgets.QMessageBox.warning(self, 'Invalid parameter value', str(vex))
+                command_result = vex
+            except Exception as inner_ex:
+                QtWidgets.QMessageBox.critical(
+                    self,
+                    'Command failed',
+                    f'{type(inner_ex).__name__}: {inner_ex}',
+                )
+                command_result = inner_ex
         except Exception as ex:
             command_result = ex
             logger.error('Failure running command', exc_info=True)
@@ -135,55 +271,88 @@ class ScriptRunner(QtWidgets.QMainWindow, Ui_MainWindow):
         i = len(self.commands)
         self.commands.append(command)
 
-        layout = self.commands_layout
-        cmd_btn = QtWidgets.QPushButton(command.name, self.commands_widget)
+        command_container = QtWidgets.QWidget(self.commands_widget)
+        command_container.setObjectName('CommandCard')
+        command_layout = QtWidgets.QVBoxLayout(command_container)
+        command_layout.setContentsMargins(12, 12, 12, 12)
+        command_layout.setSpacing(10)
+
+        cmd_btn = QtWidgets.QPushButton(command.name, command_container)
         cmd_btn.setObjectName(f'command_{i}')
-        cmd_btn.setMinimumSize(QtCore.QSize(100, 0))
-        layout.addWidget(cmd_btn, i, 0, 1, 1)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
+        cmd_btn.setSizePolicy(sizePolicy)
+        cmd_btn.setMinimumHeight(36)
+        cmd_btn.setMaximumHeight(48)
+        command_layout.addWidget(cmd_btn)
 
         arg_inputs = {}
-        for j, (name, parameter) in enumerate(command.parameters.items()):
-            _label = QtWidgets.QLabel(self.commands_widget)
-            _label.setObjectName(f"{command.name}_label_{j}")
-            _label.setMinimumSize(QtCore.QSize(20, 0))
-            _label.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
-            text = name
-            annotation = parameter.annotation
-            if annotation is not inspect._empty:
-                if isinstance(annotation, str):
-                    raise Exception(f"Type of argument {parameter.name} ('{annotation}') cannot be converted.")
-                text = f'{name} ({annotation.__name__})'
-            _label.setText(text)
-            layout.addWidget(_label, i, 2*j+1, 1, 1)
+        if command.parameters:
+            params_widget = QtWidgets.QWidget(command_container)
+            params_layout = FlowLayout(params_widget, margin=0, spacing=12)
 
-            if issubclass(annotation, Enum):
-                _input = QtWidgets.QComboBox(self.commands_widget)
-                for e in annotation:
-                    _input.addItem(e.name, e)
-                if name in command.defaults:
-                    default = command.defaults[name]
-                    if isinstance(default, str):
-                        try:
-                            # try match on value
-                            default = annotation(default)
-                        except Exception:
-                            # try match on name
-                            default = annotation[default]
-                    _input.setCurrentText(default.name)
-            else:
-                _input = QtWidgets.QLineEdit(self.commands_widget)
-                if name in command.defaults:
-                    _input.setText(str(command.defaults[name]))
-            _input.setObjectName(f"{command.name}_input_{j}")
-            _input.setMinimumSize(QtCore.QSize(80, 0))
-            layout.addWidget(_input, i, 2*j+2, 1, 1)
-            arg_inputs[name] = _input
+            for j, (name, parameter) in enumerate(command.parameters.items()):
+                param_container = QtWidgets.QWidget(params_widget)
+                param_layout = QtWidgets.QVBoxLayout(param_container)
+                param_layout.setContentsMargins(0, 0, 0, 0)
+                param_layout.setSpacing(4)
 
-        cmd_btn.clicked.connect(lambda: self._run_command(command, arg_inputs))
+                label = QtWidgets.QLabel(param_container)
+                label.setObjectName(f"{command.name}_label_{j}")
+                label.setText(name)
+                label.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+                param_layout.addWidget(label)
+
+                annotation = parameter.annotation
+                if (
+                    annotation is not inspect._empty
+                    and inspect.isclass(annotation)
+                    and issubclass(annotation, Enum)
+                ):
+                    input_widget = QtWidgets.QComboBox(param_container)
+                    for enum_value in annotation:
+                        input_widget.addItem(enum_value.name, enum_value)
+                    if name in command.defaults:
+                        default = command.defaults[name]
+                        if isinstance(default, str):
+                            try:
+                                default = annotation(default)
+                            except Exception:
+                                default = annotation[default]
+                        input_widget.setCurrentText(default.name)
+                else:
+                    input_widget = QtWidgets.QLineEdit(param_container)
+                    if name in command.defaults and command.defaults[name] is not None:
+                        input_widget.setText(str(command.defaults[name]))
+
+                input_widget.setObjectName(f"{command.name}_input_{j}")
+                input_widget.setMinimumSize(QtCore.QSize(220, 0))
+                input_widget.setMaximumSize(QtCore.QSize(360, 44))
+                param_layout.addWidget(input_widget)
+
+                if annotation is not inspect._empty and not isinstance(annotation, str):
+                    type_label = QtWidgets.QLabel(param_container)
+                    type_label.setText(f"Param type: {pretty_type_str(annotation)}")
+                    type_label.setStyleSheet("color:#777; font-size:11px; margin-top:2px;")
+                    param_layout.addWidget(type_label)
+
+                arg_inputs[name] = input_widget
+                params_layout.addWidget(param_container)
+
+            params_widget.setLayout(params_layout)
+            command_layout.addWidget(params_widget)
+
+        command_container.setLayout(command_layout)
+        self.commands_layout.addWidget(command_container, i, 0, 1, 1)
+
+        cmd_btn.clicked.connect(
+            lambda _checked=False, cmd=command, inputs=arg_inputs: self._run_command(cmd, inputs)
+        )
 
     def add_commands(self, commands):
-        for i, command in enumerate(commands):
-            self._add_command(i, command)
+        for command in commands:
+            self._add_command(command)
 
     def _update_video_mode_status(self):
         if self.video_mode_paused:

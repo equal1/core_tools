@@ -97,12 +97,27 @@ class VirtualGateMatrix:
         matrix.setflags(write=False)
         return matrix
 
-    @matrix.setter
-    def matrix(self, value):
+    def _set_matrix(self, value, *, persist: bool) -> None:
+        value = np.asarray(value)
+        if value.shape != self._r2v_matrix.shape:
+            raise ValueError(
+                f"Matrix shape {value.shape} does not match current shape {self._r2v_matrix.shape}."
+            )
+
         self._r2v_matrix[:] = value
         self._v2r_matrix[:] = np.linalg.inv(self._r2v_matrix)
         self._calc_normalized()
-        self._persistent_object.save()
+
+        if persist:
+            self._persistent_object.save()
+
+    @matrix.setter
+    def matrix(self, value):
+        self._set_matrix(value, persist=True)
+
+    def update_matrix(self, value, *, persist: bool = False) -> None:
+        """Update the virtual gate matrix, optionally skipping persistence."""
+        self._set_matrix(value, persist=persist)
 
     @property
     def gates(self):
@@ -164,8 +179,10 @@ class VirtualGateMatrix:
                 real_gate_names.append(name)
                 virtual_gate_names.append(self.virtual_gate_names[i])
 
-        return VirtualGateMatrixView(self.name,
-                                     real_gate_names,
-                                     virtual_gate_names,
-                                     self._r2v_matrix,
-                                     gate_indices)
+        return VirtualGateMatrixView(
+            self.name,
+            real_gate_names,
+            virtual_gate_names,
+            self._norm_r2v_matrix,
+            gate_indices,
+        )
