@@ -37,19 +37,23 @@ class SQL_conn_info_local:
     passwd: str | None = None
     dbname: str | None = None
     readonly: bool = False
+    is_sqlite: bool = False
 
-    def __init__(self, host, port, user, passwd, dbname, readonly=False):
+    def __init__(
+        self, host, port, user, passwd, dbname, readonly=False, is_sqlite=False
+    ):
         SQL_conn_info_local.host = host
         SQL_conn_info_local.port = port
         SQL_conn_info_local.user = user
         SQL_conn_info_local.passwd = passwd
         SQL_conn_info_local.dbname = dbname
         SQL_conn_info_local.readonly = readonly
+        SQL_conn_info_local.is_sqlite = is_sqlite
 
     def __repr__(self):
         return (
-            f'{self.__class__}: host {self.host}, port {self.port}, user {self.user}, passwd *, '
-            f'dbname {self.dbname}, readonly {self.readonly}'
+            f"{self.__class__}: host {self.host}, port {self.port}, user {self.user}, passwd *, "
+            f"dbname {self.dbname}, readonly {self.readonly}, is_sqlite {self.is_sqlite}"
         )
 
 
@@ -60,31 +64,36 @@ class SQL_conn_info_remote:
     passwd: str | None = None
     dbname: str | None = None
     readonly: bool = False
+    is_sqlite: bool = False
 
-    def __init__(self, host, port, user, passwd, dbname, readonly=False):
+    def __init__(
+        self, host, port, user, passwd, dbname, readonly=False, is_sqlite=False
+    ):
         SQL_conn_info_remote.host = host
         SQL_conn_info_remote.port = port
         SQL_conn_info_remote.user = user
         SQL_conn_info_remote.passwd = passwd
         SQL_conn_info_remote.dbname = dbname
         SQL_conn_info_remote.readonly = readonly
+        SQL_conn_info_remote.is_sqlite = is_sqlite
 
     def __repr__(self):
         return (
-            f'{self.__class__}: host {self.host}, port {self.port}, user {self.user}, passwd *, '
-            f'dbname {self.dbname}, readonly {self.readonly}'
+            f"{self.__class__}: host {self.host}, port {self.port}, user {self.user}, passwd *, "
+            f"dbname {self.dbname}, readonly {self.readonly}, is_sqlite {self.is_sqlite}"
         )
 
 
 def set_up_local_storage(
-        user,
-        passwd,
-        dbname,
-        project,
-        set_up,
-        sample,
-        scope=None,
-        readonly=False
+    user,
+    passwd,
+    dbname,
+    project,
+    set_up,
+    sample,
+    scope=None,
+    readonly=False,
+    is_sqlite=False,
 ):
     """
     Set up the specification for the datastorage needed to store/retrieve measurements.
@@ -99,7 +108,7 @@ def set_up_local_storage(
         sample (str) : sample name
         scope (str|None) : SQDL scope name, can be None for setups that do not use SQDL.
     """
-    SQL_conn_info_local('localhost', 5432, user, passwd, dbname, readonly)
+    SQL_conn_info_local("localhost", 5432, user, passwd, dbname, readonly, is_sqlite)
     sample_info(project, set_up, sample, scope)
 
 
@@ -113,7 +122,8 @@ def set_up_remote_storage(
     set_up,
     sample,
     scope=None,
-    readonly=False
+    readonly=False,
+    is_sqlite=False,
 ):
     """
     Set up the specification for the datastorage needed to store/retrieve measurements.
@@ -130,7 +140,7 @@ def set_up_remote_storage(
         sample (str) : sample name
         scope (str|None) : SQDL scope name, can be None for setups that do not use SQDL.
     """
-    SQL_conn_info_remote(host, port, user, passwd, dbname, readonly)
+    SQL_conn_info_remote(host, port, user, passwd, dbname, readonly, is_sqlite)
     sample_info(project, set_up, sample, scope)
 
 
@@ -148,7 +158,9 @@ def set_up_local_and_remote_storage(
     sample,
     scope=None,
     local_readonly=False,
-    remote_readonly=False
+    remote_readonly=False,
+    local_is_sqlite=False,
+    remote_is_sqlite=False,
 ):
     """
     Set up the specification for the datastorage needed to store/retrieve measurements.
@@ -170,6 +182,22 @@ def set_up_local_and_remote_storage(
         sample (str) : sample name
         scope (str|None) : SQDL scope name, can be None for setups that do not use SQDL.
     """
-    SQL_conn_info_local('localhost', 5432, user_local, passwd_local, dbname_local, local_readonly)
-    SQL_conn_info_remote(host, port, user_remote, passwd_remote, dbname_remote, remote_readonly)
+    SQL_conn_info_local(
+        "localhost",
+        5432,
+        user_local,
+        passwd_local,
+        dbname_local,
+        local_readonly,
+        local_is_sqlite,
+    )
+    SQL_conn_info_remote(
+        host,
+        port,
+        user_remote,
+        passwd_remote,
+        dbname_remote,
+        remote_readonly,
+        remote_is_sqlite,
+    )
     sample_info(project, set_up, sample, scope)

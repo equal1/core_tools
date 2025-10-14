@@ -5,16 +5,16 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
-from qcodes.parameters import Parameter, ElapsedTimeParameter
+from pulse_lib.sequencer import index_param, sequencer
+from qcodes.parameters import ElapsedTimeParameter, Parameter
 
-from pulse_lib.sequencer import sequencer, index_param
-
-from core_tools.data.measurement import Measurement, AbortMeasurement
+from core_tools.data.measurement import AbortMeasurement, Measurement
+from core_tools.job_mgnt.job_mgmt import ExperimentJob, queue_mgr
 from core_tools.sweeps.progressbar import progress_bar
-from core_tools.job_mgnt.job_mgmt import queue_mgr, ExperimentJob
 
 try:
     from qtpy.QtCore import QCoreApplication
+
     _qapplication = True
 except Exception:
     _qapplication = False
@@ -43,10 +43,16 @@ class Action:
 
 
 class Setter(Action):
-    def __init__(self, param, n_points, delay=0.0, resetable=True,
-                 value_after: float | None = None,
-                 label=None):
-        super().__init__(f'set {param.name}', delay, label=label)
+    def __init__(
+        self,
+        param,
+        n_points,
+        delay=0.0,
+        resetable=True,
+        value_after: float | None = None,
+        label=None,
+    ):
+        super().__init__(f"set {param.name}", delay, label=label)
         self._param = param
         self._n_points = n_points
         self._resetable = resetable
@@ -74,7 +80,7 @@ class Setter(Action):
 
 class Getter(Action):
     def __init__(self, param, delay=0.0, label=None):
-        super().__init__(f'get {param.name}', delay, label=label)
+        super().__init__(f"get {param.name}", delay, label=label)
         self._param = param
 
     @property
@@ -83,13 +89,17 @@ class Getter(Action):
 
 
 class Function(Action):
-    def __init__(self, func, *args,
-                 delay=0.0,
-                 add_dataset=False,
-                 add_last_values=False,
-                 label=None,
-                 **kwargs):
-        '''
+    def __init__(
+        self,
+        func,
+        *args,
+        delay=0.0,
+        add_dataset=False,
+        add_last_values=False,
+        label=None,
+        **kwargs,
+    ):
+        """
         Adds a function to a Scan.
         Args:
             func: function to call
@@ -102,8 +112,8 @@ class Function(Action):
 
         Notes:
             last parameter values are past as dictionary.
-        '''
-        super().__init__(f'do {func.__name__}', delay, label=label)
+        """
+        super().__init__(f"do {func.__name__}", delay, label=label)
         self._func = func
         self._add_dataset = add_dataset
         self._add_last_values = add_last_values
@@ -120,20 +130,25 @@ class Function(Action):
         else:
             kwargs = self._kwargs
         if self._add_dataset:
-            kwargs['dataset'] = dataset
+            kwargs["dataset"] = dataset
         if self._add_last_values:
-            kwargs['last_values'] = last_values
+            kwargs["last_values"] = last_values
         self._func(*self._args, **kwargs)
 
 
 class SequenceFunction(Function):
-    def __init__(self, func, *args, delay=0.0,
-                 axis=None,
-                 add_dataset=False,
-                 add_last_values=False,
-                 label=None,
-                 **kwargs):
-        '''
+    def __init__(
+        self,
+        func,
+        *args,
+        delay=0.0,
+        axis=None,
+        add_dataset=False,
+        add_last_values=False,
+        label=None,
+        **kwargs,
+    ):
+        """
         Adds a function to be run after setting sequence sweep index, but before playing sequence.
         Args:
             func: function to call
@@ -147,12 +162,17 @@ class SequenceFunction(Function):
 
         Notes:
             last parameter values are past as dictionary.
-        '''
+        """
         super().__init__(
-            func, *args, delay=delay, add_dataset=add_dataset,
-            add_last_values=add_last_values, **kwargs)
+            func,
+            *args,
+            delay=delay,
+            add_dataset=add_dataset,
+            add_last_values=add_last_values,
+            **kwargs,
+        )
         if axis is None:
-            raise ValueError('Argument axis must be specified')
+            raise ValueError("Argument axis must be specified")
         self.axis = axis
 
 
@@ -172,19 +192,21 @@ class SequenceStart(Action):
 
 
 class ArraySetter(Setter):
-    def __init__(self, param, data,
-                 delay=0.0,
-                 resetable=True,
-                 value_after: str | float | None = None,
-                 label=None,
-                 ):
+    def __init__(
+        self,
+        param,
+        data,
+        delay=0.0,
+        resetable=True,
+        value_after: str | float | None = None,
+        label=None,
+    ):
         if isinstance(value_after, str):
-            if value_after == 'start':
+            if value_after == "start":
                 value_after = data[0]
             else:
                 raise Exception(f"Unknown value_after '{value_after}'")
-        super().__init__(param, len(data), delay, resetable, value_after,
-                         label=label)
+        super().__init__(param, len(data), delay, resetable, value_after, label=label)
         self._data = data
 
     def __iter__(self):
@@ -193,19 +215,19 @@ class ArraySetter(Setter):
 
 
 class Sweep(ArraySetter):
-
     def __init__(
-            self,
-            parameter,
-            data,
-            stop=None,
-            n_points=None,
-            delay=0.0,
-            resetable=True,
-            value_after: str | float | None = None,
-            endpoint=True,
-            label=None):
-        """ Sweeps parameter over specified values.
+        self,
+        parameter,
+        data,
+        stop=None,
+        n_points=None,
+        delay=0.0,
+        resetable=True,
+        value_after: str | float | None = None,
+        endpoint=True,
+        label=None,
+    ):
+        """Sweeps parameter over specified values.
 
         If stop is None, then data is assumed to be an array, otherwise data is the start value.
 
@@ -228,12 +250,18 @@ class Sweep(ArraySetter):
         super().__init__(parameter, data, delay, resetable, value_after, label=label)
 
 
-def sweep(parameter, data, stop=None, n_points=None, delay=0.0,
-          resetable=True,
-          value_after: str | float | None = None,
-          endpoint=True,
-          label=None):
-    """ Sweeps parameter over specified values.
+def sweep(
+    parameter,
+    data,
+    stop=None,
+    n_points=None,
+    delay=0.0,
+    resetable=True,
+    value_after: str | float | None = None,
+    endpoint=True,
+    label=None,
+):
+    """Sweeps parameter over specified values.
 
     If stop is None, then data is assumed to be an array, otherwise data is the start value.
 
@@ -250,8 +278,16 @@ def sweep(parameter, data, stop=None, n_points=None, delay=0.0,
         endpoint (bool): if True the stop value is inclusive, otherwise it is excluded.
         label (str): Label to use for resume after break.
     """
-    return Sweep(parameter, data,
-                 stop=stop, n_points=n_points, delay=delay, resetable=resetable, endpoint=endpoint, label=label)
+    return Sweep(
+        parameter,
+        data,
+        stop=stop,
+        n_points=n_points,
+        delay=delay,
+        resetable=resetable,
+        endpoint=endpoint,
+        label=label,
+    )
 
 
 class Section:
@@ -264,12 +300,12 @@ class ActionStats:
     n: int = 0
     t: float = 0.0
 
-    def add_time(self,  t):
+    def add_time(self, t):
         self.n += 1
         self.t += t
 
     def __str__(self):
-        return f"{self.n:3d}: {self.t:6.3f} s ({self.t/self.n*1000.0:#.3g} ms/pt)"
+        return f"{self.n:3d}: {self.t:6.3f} s ({self.t / self.n * 1000.0:#.3g} ms/pt)"
 
 
 @dataclass
@@ -298,8 +334,15 @@ class _Block:
 class Scan:
     verbose = False
 
-    def __init__(self, *args, name='', reset_param=False, silent=False, snapshot_extra=None,
-                 update_gui: bool = False):
+    def __init__(
+        self,
+        *args,
+        name="",
+        reset_param=False,
+        silent=False,
+        snapshot_extra=None,
+        update_gui: bool = False,
+    ):
         self.name = name
         self.reset_param = reset_param
         self.silent = silent
@@ -314,12 +357,12 @@ class Scan:
         self._meas = Measurement(self.name, silent=silent)
         self._add_actions(args)
 
-        if name == '':
+        if name == "":
             print("WARNING: no name specified with scan! Please specify a name.")
             if len(self.set_params) == 0:
-                self.name = '0D_' + self.m_params[0].name[:10]
+                self.name = "0D_" + self.m_params[0].name[:10]
             else:
-                self.name += '{}D_'.format(len(self.set_params))
+                self.name += "{}D_".format(len(self.set_params))
             self._meas.name = name
 
         self._register_params()
@@ -340,13 +383,16 @@ class Scan:
                 seq_params = arg.params
                 # Note: reverse order, because axis=0 is fastest running and must thus be last.
                 for var in seq_params[::-1]:
-                    setter = ArraySetter(var, var.values, resetable=False,
-                                         label=f"sequence.{var.name}")
+                    setter = ArraySetter(
+                        var, var.values, resetable=False, label=f"sequence.{var.name}"
+                    )
                     self._add_setter(setter)
                 self._actions.append(SequenceStart(arg))
-                self._meas.add_snapshot('sequence', arg.metadata)
-                if hasattr(arg, 'starting_lambda'):
-                    raise Exception('sequencer starting_lambda is not supported anymore')
+                self._meas.add_snapshot("sequence", arg.metadata)
+                if hasattr(arg, "starting_lambda"):
+                    raise Exception(
+                        "sequencer starting_lambda is not supported anymore"
+                    )
             elif isinstance(arg, Getter):
                 self._add_getter(arg)
             elif isinstance(arg, SequenceFunction):
@@ -404,9 +450,14 @@ class Scan:
         sequence_added = False
         for block in self._block_stack:
             setter = block.setter
-            if (isinstance(setter, ArraySetter)
-                    and isinstance(setter.param, index_param)
-                    and (setter.param.dim == seq_function.axis or setter.param.name == seq_function.axis)):
+            if (
+                isinstance(setter, ArraySetter)
+                and isinstance(setter.param, index_param)
+                and (
+                    setter.param.dim == seq_function.axis
+                    or setter.param.name == seq_function.axis
+                )
+            ):
                 break
             for action in block.actions:
                 if isinstance(action, SequenceStart):
@@ -417,8 +468,8 @@ class Scan:
         else:
             # axis not found.
             if not sequence_added:
-                raise Exception('SequenceFunction must be added after sequence')
-            raise Exception(f'sequence axis {seq_function.axis} not found in sequence')
+                raise Exception("SequenceFunction must be added after sequence")
+            raise Exception(f"sequence axis {seq_function.axis} not found in sequence")
         block.actions.insert(0, seq_function)
 
     def _get_n_pts(self, block):
@@ -436,45 +487,50 @@ class Scan:
         try:
             start = time.perf_counter()
             with self._meas as m:
-                runner = Runner(m, self._root, self._n_pts, self.set_params, self.update_gui)
+                runner = Runner(
+                    m, self._root, self._n_pts, self.set_params, self.update_gui
+                )
                 runner.run(self.reset_param, self.silent)
             duration = time.perf_counter() - start
-            logger.info(f'Total duration: {duration:5.2f} s ({duration/self._n_pts*1000:5.1f} ms/pt)')
+            logger.info(
+                f"Total duration: {duration:5.2f} s ({duration / self._n_pts * 1000:5.1f} ms/pt)"
+            )
             logger.debug(f"Stats: {runner.stats}")
         except Break as b:
-            logger.warning(f'Measurement break: {b}')
+            logger.warning(f"Measurement break: {b}")
         except AbortMeasurement:
-            logger.warning('Measurement aborted')
+            logger.warning("Measurement aborted")
         except KeyboardInterrupt:
-            logger.info('Measurement interrupted', exc_info=True)
-            logger.warning('Measurement interrupted')
-            raise KeyboardInterrupt('Measurement interrupted') from None
+            logger.info("Measurement interrupted", exc_info=True)
+            logger.warning("Measurement interrupted")
+            raise KeyboardInterrupt("Measurement interrupted") from None
         except Exception as ex:
-            print(f'\n*** ERROR in measurement: {ex}')
-            logger.error('Exception in measurement', exc_info=True)
+            print(f"\n*** ERROR in measurement: {ex}")
+            logger.error("Exception in measurement", exc_info=True)
             raise
 
         return self._meas.dataset
 
     def put(self, priority=1):
-        '''
+        """
         put the job in a queue.
-        '''
+        """
         queue = queue_mgr()
         job = ExperimentJob(priority, self)
         queue.put(job)
 
     def abort_measurement(self):
-        '''Abort measurement.
+        """Abort measurement.
         This is called by job queue manager.
-        '''
+        """
         if self._meas:
             self._meas.abort()
 
 
 class Runner:
-    def __init__(self, measurement, root_block, n_pts, set_params,
-                 update_gui: bool = False):
+    def __init__(
+        self, measurement, root_block, n_pts, set_params, update_gui: bool = False
+    ):
         self._measurement = measurement
         self._root = root_block
         self._n_pts = n_pts
@@ -489,7 +545,11 @@ class Runner:
         self._exception_at = None
         self._skipped_setters = set()
 
-    def run(self, reset_param=False, silent=False, ):
+    def run(
+        self,
+        reset_param=False,
+        silent=False,
+    ):
         if reset_param:
             start_values = self._get_start_values()
         self._n = 0
@@ -502,14 +562,11 @@ class Runner:
             else:
                 msg = "Measurement stopped"
             if self._exception_at is not None:
-                last_index = {
-                    param.name: data
-                    for param, data in self._exception_at
-                }
-                msg += f' at {last_index}'
+                last_index = {param.name: data for param, data in self._exception_at}
+                msg += f" at {last_index}"
 
             if not silent:
-                print('\n'+msg, flush=True)
+                print("\n" + msg, flush=True)
             logger.info(msg)
             raise
         finally:
@@ -541,7 +598,7 @@ class Runner:
             try:
                 param(value)
             except Exception:
-                logger.error(f'Failed to reset parameter {param.name}', exc_info=True)
+                logger.error(f"Failed to reset parameter {param.name}", exc_info=True)
                 raise
 
     def _loop(self, actions: list[Action]):
@@ -573,7 +630,7 @@ class Runner:
                         t_store = time.perf_counter()
                         self._measurement.add_result((m_param, value), *self._setpoints)
                         store_duration = time.perf_counter() - t_store
-                        self._action_stats['store'].add_time(store_duration)
+                        self._action_stats["store"].add_time(store_duration)
                         t_start += store_duration
                     except Break:
                         raise
@@ -585,9 +642,9 @@ class Runner:
 
                 elif isinstance(action, SequenceStart):
                     play_time = action.play()
-                    self._action_stats['sequence play'].add_time(play_time)
+                    self._action_stats["sequence play"].add_time(play_time)
                     t_start += play_time
-                    stats_name = 'sequence overhead'
+                    stats_name = "sequence overhead"
 
                 elif isinstance(action, Function):
                     last_values = {
@@ -631,7 +688,7 @@ class Runner:
                     time.sleep(setter._delay)
                 value = setter.param()
                 setpoint[1] = value
-                self._action_stats[setter.name].add_time(time.perf_counter()-t_start)
+                self._action_stats[setter.name].add_time(time.perf_counter() - t_start)
                 self._loop(block.actions)
             if setter.value_after is not None:
                 setter.param(setter.value_after)
@@ -656,8 +713,10 @@ class Runner:
 
         if len(self._skipped_setters) > 0:
             not_set_params = [setter.param.name for setter in self._skipped_setters]
-            raise Exception(f"Cannot resume at label '{self._resume_at_label}', "
-                            f"because parameter(s) {not_set_params} is/are not set")
+            raise Exception(
+                f"Cannot resume at label '{self._resume_at_label}', "
+                f"because parameter(s) {not_set_params} is/are not set"
+            )
         # resume with this action
         logger.info(f"Resuming at '{action.label}' npt={self._n}")
         self._resume_at_label = None
@@ -670,7 +729,9 @@ class Runner:
 
     def _handle_break(self, _break):
         setpoint = {p.name: v for p, v in self._setpoints}
-        logger.info(f"Break at {setpoint}, resume at '{_break.resume_at_label}' npt={self._n}")
+        logger.info(
+            f"Break at {setpoint}, resume at '{_break.resume_at_label}' npt={self._n}"
+        )
         if _break.resume_at_label is not None:
             self._resume_at_label = _break.resume_at_label
         else:
@@ -683,7 +744,7 @@ class Runner:
         if Scan.verbose:
             n = self._n
             if n % 100 == 0:
-                logger.debug(f'Stats ({n}): {self.stats}')
+                logger.debug(f"Stats ({n}): {self.stats}")
 
     def _process_gui_events(self):
         if not self._update_gui or not _qapplication:

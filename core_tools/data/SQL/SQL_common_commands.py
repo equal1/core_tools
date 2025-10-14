@@ -111,27 +111,49 @@ def execute_statement(conn, statement, placeholders=[], close_on_error=True):
 
 def execute_query(conn, query, dict_cursor=False, placeholders=[]):
     try:
+        restore_orig_row_factory = False
+
         if dict_cursor is False:
             cursor = conn.cursor()
         else:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            if not isinstance(conn, sqlite3.Connection):
+                cursor = conn.cursor(cursor_factory=RealDictCursor)
+            else:
+                if dict_cursor is not False:
+
+                    def dict_factory(cursor, row):
+                        d = {}
+                        for idx, col in enumerate(cursor.description):
+                            d[col[0]] = row[idx]
+                        return d
+
+                    restore_orig_row_factory = True
+                    orig_row_factory = conn.row_factory
+                    conn.row_factory = dict_factory
+
+                cursor = conn.cursor()
 
         if sqlite_helper.is_active(cursor):
             query = sqlite_helper.convert_to_string(query)
-            placeholders = sqlite_helper.convert_placeholders(placeholders)
-        cursor.execute(query, placeholders)
-        return_values = cursor.fetchall()
+
+        try:
+            cursor.execute(query, placeholders)
+            return_values = cursor.fetchall()
+        finally:
+            if restore_orig_row_factory:
+                conn.row_factory = orig_row_factory
+
         cursor.close()
         return return_values
     except Exception:
-        # After exception the connection cannot be used anymore.
-        # A new connection will automatically be opened for the next command.
         conn.close()
         raise
 
 
-def select_elements_in_table(conn, table_name, var_names, where=None, order_by=None, limit=None, dict_cursor=True):
-    '''
+def select_elements_in_table(
+    conn, table_name, var_names, where=None, order_by=None, limit=None, dict_cursor=True
+):
+    """
     execute a query on a table
 
     Args:
@@ -142,7 +164,7 @@ def select_elements_in_table(conn, table_name, var_names, where=None, order_by=N
         order_by (tuple, str) : order results (e.g. ('uuid',  'DESC')
         limit (int) : limit the amount of results
         dict_cursor (bool) : return result as an ordered dict
-    '''
+    """
     var_names_SQL = sql_name_formatter(var_names)
 
     query = sql.SQL("select {0} from {1} ").format(
@@ -152,7 +174,9 @@ def select_elements_in_table(conn, table_name, var_names, where=None, order_by=N
     # SQL.Identifier does not work with underscore names for tables?
 
     if where is not None:
-        query += sql.SQL("WHERE {0} = {1} ").format(sql.Identifier(where[0]), sql.Literal(where[1]))
+        query += sql.SQL("WHERE {0} = {1} ").format(
+            sql.Identifier(where[0]), sql.Literal(where[1])
+        )
     if order_by is not None:
         query += sql.SQL("ORDER BY {0} {1} ").format(
             sql.Identifier(order_by[0]), sql.SQL(order_by[1])
@@ -192,7 +216,9 @@ def insert_row_in_table(
     elif isinstance(conn, sqlite3.Connection):
         cursor = conn.cursor()
         try:
-            stmt = sqlite_helper.convert_to_string(statement + sql.SQL(custom_statement))
+            stmt = sqlite_helper.convert_to_string(
+                statement + sql.SQL(custom_statement)
+            )
             cursor.execute(stmt, sqlite_helper.convert_placeholders(placeholders))
             return cursor.lastrowid
         finally:

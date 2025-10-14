@@ -6,13 +6,13 @@ from core_tools.data.SQL.model.versions.v1_0_0 import initialise_v1_0_0
 from core_tools.data.SQL.model.versions.v1_1_0 import update_to_v1_1_0
 from core_tools.data.SQL.model.versions.v1_2_0 import (
     update_to_1_2_0_from_1_0_0,
-    update_to_1_2_0_from_1_1_0
+    update_to_1_2_0_from_1_1_0,
 )
 
 from psycopg2._psycopg import (
-        connection as Connection,
-        cursor as Cursor,
-        Error as PGError
+    connection as Connection,
+    cursor as Cursor,
+    Error as PGError,
 )
 
 
@@ -37,8 +37,14 @@ __REQUIRED_DATABASE_VERSION__ = DatabaseVersion("1.2.0")
 
 
 __UPDATE_PATH__: dict[DatabaseVersion, UpdateOperation] = {
-    DatabaseVersion("1.0.0"): (DatabaseVersion("1.2.0"), update_to_1_2_0_from_1_0_0, ),
-    DatabaseVersion("1.1.0"): (DatabaseVersion("1.2.0"), update_to_1_2_0_from_1_1_0, ),
+    DatabaseVersion("1.0.0"): (
+        DatabaseVersion("1.2.0"),
+        update_to_1_2_0_from_1_0_0,
+    ),
+    DatabaseVersion("1.1.0"): (
+        DatabaseVersion("1.2.0"),
+        update_to_1_2_0_from_1_1_0,
+    ),
 }
 
 
@@ -62,8 +68,7 @@ def local_database_update_routine(conn: Connection):
 
 
 def get_database_version(
-        connection: Connection,
-        assert_requirement: bool
+    connection: Connection, assert_requirement: bool
 ) -> DatabaseVersion:
     try:
         with connection:
@@ -105,7 +110,9 @@ def check_for_v110_case(conn: Connection) -> bool:
 
 def _update_database(conn: Connection, current: DatabaseVersion) -> DatabaseVersion:
     next_version, update_operation = _check_for_database_updates(current)
-    logger.info(f"Attempting local database upgrade from version {current} to {next_version}")
+    logger.info(
+        f"Attempting local database upgrade from version {current} to {next_version}"
+    )
     _apply_database_update(conn, next_version, update_operation)
     logger.info("Update successful.")
     return next_version
@@ -122,9 +129,7 @@ def _check_for_database_updates(current: DatabaseVersion) -> DatabaseUpdate:
 
 
 def _apply_database_update(
-        conn: Connection,
-        next_version: DatabaseVersion,
-        update: UpdateOperation
+    conn: Connection, next_version: DatabaseVersion, update: UpdateOperation
 ):
     try:
         with conn:
@@ -135,7 +140,7 @@ def _apply_database_update(
         logger.error(
             "Error during update. Changes are automatically rolled back to "
             f"previous successful update. Quiting with the following error: {err}",
-            exc_info=True
+            exc_info=True,
         )
         raise err
 
