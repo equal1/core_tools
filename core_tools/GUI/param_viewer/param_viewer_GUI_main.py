@@ -2,7 +2,7 @@ import logging
 import os
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable, Collection
 
 import qcodes as qc
 from qtpy import QtCore, QtWidgets
@@ -24,7 +24,13 @@ class param_data_obj:
 
 class param_viewer(QtWidgets.QMainWindow):
     def __init__(
-        self, gates_object: object | None = None, max_diff: float = 1000, locked=False
+        self,
+        gates_object: object | None = None,
+        max_diff: float = 1000,
+        locked: bool = False,
+        visible_real_gates: Collection[str] | None = None,
+        visible_virtual_gates: Collection[str] | None = None,
+        virtual_gate_normaliser: Callable[[str], str] | None = None,
     ):
         self.tab_gates: dict[str, list] = defaultdict(list)
         self.station = qc.Station.default
@@ -32,6 +38,7 @@ class param_viewer(QtWidgets.QMainWindow):
         self.locked = locked
         self.favorite_gates: list[str] = []
         self._last_gui_values: dict[str, dict[str, float]] = defaultdict(dict)
+        self._row_widget_heights: dict[QtWidgets.QWidget, int] = {}
 
         if gates_object:
             self.gates_object = gates_object
@@ -58,7 +65,20 @@ class param_viewer(QtWidgets.QMainWindow):
 
         self.layout_favorites = self.add_tab("Favorites")
         self.add_tab("Real")
-        self.add_tab("All virtual")
+
+        hardware = gates_object.hardware
+
+        all_virtual_names = list(getattr(gates_object, "v_gates", []))
+        virtual_gate_sets = list(hardware.virtual_gates)
+        include_summary_tab = bool(all_virtual_names)
+        summary_alias: str | None = None
+        if include_summary_tab and len(virtual_gate_sets) == 1:
+            only_set = virtual_gate_sets[0]
+            if set(only_set.virtual_gate_names) == set(all_virtual_names):
+                include_summary_tab = False
+                summary_alias = only_set.name
+
+        virtual_tab_names: list[str] = []
 
         try:
             self.opx_instr = self.station.get_component("opx_instr")
@@ -66,16 +86,44 @@ class param_viewer(QtWidgets.QMainWindow):
             self.opx_instr = None
 
         # add real gates
-        self._add_gates("Real", gates_object.hardware.dac_gate_map.keys())
+        self._add_gates("Real", hardware.dac_gate_map.keys())
 
-        # add virtual gates
-        self._add_gates("All virtual", gates_object.v_gates)
+        if include_summary_tab:
+            self.add_tab("All virtual")
+            self._add_gates("All virtual", all_virtual_names)
+            virtual_tab_names.append("All virtual")
+        elif summary_alias is None and virtual_gate_sets:
+            summary_alias = virtual_gate_sets[0].name
 
         # add virtual gates per matrix
-        for virt_gate_set in gates_object.hardware.virtual_gates:
+        for virt_gate_set in virtual_gate_sets:
             vgm_name = virt_gate_set.name
             self.add_tab(vgm_name)
             self._add_gates(vgm_name, virt_gate_set.virtual_gate_names)
+            virtual_tab_names.append(vgm_name)
+            if summary_alias == vgm_name:
+                self.tab_gates["All virtual"] = self.tab_gates[vgm_name]
+
+        if include_summary_tab:
+            summary_alias = "All virtual"
+        elif (
+            summary_alias is not None
+            and "All virtual" not in self.tab_gates
+            and summary_alias in self.tab_gates
+        ):
+            self.tab_gates["All virtual"] = self.tab_gates[summary_alias]
+
+        if visible_real_gates is not None:
+            self.hide_gates_not_in("Real", visible_real_gates)
+
+        if visible_virtual_gates is not None:
+            normalise = virtual_gate_normaliser or (lambda name: name)
+            for tab_name in virtual_tab_names:
+                self.hide_gates_not_in(
+                    tab_name,
+                    visible_virtual_gates,
+                    normalise=normalise,
+                )
 
         self.refill_favorite_gates_tab()
         self.tab_menu.setCurrentIndex(1)
@@ -98,6 +146,54 @@ class param_viewer(QtWidgets.QMainWindow):
         self.show()
         if not instance_ready:
             self.app.exec()
+
+    def get_tab_gate_names(self, tab_name: str) -> list[str]:
+        """Return the parameter names registered under ``tab_name``."""
+
+        return [pd.param_parameter.name for pd in self.tab_gates.get(tab_name, [])]
+
+    def hide_gates_not_in(
+        self,
+        tab_name: str,
+        allowed_names: Collection[str],
+        *,
+        normalise: Callable[[str], str] | None = None,
+    ) -> None:
+        """Hide gate rows whose (optionally normalised) name is not allowed."""
+
+        allowed = set(allowed_names)
+        if not allowed:
+            # Hide everything when nothing is allowed.
+            normalise = normalise or (lambda name: name)
+        normalise = normalise or (lambda name: name)
+
+        for param_data in self.tab_gates.get(tab_name, []):
+            gate_name = normalise(param_data.param_parameter.name)
+            self._set_param_row_visible(param_data, gate_name in allowed)
+
+    def _set_param_row_visible(self, param_data: param_data_obj, visible: bool) -> None:
+        widgets = [
+            param_data.gui_input_param,
+            self.findChild(QtWidgets.QWidget, param_data.param_parameter.name),
+            self.findChild(
+                QtWidgets.QWidget, param_data.param_parameter.name + "_unit"
+            ),
+            param_data.cb_star,
+        ]
+        for widget in widgets:
+            if widget is None:
+                continue
+            if not visible:
+                if widget not in self._row_widget_heights:
+                    self._row_widget_heights[widget] = widget.sizeHint().height()
+                widget.hide()
+                widget.setFixedHeight(0)
+            else:
+                previous_height = self._row_widget_heights.get(widget)
+                widget.show()
+                if previous_height is None:
+                    previous_height = widget.sizeHint().height()
+                widget.setFixedHeight(previous_height)
 
     def setup_ui(self):
         self.tabs = {}

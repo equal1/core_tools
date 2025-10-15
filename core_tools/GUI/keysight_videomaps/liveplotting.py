@@ -1,7 +1,7 @@
 import logging
 import os
 from collections.abc import Sequence
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 import numpy as np
 import pyqtgraph as pg
@@ -92,6 +92,8 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         title: str | None = None,
         settings_dir: str | None = None,
         settings_name: str | None = None,
+        gate_filter_names: Sequence[str] | None = None,
+        virtual_gate_filter_names: Sequence[str] | None = None,
     ):
         """
         Args:
@@ -168,6 +170,8 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
             raise Exception("Maximum number of pulse gates is 15")
         self.n_pulse_gates = n_pulse_gates
 
+        self._gate_ui_initialised = False
+
         if scan_generator is not None:
             self._scan_generator = scan_generator
         else:
@@ -208,6 +212,25 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         self.setup_statusbar()
         self._favorites = Favorites(self, settings_dir)
         self.setupUI2()
+
+        if gate_filter_names is None:
+            gate_filter_names = [
+                self._1D_gate_name.itemText(i)
+                for i in range(self._1D_gate_name.count())
+            ]
+        else:
+            gate_filter_names = list(gate_filter_names)
+            if not gate_filter_names:
+                gate_filter_names = [
+                    self._1D_gate_name.itemText(i)
+                    for i in range(self._1D_gate_name.count())
+                ]
+
+        self.set_available_gates(
+            gate_filter_names,
+            virtual_gate_names=virtual_gate_filter_names,
+        )
+
         self._init_defaults(cust_defaults, settings_name)
 
         # update GUI state (for single step)
@@ -453,6 +476,76 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         self._fav_apply.clicked.connect(lambda: self._apply_favorite())
         self._favorites_names.currentRowChanged.connect(self._load_selected_favorite)
 
+    def set_available_gates(
+        self,
+        real_gate_names: Sequence[str],
+        *,
+        virtual_gate_names: Sequence[str] | None = None,
+    ) -> None:
+        """Limit gate selectors to ``real_gate_names`` and matching virtual gates."""
+
+        real_gate_names = list(dict.fromkeys(real_gate_names))
+        merged: list[str] = list(real_gate_names)
+
+        if virtual_gate_names is None and hasattr(self.gates, "v_gates"):
+            virtual_gate_names = getattr(self.gates, "v_gates")
+
+        if virtual_gate_names:
+            virtual_gate_names = list(dict.fromkeys(virtual_gate_names))
+            for candidate in virtual_gate_names:
+                base = candidate[1:] if candidate.startswith("v") else candidate
+                if base in real_gate_names and candidate not in merged:
+                    merged.append(candidate)
+
+        def _select_fallback(requested: str | None) -> str | None:
+            if not merged:
+                return None
+            if requested and requested in merged:
+                return requested
+            if requested:
+                base = requested[1:] if requested.startswith("v") else requested
+                virtual = f"v{base}"
+                if virtual in merged:
+                    return virtual
+                if base in merged:
+                    return base
+            for candidate in real_gate_names:
+                if candidate in merged:
+                    return candidate
+            return merged[0]
+
+        combos = [
+            (self._1D_settings, "gate_name", self._1D_gate_name),
+            (self._2D_settings, "gate1_name", self._2D_gate1_name),
+            (self._2D_settings, "gate2_name", self._2D_gate2_name),
+        ]
+
+        for _, _, combo in combos:
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItems(merged)
+            combo.blockSignals(False)
+
+        for settings_obj, setting_name, _ in combos:
+            fallback = _select_fallback(settings_obj[setting_name])
+            if fallback is None:
+                continue
+            settings_obj.set_value(setting_name, fallback)
+
+        offsets_widgets = [
+            cast(OffsetsList, self._1D_settings.get_element("offsets")),
+            cast(OffsetsList, self._2D_settings.get_element("offsets")),
+        ]
+        for offsets_widget in offsets_widgets:
+            offsets_widget.set_available_gates(merged)
+
+        self.gate_names = list(real_gate_names)
+        if not self._gate_ui_initialised:
+            self._initialise_gate_ui()
+
+    def _initialise_gate_ui(self) -> None:
+        self._gate_ui_initialised = True
+
     def _set_icon(self, button, name):
         icon_path = os.path.dirname(gui_module.__file__)
         button.setIcon(QtGui.QIcon(os.path.join(icon_path, name)))
@@ -483,8 +576,14 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
             self.channel_map = get_channel_map_dig_4ch(iq_mode)
 
     def _init_defaults(self, cust_defaults, settings_name: str = None):
+        if not self.gate_names:
+            raise RuntimeError("No gate names available to initialize defaults.")
+
+        default_gate = self.gate_names[0]
+        second_gate = self.gate_names[1] if len(self.gate_names) > 1 else default_gate
+
         self.defaults_1D = {
-            "gate_name": self.gate_names[0],
+            "gate_name": default_gate,
             "V_swing": 50,
             "npt": 200,
             "t_meas": 50,
@@ -494,8 +593,8 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         }
 
         self.defaults_2D = {
-            "gate1_name": self.gate_names[0],
-            "gate2_name": self.gate_names[1],
+            "gate1_name": default_gate,
+            "gate2_name": second_gate,
             "V1_swing": 50,
             "V2_swing": 50,
             "npt": 75,
@@ -531,15 +630,20 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
             defaults_1D = cust_defaults.get("1D", {}).copy()
             defaults_2D = cust_defaults.get("2D", {}).copy()
             defaults_gen = cust_defaults.get("gen", {}).copy()
+
             # convert old settings to new settings
             if "biasT_corr_1D" in defaults_gen:
                 defaults_1D["biasT_corr"] = defaults_gen["biasT_corr_1D"]
+                defaults_gen.pop("biasT_corr_1D")
             if "biasT_corr_2D" in defaults_gen:
                 defaults_2D["biasT_corr"] = defaults_gen["biasT_corr_2D"]
+                defaults_gen.pop("biasT_corr_2D")
             if "2D_cross" in defaults_gen:
                 defaults_2D["cross"] = defaults_gen["2D_cross"]
+                defaults_gen.pop("2D_cross")
             if "2D_colorbar" in defaults_gen:
                 defaults_2D["colorbar"] = defaults_gen["2D_colorbar"]
+                defaults_gen.pop("2D_colorbar")
 
             self._1D_settings.update(defaults_1D)
             self._2D_settings.update(defaults_2D)
@@ -681,6 +785,33 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         self._scan_generator.set_iq_mode(self.iq_mode)
         self._scan_generator.set_channel_map(active_channel_map)
 
+    def _ensure_gate_selection(
+        self,
+        settings: Settings,
+        setting_name: str,
+        combo_box: QtWidgets.QComboBox,
+    ) -> str:
+        """Ensure ``setting_name`` references a gate that is still selectable."""
+
+        selected = settings[setting_name]
+        if selected and combo_box.findText(selected) != -1:
+            return selected
+
+        if combo_box.count() == 0:
+            raise RuntimeError("No gate options available to configure sweeps.")
+
+        fallback = combo_box.currentText()
+        if not fallback or combo_box.findText(fallback) == -1:
+            fallback = combo_box.itemText(0)
+
+        if fallback != selected:
+            combo_box.blockSignals(True)
+            combo_box.setCurrentText(fallback)
+            combo_box.blockSignals(False)
+            settings.update_value(setting_name, fallback)
+
+        return fallback
+
     def _prepare_1D_scan(self):
         gen_settings = self._gen_settings
         if gen_settings.update_scan:
@@ -693,8 +824,13 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         if self._requires_build(self._param1D, settings):
             logger.debug("Creating 1D scan")
             self._prepare_scan()
+            gate_name = self._ensure_gate_selection(
+                settings,
+                "gate_name",
+                self._1D_gate_name,
+            )
             self._param1D = self._scan_generator.create_1D_scan(
-                settings["gate_name"],
+                gate_name,
                 settings["V_swing"],
                 settings["npt"],
                 settings["t_meas"] * 1000,
@@ -758,11 +894,21 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         if self._requires_build(self._param2D, settings):
             logger.debug("Creating 2D scan")
             self._prepare_scan()
+            gate1 = self._ensure_gate_selection(
+                settings,
+                "gate1_name",
+                self._2D_gate1_name,
+            )
+            gate2 = self._ensure_gate_selection(
+                settings,
+                "gate2_name",
+                self._2D_gate2_name,
+            )
             self._param2D = self._scan_generator.create_2D_scan(
-                settings["gate1_name"],
+                gate1,
                 settings["V1_swing"],
                 settings["npt"],
-                settings["gate2_name"],
+                gate2,
                 settings["V2_swing"],
                 settings["npt"],
                 settings["t_meas"] * 1000,

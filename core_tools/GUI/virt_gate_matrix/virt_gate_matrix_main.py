@@ -130,6 +130,10 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         self.setupUi(self)
         self.setWindowTitle("Virtual Matrix Editor")
 
+        awg_tab_index = self.tabWidget.indexOf(self.AWG_to_dac_att)
+        if awg_tab_index != -1:
+            self.tabWidget.removeTab(awg_tab_index)
+
         hardware = self.gates_object.hardware
         self._old_harware_class = not hasattr(hardware, "awg2dac_ratios")
         if self._old_harware_class:

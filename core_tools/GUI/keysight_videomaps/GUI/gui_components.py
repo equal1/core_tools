@@ -2,11 +2,11 @@ import copy
 import logging
 from abc import abstractmethod
 from functools import partial
-from typing import Any
+from typing import Any, Sequence
 
 from PyQt5 import QtCore, QtWidgets
 
-from core_tools.GUI.qt_util import qt_show_error, qt_log_exception
+from core_tools.GUI.qt_util import qt_log_exception, qt_show_error
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,11 @@ class Settings:
         self._gui_elements[name] = gui_element
         self._values[name] = gui_element.get_value()
 
+    def get_element(self, name: str) -> "GuiElement":
+        """Return the :class:`GuiElement` registered for ``name``."""
+
+        return self._gui_elements[name]
+
     def update_value(self, name: str, value: Any):
         self._values[name] = value
         if self._gui_elements[name].plot_setting:
@@ -61,9 +66,7 @@ class Settings:
 
 
 class GuiElement:
-    def __init__(self,
-                 name: str,
-                 settings: Settings):
+    def __init__(self, name: str, settings: Settings):
         self._name = name
         self._settings = settings
         self.plot_setting = False
@@ -81,11 +84,12 @@ class GuiElement:
 
 
 class CheckboxElement(GuiElement):
-    def __init__(self,
-                 name: str,
-                 settings: Settings,
-                 widget: QtWidgets.QCheckBox,
-                 ):
+    def __init__(
+        self,
+        name: str,
+        settings: Settings,
+        widget: QtWidgets.QCheckBox,
+    ):
         super().__init__(name, settings)
         self._widget = widget
         widget.stateChanged.connect(self._changed)
@@ -102,11 +106,12 @@ class CheckboxElement(GuiElement):
 
 
 class NumberElement(GuiElement):
-    def __init__(self,
-                 name: str,
-                 settings: Settings,
-                 widget: QtWidgets.QSpinBox | QtWidgets.QDoubleSpinBox,
-                 ):
+    def __init__(
+        self,
+        name: str,
+        settings: Settings,
+        widget: QtWidgets.QSpinBox | QtWidgets.QDoubleSpinBox,
+    ):
         super().__init__(name, settings)
         self._widget = widget
         widget.valueChanged.connect(self._changed)
@@ -123,11 +128,12 @@ class NumberElement(GuiElement):
 
 
 class TextElement(GuiElement):
-    def __init__(self,
-                 name: str,
-                 settings: Settings,
-                 widget: QtWidgets.QComboBox,
-                 ):
+    def __init__(
+        self,
+        name: str,
+        settings: Settings,
+        widget: QtWidgets.QComboBox,
+    ):
         super().__init__(name, settings)
         self._widget = widget
         widget.currentTextChanged.connect(self._changed)
@@ -140,22 +146,23 @@ class TextElement(GuiElement):
         self._widget.setCurrentText(value)
         if self._widget.currentText() != value:
             qt_show_error(
-                "VideoMode: Invalid value",
-                f"{self._name} cannot be set to '{value}'")
+                "VideoMode: Invalid value", f"{self._name} cannot be set to '{value}'"
+            )
 
     def get_value(self) -> str:
         return self._widget.currentText()
 
 
 class CheckboxList(GuiElement):
-    def __init__(self,
-                 name: str,
-                 settings: Settings,
-                 names: list[str],
-                 layout_labels: QtWidgets.QLayout,
-                 layout_check_boxes: QtWidgets.QLayout,
-                 default: bool,
-                 ):
+    def __init__(
+        self,
+        name: str,
+        settings: Settings,
+        names: list[str],
+        layout_labels: QtWidgets.QLayout,
+        layout_check_boxes: QtWidgets.QLayout,
+        default: bool,
+    ):
         super().__init__(name, settings)
         self._checked = set()
         if default:
@@ -189,14 +196,15 @@ class CheckboxList(GuiElement):
 
 
 class OffsetsList(GuiElement):
-    def __init__(self,
-                 name: str,
-                 settings: Settings,
-                 layout: QtWidgets.QFormLayout,
-                 layout_offset: int,
-                 n_pulse_gates: int,
-                 gate_names: list[str],
-                 ):
+    def __init__(
+        self,
+        name: str,
+        settings: Settings,
+        layout: QtWidgets.QFormLayout,
+        layout_offset: int,
+        n_pulse_gates: int,
+        gate_names: list[str],
+    ):
         super().__init__(name, settings)
 
         self._gates: list[str] = ["<None>"] * n_pulse_gates
@@ -206,18 +214,24 @@ class OffsetsList(GuiElement):
         self._voltage_boxes = []
         for i in range(n_pulse_gates):
             cb_gate = QtWidgets.QComboBox()
-            sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+            sizePolicy = QtWidgets.QSizePolicy(
+                QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+            )
             sizePolicy.setHorizontalStretch(0)
             sizePolicy.setVerticalStretch(0)
             cb_gate.setSizePolicy(sizePolicy)
             cb_gate.setMinimumSize(QtCore.QSize(107, 0))
             self._gate_boxes.append(cb_gate)
-            layout.setWidget(layout_offset+i, QtWidgets.QFormLayout.LabelRole, cb_gate)
+            layout.setWidget(
+                layout_offset + i, QtWidgets.QFormLayout.LabelRole, cb_gate
+            )
 
             box_voltage = QtWidgets.QDoubleSpinBox()
             box_voltage.setRange(-1000.0, +1000.0)
             self._voltage_boxes.append(box_voltage)
-            layout.setWidget(layout_offset+i, QtWidgets.QFormLayout.FieldRole, box_voltage)
+            layout.setWidget(
+                layout_offset + i, QtWidgets.QFormLayout.FieldRole, box_voltage
+            )
 
             cb_gate.addItem("<None>")
             for gate_name in gate_names:
@@ -237,8 +251,10 @@ class OffsetsList(GuiElement):
 
     def set_value(self, offsets: dict[str, float]):
         if len(offsets) >= len(self._gate_boxes):
-            raise Exception(f"Only {len(self._gate_boxes)} offsets configured. "
-                            "Specify larger n_pulse_gates")
+            raise Exception(
+                f"Only {len(self._gate_boxes)} offsets configured. "
+                "Specify larger n_pulse_gates"
+            )
         for i, (gate, value) in enumerate(offsets.items()):
             self._gate_boxes[i].setCurrentText(gate)
             self._voltage_boxes[i].setValue(value)
@@ -253,3 +269,31 @@ class OffsetsList(GuiElement):
             if gate != "<None>" and voltage != 0.0:
                 result[gate] = voltage
         return result
+
+    def set_available_gates(self, gate_names: Sequence[str]):
+        """Update the selectable gate list and drop offsets for unknown gates."""
+
+        gate_names = list(gate_names)
+        allowed = {"<None>", *gate_names}
+        offsets_changed = False
+
+        for i, combo in enumerate(self._gate_boxes):
+            current_text = combo.currentText()
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItem("<None>")
+            combo.addItems(gate_names)
+            if current_text in allowed:
+                combo.setCurrentText(current_text)
+            else:
+                combo.setCurrentIndex(0)
+                self._voltages[i] = 0.0
+                self._voltage_boxes[i].setValue(0.0)
+                offsets_changed = True
+            combo.blockSignals(False)
+
+        self._gates = [combo.currentText() for combo in self._gate_boxes]
+        self._voltages = [box.value() for box in self._voltage_boxes]
+
+        if offsets_changed:
+            self._value_changed(self.get_value())
