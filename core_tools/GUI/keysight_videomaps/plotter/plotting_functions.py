@@ -1,22 +1,25 @@
+import logging
+import time
 from dataclasses import dataclass
 from functools import partial
 from typing import Any
-from PyQt5.QtCore import QThread
-from PyQt5 import QtWidgets, QtGui
-from PyQt5 import QtCore
-import pyqtgraph as pg
+
 import numpy as np
-from scipy import ndimage
-import time
-import logging
+import pyqtgraph as pg
 from matplotlib import colormaps
-from .colors import polar_to_rgb, compress_range
+from matplotlib.colors import ListedColormap
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import QThread
+from scipy import ndimage
+
+from .colors import compress_range, polar_to_rgb
 
 logger = logging.getLogger(__name__)
 
-colormap = colormaps["viridis"]
+colormap = ListedColormap(colormaps["Spectral_r"](range(256)))
 colormap._init()
-lut = np.array(colormap.colors)*255  # Convert matplotlib colormap from 0-1 to 0-255 for Qt
+lut = (np.array(colormap.colors) * 255).astype(np.uint8)
+pg_colormap = pg.ColorMap(np.linspace(0.0, 1.0, lut.shape[0]), lut)
 
 
 @dataclass
@@ -53,13 +56,13 @@ class plot_param:
         setpoints = np.array(self.setpoints[dim])
         base_index = (0,) * dim
         # return first and last value
-        return setpoints[base_index+(0,)], setpoints[base_index+(-1,)]
+        return setpoints[base_index + (0,)], setpoints[base_index + (-1,)]
 
     def get_index(self, *values):
         indices = []
         for i, value in enumerate(values):
             xrange = self.xrange(i)
-            index = int((value-xrange[0]) / (xrange[1]-xrange[0]) * self.shape[i])
+            index = int((value - xrange[0]) / (xrange[1] - xrange[0]) * self.shape[i])
             if index < 0 or index >= self.shape[i]:
                 index = None
             indices.append(index)
@@ -67,19 +70,26 @@ class plot_param:
 
 
 class live_plot(QThread):
-
-    def __init__(self,  top_layout, parameter_getter,
-                 n_col, prog_bar=None, gate_values_label=None,
-                 gates=None, refresh_rate_ms=100,
-                 on_mouse_moved=None, on_mouse_clicked=None):
-        '''
+    def __init__(
+        self,
+        top_layout,
+        parameter_getter,
+        n_col,
+        prog_bar=None,
+        gate_values_label=None,
+        gates=None,
+        refresh_rate_ms=100,
+        on_mouse_moved=None,
+        on_mouse_clicked=None,
+    ):
+        """
         init the class
 
         top_frame (QtWidgets.QFrame) : frame wherin to place the plots
         top_layout (QtWidgets.QGridLayout) : layout in the frame for the plots
         parameter_getter (QCoDeS multiparamter) : qCoDeS multiparamter that is used to get the data.
         n_col (int): max number of plots on a row
-        '''
+        """
         super().__init__()
 
         self.n_plots = len(parameter_getter.names)
@@ -101,7 +111,9 @@ class live_plot(QThread):
 
         # getter for the scan.
         self.parameter_getter = parameter_getter
-        self.plot_params = [plot_param(parameter_getter, i) for i in range(self.n_plots)]
+        self.plot_params = [
+            plot_param(parameter_getter, i) for i in range(self.n_plots)
+        ]
         self.shape = parameter_getter.shapes[0]  # assume all the shapes are the same.
         self.plot_widgets = []
 
@@ -227,28 +239,27 @@ class live_plot(QThread):
             try:
                 return self.gates.parameters[gate_name].get()
             except Exception:
-                logging.debug(f'Cannot read DC gate {gate_name}')
+                logging.debug(f"Cannot read DC gate {gate_name}")
 
     def _format_dc_voltage(self, voltage):
         if voltage is not None:
-            return f'{voltage:6.2f} mV'
+            return f"{voltage:6.2f} mV"
         else:
-            return ' - - -'
+            return " - - -"
 
 
 class _1D_live_plot(live_plot):
-
     def init_plot(self):
         self.prog_per = 0
         n_col = self.n_col
         for i in range(self.n_plots):
             param = self.plot_params[i]
             plot_1D = pg.PlotWidget()
-            plot_1D.getAxis('left').enableAutoSIPrefix(enable=False)
-            plot_1D.getAxis('bottom').enableAutoSIPrefix(enable=False)
+            plot_1D.getAxis("left").enableAutoSIPrefix(enable=False)
+            plot_1D.getAxis("bottom").enableAutoSIPrefix(enable=False)
             plot_1D.showGrid(x=True, y=True)
-            plot_1D.setLabel('left', param.label, param.unit)
-            plot_1D.setLabel('bottom', param.xlabel(0), param.xunit(0))
+            plot_1D.setLabel("left", param.label, param.unit)
+            plot_1D.setLabel("bottom", param.xlabel(0), param.xunit(0))
 
             cursor = QtCore.Qt.CrossCursor
             plot_1D.setCursor(cursor)
@@ -262,14 +273,21 @@ class _1D_live_plot(live_plot):
 
             curve = plot_1D.plot(self.x_data, self.plot_data[i], pen=(255, 0, 0))
             plot_data = plot_widget_data(plot_1D, [curve])
-            plot_data.proxy = pg.SignalProxy(plot_1D.scene().sigMouseMoved, rateLimit=10,
-                                             slot=partial(self.mouse_moved, plot_1D, i))
-            plot_data.proxy2 = pg.SignalProxy(plot_1D.scene().sigMouseClicked,
-                                              slot=partial(self.mouse_clicked, plot_1D, i))
+            plot_data.proxy = pg.SignalProxy(
+                plot_1D.scene().sigMouseMoved,
+                rateLimit=10,
+                slot=partial(self.mouse_moved, plot_1D, i),
+            )
+            plot_data.proxy2 = pg.SignalProxy(
+                plot_1D.scene().sigMouseClicked,
+                slot=partial(self.mouse_clicked, plot_1D, i),
+            )
             self.plot_widgets.append(plot_data)
 
     def _read_dc_voltages(self):
-        self.gate_x_voltage = self._read_dc_voltage(self.plot_params[0].setpoint_names[0])
+        self.gate_x_voltage = self._read_dc_voltage(
+            self.plot_params[0].setpoint_names[0]
+        )
 
     def _get_plot_coords(self, plot, index, coordinates):
         if plot.sceneBoundingRect().contains(coordinates):
@@ -318,10 +336,9 @@ class _1D_live_plot(live_plot):
             if self.gates is not None:
                 gate_x = self.plot_params[0].setpoint_names[0]
                 x_voltage_str = self._format_dc_voltage(self.gate_x_voltage)
-                self.gate_values_label.setText(
-                        f'DC {gate_x}:{x_voltage_str}')
+                self.gate_values_label.setText(f"DC {gate_x}:{x_voltage_str}")
         except Exception:
-            logger.error('Plotting failed', exc_info=True)
+            logger.error("Plotting failed", exc_info=True)
             # slow down to reduce error burst
             time.sleep(1.0)
 
@@ -337,14 +354,17 @@ class _1D_live_plot(live_plot):
                 if self._buffers_need_resize:
                     self._resize_buffers()
 
-                self.average_scans = min(self.average_scans+1, self._averaging)
+                self.average_scans = min(self.average_scans + 1, self._averaging)
                 for i in range(self.n_plots):
                     buffer_data = self.buffer_data[i]
                     y = input_data[i]
                     buffer_data = np.roll(buffer_data, 1, 0)
                     buffer_data[0] = y
                     self.buffer_data[i] = buffer_data
-                    self.plot_data[i] = np.sum(buffer_data[:self.average_scans], 0)/self.average_scans
+                    self.plot_data[i] = (
+                        np.sum(buffer_data[: self.average_scans], 0)
+                        / self.average_scans
+                    )
                 self.plot_data_valid = True
                 self.prog_per = int(self.average_scans / self._averaging * 100)
                 if self._stepping and (self.average_scans == self._averaging):
@@ -352,8 +372,8 @@ class _1D_live_plot(live_plot):
                     self.active = False
             except Exception as e:
                 self.plot_data_valid = True
-                logger.error(f'Exception: {e}', exc_info=True)
-                print('frame dropped (check logging)')
+                logger.error(f"Exception: {e}", exc_info=True)
+                print("frame dropped (check logging)")
                 # slow down to reduce error burst
                 time.sleep(1.0)
 
@@ -361,7 +381,6 @@ class _1D_live_plot(live_plot):
 
 
 class _2D_live_plot(live_plot):
-
     _enhanced_contrast = False
     _filter_background = False
     _background_rel_sigma = 0.1
@@ -379,12 +398,12 @@ class _2D_live_plot(live_plot):
             img = pg.ImageItem()
             # Note: lookup table is set via color bar
             plot_2D.addItem(img)
-            plot_2D.getAxis('left').enableAutoSIPrefix(enable=False)
-            plot_2D.getAxis('bottom').enableAutoSIPrefix(enable=False)
-            plot_2D.setLabel('left', param.xlabel(0), param.xunit(0))
-            plot_2D.setLabel('bottom', param.xlabel(1), param.xunit(1))
+            plot_2D.getAxis("left").enableAutoSIPrefix(enable=False)
+            plot_2D.getAxis("bottom").enableAutoSIPrefix(enable=False)
+            plot_2D.setLabel("left", param.xlabel(0), param.xunit(0))
+            plot_2D.setLabel("bottom", param.xlabel(1), param.xunit(1))
 
-            plot_2D.setTitle(param.label, size='10pt')
+            plot_2D.setTitle(param.label, size="10pt")
 
             min_max = pg.LabelItem(parent=plot_2D.graphicsItem())
             min_max.anchor(itemPos=(1, 0), parentPos=(1, 0))
@@ -399,17 +418,22 @@ class _2D_live_plot(live_plot):
             shape = param.shape
             tr = QtGui.QTransform()
             tr.translate(-range1, -range0)
-            tr.scale(1/shape[1]*range1*2, 1/shape[0]*range0*2)
+            tr.scale(1 / shape[1] * range1 * 2, 1 / shape[0] * range0 * 2)
             img.setTransform(tr)
 
             cursor = QtCore.Qt.CrossCursor
             img.setCursor(cursor)
 
             plot_data = plot_widget_data(plot_2D, [img])
-            plot_data.proxy = pg.SignalProxy(img.scene().sigMouseMoved, rateLimit=10,
-                                             slot=partial(self.mouse_moved, plot_2D, i))
-            plot_data.proxy2 = pg.SignalProxy(img.scene().sigMouseClicked,
-                                              slot=partial(self.mouse_clicked, plot_2D, i))
+            plot_data.proxy = pg.SignalProxy(
+                img.scene().sigMouseMoved,
+                rateLimit=10,
+                slot=partial(self.mouse_moved, plot_2D, i),
+            )
+            plot_data.proxy2 = pg.SignalProxy(
+                img.scene().sigMouseClicked,
+                slot=partial(self.mouse_clicked, plot_2D, i),
+            )
             self.plot_widgets.append(plot_data)
 
     def set_background_filter(self, enabled, rel_sigma):
@@ -440,7 +464,7 @@ class _2D_live_plot(live_plot):
     def set_colorbar(self, enabled):
         if enabled:
             for pwd in self.plot_widgets:
-                cb = pg.ColorBarItem(colorMap='viridis', interactive=False, width=14)
+                cb = pg.ColorBarItem(colorMap=pg_colormap, interactive=False, width=14)
                 cb.setImageItem(pwd.plot_items[0], insert_in=pwd.plot_widget.plotItem)
                 pwd.color_bar = cb
 
@@ -486,8 +510,12 @@ class _2D_live_plot(live_plot):
         self.refresh()
 
     def _read_dc_voltages(self):
-        self.gate_x_voltage = self._read_dc_voltage(self.plot_params[0].setpoint_names[1])
-        self.gate_y_voltage = self._read_dc_voltage(self.plot_params[0].setpoint_names[0])
+        self.gate_x_voltage = self._read_dc_voltage(
+            self.plot_params[0].setpoint_names[1]
+        )
+        self.gate_y_voltage = self._read_dc_voltage(
+            self.plot_params[0].setpoint_names[0]
+        )
 
     def update_plot(self):
         try:
@@ -501,46 +529,59 @@ class _2D_live_plot(live_plot):
                 plot_data = self.plot_data[i]
                 if self._filter_background:
                     sigma = self.plot_params[i].shape[0] * self._background_rel_sigma
-                    plot_data = plot_data - ndimage.gaussian_filter(plot_data, sigma, mode='nearest')
+                    plot_data = plot_data - ndimage.gaussian_filter(
+                        plot_data, sigma, mode="nearest"
+                    )
                 if self._filter_noise:
-                    plot_data = ndimage.gaussian_filter(plot_data, self._noise_sigma, mode='nearest')
-                if self.gradient == 'Off':
+                    plot_data = ndimage.gaussian_filter(
+                        plot_data, self._noise_sigma, mode="nearest"
+                    )
+                if self.gradient == "Off":
                     if self.enhanced_contrast:
                         plot_data = compress_range(plot_data, upper=99.5, lower=0.5)
                     mn, mx = np.min(plot_data), np.max(plot_data)
-                    self.min_max[i].setText(f"min:{mn:4.0f} mV<br/>max:{mx:4.0f} mV")
+                    mn_mx_diff = mx - mn
+                    self.min_max[i].setText(f"min_max_diff:{mn_mx_diff:6.4f}")
                     if color_bar:
                         color_bar.setLevels(values=(mn, mx))
                         if img_item.lut is None:
-                            img_item.setLookupTable(color_bar.colorMap().getLookupTable())
+                            img_item.setLookupTable(
+                                color_bar.colorMap().getLookupTable()
+                            )
                     else:
                         img_item.setLookupTable(lut)
-                elif self.gradient == 'Magnitude':
-                    dx = ndimage.sobel(plot_data, axis=0, mode='nearest')
-                    dy = ndimage.sobel(plot_data, axis=1, mode='nearest')
+                elif self.gradient == "Magnitude":
+                    dx = ndimage.sobel(plot_data, axis=0, mode="nearest")
+                    dy = ndimage.sobel(plot_data, axis=1, mode="nearest")
                     plot_data = np.hypot(dx, dy)
                     if self.enhanced_contrast:
                         plot_data = compress_range(plot_data, upper=99.8, lower=25)
                     mn, mx = np.min(plot_data), np.max(plot_data)
-                    self.min_max[i].setText(f"min:{mn:4.0f} a.u.<br/>max:{mx:4.0f} a.u.")
+                    self.min_max[i].setText(
+                        f"min:{mn:4.0f} a.u.<br/>max:{mx:4.0f} a.u."
+                    )
                     if color_bar:
                         color_bar.setLevels(values=(mn, mx))
                         if img_item.lut is None:
-                            img_item.setLookupTable(color_bar.colorMap().getLookupTable())
+                            img_item.setLookupTable(
+                                color_bar.colorMap().getLookupTable()
+                            )
                     else:
                         img_item.setLookupTable(lut)
-                elif self.gradient == 'Mag & angle':
-                    dx = ndimage.sobel(plot_data, axis=0, mode='nearest')
-                    dy = ndimage.sobel(plot_data, axis=1, mode='nearest')
+                elif self.gradient == "Mag & angle":
+                    dx = ndimage.sobel(plot_data, axis=0, mode="nearest")
+                    dy = ndimage.sobel(plot_data, axis=1, mode="nearest")
                     mag = np.hypot(dx, dy)
                     angle = np.arctan2(dy, dx)
                     if self.enhanced_contrast:
-                        mag = compress_range(mag, upper=99.8, lower=25, subtract_low=True)
+                        mag = compress_range(
+                            mag, upper=99.8, lower=25, subtract_low=True
+                        )
                     plot_data = polar_to_rgb(mag, angle)
-                    self.min_max[i].setText('  ')
+                    self.min_max[i].setText("  ")
                     img_item.setLookupTable(None)
                 else:
-                    logger.warning(f'Unknown gradient setting {self.gradient}')
+                    logger.warning(f"Unknown gradient setting {self.gradient}")
 
                 img_item.setImage(plot_data)
             self.prog_bar.setValue(self.prog_per)
@@ -550,10 +591,11 @@ class _2D_live_plot(live_plot):
                 x_voltage_str = self._format_dc_voltage(self.gate_x_voltage)
                 y_voltage_str = self._format_dc_voltage(self.gate_y_voltage)
                 self.gate_values_label.setText(
-                        f'DC {gate_x}:{x_voltage_str}, {gate_y}:{y_voltage_str}')
+                    f"DC {gate_x}:{x_voltage_str}, {gate_y}:{y_voltage_str}"
+                )
 
         except Exception as e:
-            logger.error(f'Exception plotting: {e}', exc_info=True)
+            logger.error(f"Exception plotting: {e}", exc_info=True)
             # slow down to reduce error burst
             time.sleep(1.0)
 
@@ -570,14 +612,17 @@ class _2D_live_plot(live_plot):
                 if self._buffers_need_resize:
                     self._resize_buffers()
 
-                self.average_scans = min(self.average_scans+1, self._averaging)
+                self.average_scans = min(self.average_scans + 1, self._averaging)
                 for i in range(self.n_plots):
                     buffer_data = self.buffer_data[i]
                     xy = input_data[i][:, :].T
                     buffer_data = np.roll(buffer_data, 1, 0)
                     buffer_data[0] = xy
                     self.buffer_data[i] = buffer_data
-                    self.plot_data[i] = np.sum(buffer_data[:self.average_scans], 0)/self.average_scans
+                    self.plot_data[i] = (
+                        np.sum(buffer_data[: self.average_scans], 0)
+                        / self.average_scans
+                    )
                 self.plot_data_valid = True
                 self.prog_per = int(self.average_scans / self._averaging * 100)
                 if self._stepping and (self.average_scans == self._averaging):
@@ -585,7 +630,7 @@ class _2D_live_plot(live_plot):
                     self.active = False
             except Exception as e:
                 self.plot_data_valid = True
-                logger.error(f'Exception: {e}', exc_info=True)
+                logger.error(f"Exception: {e}", exc_info=True)
                 # slow down to reduce error burst
                 time.sleep(1.0)
 

@@ -358,7 +358,9 @@ class param_viewer(QtWidgets.QMainWindow):
             QtCore.Qt.Checked if name in self.favorite_gates else QtCore.Qt.Unchecked
         )
         add_icons_to_checkbox(cb_star, "Starred.png", "StarWhite.png", 18)
-        cb_star.stateChanged.connect(lambda state: self._star_changed(name, state))
+        cb_star.stateChanged.connect(
+            lambda state, gate_name=name: self._star_changed(gate_name, state)
+        )
         layout.addWidget(cb_star, row, 3, 1, 1)
 
         param_data = param_data_obj(parameter, voltage_input, name, cb_star)

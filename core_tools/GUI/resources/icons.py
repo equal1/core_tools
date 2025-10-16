@@ -1,9 +1,10 @@
-from functools import cache
-import core_tools.GUI.resources as resources
 import os
 import pathlib
+from functools import cache
 
-from PyQt5 import QtGui, QtCore
+from PyQt5 import QtCore, QtGui
+
+import core_tools.GUI.resources as resources
 
 
 def add_icon_to_button(button, icon_name):
@@ -28,25 +29,28 @@ def get_image(image_name, height=None):
 
 def add_icons_to_checkbox(checkbox, icon_checked: str, icon_unchecked: str, size: int):
     icon_path = os.path.dirname(resources.__file__)
-    icon_unchecked_uri = pathlib.Path(os.path.join(icon_path, icon_unchecked)).as_uri()
-    icon_checked_uri = pathlib.Path(os.path.join(icon_path, icon_checked)).as_uri()
+
+    def _icon_local_path(icon_name: str) -> str:
+        return pathlib.Path(os.path.join(icon_path, icon_name)).as_posix()
+
+    icon_unchecked_path = _icon_local_path(icon_unchecked)
+    icon_checked_path = _icon_local_path(icon_checked)
     style_sheet = f"""
     QCheckBox::indicator {{
         width: {size}px;
         height: {size}px;
     }}
     QCheckBox::indicator:unchecked {{
-        image: url("{icon_unchecked_uri[8:]}");
+        image: url("{icon_unchecked_path}");
     }}
     QCheckBox::indicator:checked {{
-        image: url("{icon_checked_uri[8:]}");
+        image: url("{icon_checked_path}");
     }}
     """
     checkbox.setStyleSheet(style_sheet)
 
 
 class Icons:
-
     @staticmethod
     def starred():
         return get_icon("Starred.png")
