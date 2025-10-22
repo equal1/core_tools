@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[1.6.13\] - 2025-10-22
+
+- Fixed bug with step size of favorites in ParameterViewer.
+- Keysight HVI only trigger enabled sequencers.
+
 ## \[1.6.12\] - 2025-09-25
 
 - Fixed "Set DC Voltage", labels on PPT, and saved dataset after changing plot settings.
