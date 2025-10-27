@@ -12,7 +12,7 @@ def load_gate_voltages_from_ds_uuid(
     Args:
         ds_uuid (int) : uuid of the dataset to load
         gates_name (str) : name of gates instrument in the snapshot present in the dataset
-        harware_name (str) : name of the hardware in the snapshot
+        hardware_name (str) : name of the hardware in the snapshot
         force (bool) : if True overwrite without asking, else ask confirmation before changing voltage
     '''
     load_gate_voltages_from_snapshot(load_by_uuid(ds_uuid).snapshot,
@@ -29,7 +29,7 @@ def load_gate_voltages_from_ds(ds_id, gates_name='gates', hardware_name='hardwar
     Args:
         ds_id (int) : id of the dataset to load
         gates_name (str) : name of gates instrument in the snapshot present in the dataset
-        harware_name (str) : name of the hardware in the snapshot
+        hardware_name (str) : name of the hardware in the snapshot
         force (bool) : if True overwrite without asking, else ask confirmation before changing voltage
     '''
     load_gate_voltages_from_snapshot(load_by_id(ds_id).snapshot,
@@ -46,7 +46,7 @@ def load_gate_voltages_from_snapshot(snapshot, gates_name='gates', hardware_name
     Args:
         snapshot (str) : json string with snapshot
         gates_name (str) : name of gates instrument in the snapshot
-        harware_name (str) : name of the hardware in the snapshot
+        hardware_name (str) : name of the hardware in the snapshot
         force (bool) : if True overwrite without asking, else ask confirmation before changing voltage
     '''
     gates_obj = qc.Station.default.components['gates']

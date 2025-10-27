@@ -61,13 +61,13 @@ class param_viewer(QtWidgets.QMainWindow):
         self.add_tab("All virtual")
 
         # add real gates
-        self._add_gates("Real", gates_object.hardware.dac_gate_map.keys())
+        self._add_gates("Real", gates_object.real_gates)
 
         # add virtual gates
         self._add_gates("All virtual", gates_object.v_gates)
 
         # add virtual gates per matrix
-        for virt_gate_set in gates_object.hardware.virtual_gates:
+        for virt_gate_set in gates_object.virtual_gate_matrices:
             vgm_name = virt_gate_set.name
             self.add_tab(vgm_name)
             self._add_gates(vgm_name, virt_gate_set.virtual_gate_names)

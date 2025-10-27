@@ -7,13 +7,16 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+
 class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
-    """docstring for virt_gate_matrix_GUI"""
-    def __init__(self, gates_object, pulse_lib, coloring=True):
+
+    def __init__(self, hardware, pulse_lib, coloring=True):
+        if not hasattr(hardware, "awg2dac_ratios"):
+            raise Exception("Expected `hardware` object with attribute `awg2dac_ratios.")
+
         self.gates = []
-        self.gates_object = gates_object
         self.AWG_attentuation_local_data = dict()
-        self.timers =list()
+        self.timers = list()
         instance_ready = True
         self._updating = False
         self._coloring = coloring
@@ -21,14 +24,7 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         self.pulse_lib = pulse_lib
         # Use attenuation table from the hardware object
         # hardware object is now data owner. Where needed changes should be reloaded to pulse_lib
-        hardware = self.gates_object.hardware
-        self._old_harware_class = not hasattr(hardware, 'awg2dac_ratios')
-        if self._old_harware_class:
-            # old harware class
-            self._awg_attenuation = hardware.AWG_to_dac_conversion
-        else:
-            # new hardware class
-            self._awg_attenuation = hardware.awg2dac_ratios
+        self._awg_attenuation = hardware.awg2dac_ratios
         # write attenuation to pulselib
         self.pulse_lib.set_channel_attenuations(self._awg_attenuation)
 
@@ -54,7 +50,7 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
             self._add_matrix(virtual_gate_set)
 
         self.show()
-        if instance_ready == False:
+        if instance_ready is False:
             self.app.exec()
 
     @qt_log_exception
@@ -77,7 +73,7 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         gate.setFont(font)
         gate.setLayoutDirection(QtCore.Qt.RightToLeft)
         gate.setAutoFillBackground(False)
-        gate.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
+        gate.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignTrailing | QtCore.Qt.AlignVCenter)
         gate.setObjectName(gate_name)
         self.verticalLayout_2.addWidget(gate)
         _translate = QtCore.QCoreApplication.translate
@@ -96,7 +92,7 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
 
         v_ratio.setValue(v_ratio_value)
 
-        v_ratio.valueChanged.connect(lambda:self.update_v_ratio(gate_name))
+        v_ratio.valueChanged.connect(lambda: self.update_v_ratio(gate_name))
         self.verticalLayout_4.addWidget(v_ratio)
 
         db_ratio = QtWidgets.QDoubleSpinBox(self.scrollAreaWidgetContents)
@@ -107,7 +103,7 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         db_ratio.setMaximumSize(QtCore.QSize(120, 26))
 
         db_ratio.setValue(20*np.log10(v_ratio_value))
-        db_ratio.valueChanged.connect(lambda:self.update_db_ratio(gate_name))
+        db_ratio.valueChanged.connect(lambda: self.update_db_ratio(gate_name))
         self.verticalLayout_3.addWidget(db_ratio)
 
         self.AWG_attentuation_local_data[gate_name] = (v_ratio, db_ratio)
@@ -115,7 +111,7 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
     @qt_log_exception
     def update_db_ratio(self, gate_name):
         '''
-        On change of the db ratio, update the voltage ratio to the corresponding value + update in the virtual gate matrixes.
+        On change of the db ratio, update the voltage ratio to the corresponding value.
 
         Args:
             gate_name (str) : name of the gate the is being updated
@@ -129,7 +125,7 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
     @qt_log_exception
     def update_v_ratio(self, gate_name):
         '''
-        On change of the voltage ratio, update the db ratio to the corresponding value + update in the virtual gate matrixes.
+        On change of the voltage ratio, update the db ratio to the corresponding value.
 
         Args:
             gate_name (str) : name of the gate the is being updated
@@ -143,10 +139,9 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
 
     @qt_log_exception
     def update_awg_attenuation(self, gate_name, v_ratio):
+        # _awg_attenuation is an object that sync's to the database.
         self._awg_attenuation[gate_name] = v_ratio
-        hardware = self.gates_object.hardware
-        if self._old_harware_class:
-            hardware.sync_data()
+        # also update in pulse-lib
         self.pulse_lib.set_channel_attenuations(self._awg_attenuation)
 
     @qt_log_exception
@@ -160,7 +155,6 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         self.verticalLayout_4.addItem(spacerItem2)
         spacerItem3 = QtWidgets.QSpacerItem(180, 1, QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Minimum)
         self.verticalLayout_4.addItem(spacerItem3)
-
 
         spacerItem4 = QtWidgets.QSpacerItem(140, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.verticalLayout_3.addItem(spacerItem4)
@@ -198,12 +192,12 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         tableWidget.setColumnCount(n_virtual)
         tableWidget.setObjectName("virtgates")
         tableWidget.setRowCount(n_real)
-        for i,name in enumerate(virtual_gate_set.virtual_gate_names):
+        for i, name in enumerate(virtual_gate_set.virtual_gate_names):
             item = QtWidgets.QTableWidgetItem()
             tableWidget.setHorizontalHeaderItem(i, item)
             item.setText(name)
 
-        for i,name in enumerate(virtual_gate_set.real_gate_names):
+        for i, name in enumerate(virtual_gate_set.real_gate_names):
             item = QtWidgets.QTableWidgetItem()
             tableWidget.setVerticalHeaderItem(i, item)
             item.setText(name)
@@ -217,7 +211,7 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         state = {
             'v2r': True,
             'displayed': np.zeros((n_real, n_virtual)),
-            }
+        }
         update_list = []
         for i in range(n_real):
             for j in range(n_virtual):
@@ -240,7 +234,7 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
                 doubleSpinBox.setMinimum(-99.999)
                 doubleSpinBox.setSingleStep(0.001)
                 doubleSpinBox.setDecimals(3)
-                doubleSpinBox.setContentsMargins(0,0,0,0)
+                doubleSpinBox.setContentsMargins(0, 0, 0, 0)
                 value = virtual_gate_set.get_element(i, j, v2r=True)
                 doubleSpinBox.setValue(value)
                 doubleSpinBox.setObjectName("doubleSpinBox")
@@ -253,7 +247,7 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         barLayout = QtWidgets.QHBoxLayout(controlBar)
 
         directionBtn = QtWidgets.QPushButton('Invert matrix')
-        directionBtn.clicked.connect(lambda:self.invert(virtual_gate_set, refresh, tableWidget, state))
+        directionBtn.clicked.connect(lambda: self.invert(virtual_gate_set, refresh, tableWidget, state))
         directionBtn.setMinimumSize(QtCore.QSize(150, 28))
         barLayout.addWidget(directionBtn)
 
@@ -263,21 +257,22 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
 
         if virtual_gate_set.normalization:
             normalizeBtn = QtWidgets.QPushButton('Normalize')
-            normalizeBtn.clicked.connect(lambda:self.normalize(virtual_gate_set, refresh))
+            normalizeBtn.clicked.connect(lambda: self.normalize(virtual_gate_set, refresh))
             normalizeBtn.setMinimumSize(QtCore.QSize(150, 28))
             barLayout.addWidget(normalizeBtn)
             reverseNormalizeBtn = QtWidgets.QPushButton('Reverse normalize')
-            reverseNormalizeBtn.clicked.connect(lambda:self.reverse_normalize(virtual_gate_set, refresh))
+            reverseNormalizeBtn.clicked.connect(lambda: self.reverse_normalize(virtual_gate_set, refresh))
             reverseNormalizeBtn.setMinimumSize(QtCore.QSize(150, 28))
             barLayout.addWidget(reverseNormalizeBtn)
 
-        horizontalSpacer = QtWidgets.QSpacerItem(10, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        horizontalSpacer = QtWidgets.QSpacerItem(
+            10, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         barLayout.addItem(horizontalSpacer)
         barLayout.setContentsMargins(2, 2, 2, 2)
         gridLayout.addWidget(controlBar, 1, 0, 1, 1)
 
         # Timer to refresh the data in the plot when the matrix is changed externally.
-        refresh = lambda:self.update_v_gates(virtual_gate_set, update_list, state, label_determinant)
+        def refresh(): return self.update_v_gates(virtual_gate_set, update_list, state, label_determinant)
         timer = QtCore.QTimer()
         timer.timeout.connect(refresh)
         timer.start(1000)
@@ -290,7 +285,7 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
             Lambda cannot be used directly in a for-loop. All calls will be reduced to 1 call.
             functools.partial doesn't work properly with decorators.
         '''
-        return lambda:self.linked_result(virtual_gate_set, i, j, doubleSpinBox, state)
+        return lambda: self.linked_result(virtual_gate_set, i, j, doubleSpinBox, state)
 
     @qt_log_exception
     def normalize(self, virtual_gate_set, refresh):
@@ -351,7 +346,7 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
             spin_box.setStyleSheet("font-weight: normal;")
             return
         if value == 0.0:
-            r,g,b = 255,255,255
+            r, g, b = 255, 255, 255
         elif value > 0:
             # blue
             b = 255
@@ -394,7 +389,7 @@ if __name__ == "__main__":
     my_dac_3 = virtual_dac("dac_c", "virtual")
     my_dac_4 = virtual_dac("dac_d", "virtual")
 
-    hw =  hardware6dot('test1')
+    hw = hardware6dot('test1')
     my_gates = gates("my_gates", hw, [my_dac_1, my_dac_2, my_dac_3, my_dac_4])
     pulse = get_demo_lib('six')
 

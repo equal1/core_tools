@@ -8,25 +8,31 @@ import numpy as np
 import qcodes as qc
 
 from core_tools import __version__ as ct_version
-from core_tools.drivers.hardware.hardware import hardware as hw_parent
+from core_tools.drivers.hardware.virtual_gate_matrix import VirtualGateMatrix
 
 logger = logging.getLogger(__name__)
 
 
-class gates(qc.Instrument):
+class GatesBase(qc.Instrument):
     """
-    gates class, generate qcodes parameters for the real gates and the virtual gates
-    It also manages the virtual gate matrix.
+    Gates base class, generate qcodes parameters for the real gates and the virtual gates.
     """
 
-    def __init__(self, name, hardware, dac_sources, dc_gain={}):
+    def __init__(
+        self,
+            name: str,
+            dac_params: dict[str, qc.Parameter],
+            virtual_gate_matrices: list[VirtualGateMatrix],
+            dc_gain: dict[str, float] = {}
+    ):
         '''
-        gates object
+        Instrument with DC gate parameters for real and virtual gates.
+
         args:
-            name (str) : name of the instrument
-            hardware (class) : class describing the instrument
-            dac_sources (list<virtual_dac>) : list with the dacs
-            dc_gain (Dict[str,float]) : DC gain factors to compensate for.
+            name: name of the instrument
+            dac_params: QCoDeS Parameters to set and get DC voltage of a named gate in mV.
+            virtual_gate_matrices: list with virtual gate matrices.
+            dc_gain: DC gain factors to compensate for.
 
         Notes:
             DC gain is the value of the external amplification factor.
@@ -35,25 +41,21 @@ class gates(qc.Instrument):
 
             To avoid accidents, DC gain cannot be changed at run-time.
         '''
-        super(gates, self).__init__(name)
+        super().__init__(name)
 
-        if not isinstance(hardware, hw_parent):
-            logger.info('Detected old hardware class')
-
-        self.hardware = hardware
         self.dc_gain = dc_gain.copy()
 
-        self._dac_params = {}
+        self._dac_params = dac_params.copy()
         self._gv = dict()
+        self._virtual_gate_matrices = virtual_gate_matrices
         self._real_gates = list()
         self._virtual_gates = list()
         self._virt_gate_convertors = list()
         self._all_gate_names = list()
+        self._gate_limits: dict[str, tuple[float, float]] = {}
 
         # add gates:
-        for gate_name, dac_location in self.hardware.dac_gate_map.items():
-            source_index, ch_num = dac_location
-            self._dac_params[gate_name] = dac_sources[source_index].parameters[f'dac{int(ch_num)}']
+        for gate_name in self._dac_params:
             self._all_gate_names.append(gate_name)
             self._real_gates.append(gate_name)
             self.add_parameter(gate_name, set_cmd=partial(self._set_voltage,  gate_name),
@@ -61,7 +63,7 @@ class gates(qc.Instrument):
                                unit="mV")
 
         # make virtual gates:
-        for virt_gate_set in self.hardware.virtual_gates:
+        for virt_gate_set in virtual_gate_matrices:
             virt_gate_convertor = virt_gate_set.get_view(available_gates=self._all_gate_names)
             self._virt_gate_convertors.append(virt_gate_convertor)
             virtual_gates = virt_gate_convertor.virtual_gates
@@ -90,8 +92,27 @@ class gates(qc.Instrument):
         return list(self._real_gates)
 
     @property
+    def real_gates(self):
+        return list(self._real_gates)
+
+    @property
     def v_gates(self):
         return list(self._virtual_gates)
+
+    @property
+    def virtual_gate_matrices(self):
+        return self._virtual_gate_matrices
+
+    def set_gate_limits(self, gate_limits: dict[str, tuple[float, float]]):
+        for name, limits in gate_limits.items():
+            self._gate_limits[name] = limits
+
+    def _check_limits(self, gate_name: str, voltage):
+        if gate_name in self._gate_limits:
+            min_voltage, max_voltage = self._gate_limits[gate_name]
+            if voltage < min_voltage or voltage > max_voltage:
+                raise ValueError(f"Voltage limits violated, trying to set gate {gate_name} to {voltage:.1f} mV.\n"
+                                 f"The limit is set to {min_voltage} to {max_voltage} mV.")
 
     def _set_voltage(self, gate_name, voltage):
         '''
@@ -100,11 +121,7 @@ class gates(qc.Instrument):
             voltage (double) : voltage to set
             gate_name (str) : name of the gate to set
         '''
-        if gate_name in self.hardware.boundaries.keys():
-            min_voltage, max_voltage = self.hardware.boundaries[gate_name]
-            if voltage < min_voltage or voltage > max_voltage:
-                raise ValueError(f"Voltage boundaries violated, trying to set gate {gate_name} to {voltage:.1f} mV.\n"
-                                 f"The limit is set to {min_voltage} to {max_voltage} mV.")
+        self._check_limits(gate_name, voltage)
 
         if gate_name in self.dc_gain:
             dac_voltage = voltage / self.dc_gain[gate_name]
@@ -164,7 +181,7 @@ class gates(qc.Instrument):
         set all dacs in the gate set to 0. Is ramped down 1 per 1
         '''
         print("In progress ..")
-        for gate_name, dac_location in self.hardware.dac_gate_map.items():
+        for gate_name in self._real_gates:
             self.parameters[gate_name].set(0)
         print("All gates set to 0!")
 
@@ -172,7 +189,7 @@ class gates(qc.Instrument):
     def gv(self) -> dict[str, float]:
         '''Returns voltages of all real gates.
         '''
-        for gate_name, my_dac_location in self.hardware.dac_gate_map.items():
+        for gate_name in self._real_gates:
             self._gv[gate_name] = self._get_voltage(gate_name)
 
         return copy.copy(self._gv)
@@ -355,6 +372,43 @@ class gates(qc.Instrument):
             if force or confirm("Apply these voltages?"):
                 for name in changed_gates:
                     self.parameters[name].set(new_voltages[name])
+
+
+class gates(GatesBase):
+    def __init__(
+        self,
+            name: str,
+            hardware,
+            dac_sources,
+            dc_gain: dict[str, float] = {}):
+        '''
+        Instruments with DC gates, real and virtual.
+        It maps the dac sources to named gates.
+
+        args:
+            name (str) : name of the instrument
+            hardware (class) : class describing the instrument
+            dac_sources (list<virtual_dac>) : list with the dacs
+            dc_gain (Dict[str,float]) : DC gain factors to compensate for.
+
+        Notes:
+            DC gain is the value of the external amplification factor.
+            dc_gain = {'P1': 4.0} means P1 has an external amplification of 4.0.
+            The DAC output will be set to v_gate/4.0.
+
+            To avoid accidents, DC gain cannot be changed at run-time.
+        '''
+
+        # get DC parameters
+        dac_params = {}
+        for gate_name, dac_location in hardware.dac_gate_map.items():
+            source_index, ch_num = dac_location
+            dac_params[gate_name] = dac_sources[source_index].parameters[f'dac{int(ch_num)}']
+
+        virtual_gate_matrices = list(hardware.virtual_gates)
+        super().__init__(name, dac_params, virtual_gate_matrices, dc_gain)
+
+        super().set_gate_limits(hardware.boundaries)
 
 
 def confirm(prompt_text):
