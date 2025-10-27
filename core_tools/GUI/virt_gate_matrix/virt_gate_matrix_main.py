@@ -295,7 +295,8 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         bar_layout.addStretch(1)
         grid_layout.addWidget(control_bar, 1, 0, 1, 1)
 
-        tab_title = virtual_gate_set.name or "Virtual gates"
+        # tab_title = virtual_gate_set.name or "Virtual gates"
+        tab_title = "Virtual Gates"
         self.tabWidget.addTab(matrix_widget, tab_title)
 
     # ------------------------------------------------------------------
