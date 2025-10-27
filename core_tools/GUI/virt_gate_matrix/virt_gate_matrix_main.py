@@ -414,7 +414,7 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         refresh()
 
         # tab_title = virtual_gate_set.name or "Virtual gates"
-        tab_title = "Virtual gates"
+        tab_title = "Virtual Gates"
         self.tabWidget.addTab(matrix_widget, tab_title)
 
     # ------------------------------------------------------------------
