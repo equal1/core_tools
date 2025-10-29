@@ -6,7 +6,7 @@ from typing import Any, Callable
 import numpy as np
 from qcodes import MultiParameter
 
-from .iq_modes import get_channel_map, get_channel_map_dig_4ch, add_channel_map_units
+from .iq_modes import add_channel_map_units, get_channel_map, get_channel_map_dig_4ch
 
 
 @dataclass
@@ -28,23 +28,22 @@ class ScanConfigBase:
                 "channel": mapping[0],
                 "func": getattr(mapping[1], "__name__", str(mapping[1])),
                 "unit": mapping[2],
-                }
+            }
         return dict(
             t_measure=dict(label="t_measure", value=self.t_measure, unit="ns"),
             channel_map=channel_map_snapshot,
             biasT_corr=self.biasT_corr,
             iq_mode=self.iq_mode,
             acquisition_delay=dict(
-                label="acquisition_delay",
-                value=self.acquisition_delay_ns,
-                unit="ns"),
+                label="acquisition_delay", value=self.acquisition_delay_ns, unit="ns"
+            ),
             enabled_markers=self.enabled_markers,
             pulse_gates={
                 name: dict(label=name, value=value, unit="mV")
                 for name, value in self.pulse_gates.items()
-                },
+            },
             line_margin=self.line_margin,
-            )
+        )
 
 
 @dataclass
@@ -58,17 +57,17 @@ class ScanConfig1D(ScanConfigBase):
     voltages: np.ndarray = field(init=False)
 
     def __post_init__(self):
-        vp = self.swing/2
-        n_ptx = self.n_pt + 2*self.line_margin
+        vp = self.swing / 2
+        n_ptx = self.n_pt + 2 * self.line_margin
         self.n_ptx = n_ptx
-        vpx = vp * (self.n_ptx-1)/(self.n_pt-1)
+        vpx = vp * (self.n_ptx - 1) / (self.n_pt - 1)
         self.vpx = vpx
 
         # set up sweep voltages (get the right order, to compensate for the biasT).
         self.voltages_sp = np.linspace(-vp, vp, self.n_pt)
         voltages_x = np.linspace(-vpx, vpx, n_ptx)
         if self.biasT_corr:
-            m = (n_ptx+1)//2
+            m = (n_ptx + 1) // 2
             voltages = np.zeros(n_ptx)
             voltages[::2] = voltages_x[:m]
             voltages[1::2] = voltages_x[m:][::-1]
@@ -78,15 +77,15 @@ class ScanConfig1D(ScanConfigBase):
 
     @property
     def names(self):
-        return (self.gate, )
+        return (self.gate,)
 
     @property
     def shape(self):
-        return (self.n_pt, )
+        return (self.n_pt,)
 
     @property
     def setpoints(self):
-        return (tuple(self.voltages_sp), )
+        return (tuple(self.voltages_sp),)
 
     def snapshot(self):
         snapshot_base = super().snapshot()
@@ -94,7 +93,7 @@ class ScanConfig1D(ScanConfigBase):
             gate=self.gate,
             swing=dict(label="swing", value=self.swing, unit="mV"),
             n_pt=self.n_pt,
-            )
+        )
         return snapshot_1D | snapshot_base
 
 
@@ -113,20 +112,20 @@ class ScanConfig2D(ScanConfigBase):
     voltages2: np.ndarray = field(init=False)
 
     def __post_init__(self):
-        vp1 = self.swing1/2
-        vp2 = self.swing2/2
+        vp1 = self.swing1 / 2
+        vp2 = self.swing2 / 2
         self.vp2 = vp2
 
         self.voltages1_sp = np.linspace(-vp1, vp1, self.n_pt1)
         self.voltages2_sp = np.linspace(-vp2, vp2, self.n_pt2)
         voltages2_sp = self.voltages2_sp
 
-        self.n_ptx = self.n_pt1 + 2*self.line_margin
-        vpx = vp1 * (self.n_ptx-1)/(self.n_pt1-1)
+        self.n_ptx = self.n_pt1 + 2 * self.line_margin
+        vpx = vp1 * (self.n_ptx - 1) / (self.n_pt1 - 1)
         self.vpx = vpx
 
         if self.biasT_corr:
-            m = (self.n_pt2+1)//2
+            m = (self.n_pt2 + 1) // 2
             voltages2 = np.zeros(self.n_pt2)
             voltages2[::2] = voltages2_sp[:m]
             voltages2[1::2] = voltages2_sp[m:][::-1]
@@ -144,7 +143,7 @@ class ScanConfig2D(ScanConfigBase):
 
     @property
     def setpoints(self):
-        return (tuple(self.voltages2_sp), (tuple(self.voltages1_sp),)*self.n_pt2)
+        return (tuple(self.voltages2_sp), (tuple(self.voltages1_sp),) * self.n_pt2)
 
     def snapshot(self):
         snapshot_base = super().snapshot()
@@ -155,12 +154,11 @@ class ScanConfig2D(ScanConfigBase):
             gate2=self.gate2,
             swing2=dict(label="swing2", value=self.swing2, unit="mV"),
             n_pt2=self.n_pt2,
-            )
+        )
         return snapshot_2D | snapshot_base
 
 
 class FastScanParameterBase(MultiParameter):
-
     def __init__(self, scan_config: ScanConfigBase):
         self.config = scan_config
         self.channel_names = tuple(self.config.channel_map.keys())
@@ -169,16 +167,18 @@ class FastScanParameterBase(MultiParameter):
 
         n_out_ch = len(self.channel_names)
         axes_names = self.config.names
-        super().__init__(name="fast_scan",
-                         names=self.channel_names,
-                         shapes=tuple([self.config.shape]*n_out_ch),
-                         labels=self.channel_names,
-                         units=units,
-                         setpoints=tuple([self.config.setpoints]*n_out_ch),
-                         setpoint_names=tuple([axes_names]*n_out_ch),
-                         setpoint_labels=tuple([axes_names]*n_out_ch),
-                         setpoint_units=(("mV", )*len(axes_names), )*n_out_ch,
-                         docstring='Fast scan parameter (video mode)')
+        super().__init__(
+            name="fast_scan",
+            names=self.channel_names,
+            shapes=tuple([self.config.shape] * n_out_ch),
+            labels=self.channel_names,
+            units=units,
+            setpoints=tuple([self.config.setpoints] * n_out_ch),
+            setpoint_names=tuple([axes_names] * n_out_ch),
+            setpoint_labels=tuple([axes_names] * n_out_ch),
+            setpoint_units=(("mV",) * len(axes_names),) * n_out_ch,
+            docstring="Fast scan parameter (video mode)",
+        )
 
     @abstractmethod
     def get_channel_data(self) -> dict[str, np.ndarray]:
@@ -197,8 +197,8 @@ class FastScanParameterBase(MultiParameter):
             ch_data = raw[name].reshape(shape)
             if self.config.biasT_corr:
                 data = np.zeros(shape, dtype=ch_data.dtype)
-                data[:len(ch_data[::2])] = ch_data[::2]
-                data[len(ch_data[::2]):] = ch_data[1::2][::-1]
+                data[: len(ch_data[::2])] = ch_data[::2]
+                data[len(ch_data[::2]) :] = ch_data[1::2][::-1]
                 raw[name] = data
             else:
                 raw[name] = ch_data
@@ -211,10 +211,11 @@ class FastScanParameterBase(MultiParameter):
 
         return tuple(data_out)
 
-    def snapshot_base(self,
-                      update: bool | None = True,
-                      params_to_skip_update: Sequence[str] | None = None
-                      ) -> dict[Any, Any]:
+    def snapshot_base(
+        self,
+        update: bool | None = True,
+        params_to_skip_update: Sequence[str] | None = None,
+    ) -> dict[Any, Any]:
         snapshot = super().snapshot_base(update, params_to_skip_update)
         snapshot.update({"parameters": self.config.snapshot()})
         return snapshot
@@ -245,7 +246,9 @@ class FastScanGeneratorBase:
         self.acquisition_delay_ns: float = 500
         self.enabled_markers: list[str] = []
         self.line_margin: int = 0
-        self._channel_map: dict[str, tuple[int, Callable[[np.ndarray], np.ndarray], str]] = {}
+        self._channel_map: dict[
+            str, tuple[int, Callable[[np.ndarray], np.ndarray], str]
+        ] = {}
 
     def set_pulse_lib(self, pulse_lib):
         """
@@ -279,10 +282,10 @@ class FastScanGeneratorBase:
         self.iq_mode = iq_mode
 
     def set_channels(
-            self,
-            channels: list[str] | list[int] | None = None,
-            iq_mode: str | None = "I",
-            ) -> None:
+        self,
+        channels: list[str] | list[int] | None = None,
+        iq_mode: str | None = "I",
+    ) -> None:
         """
         Args:
             channels:
@@ -300,9 +303,9 @@ class FastScanGeneratorBase:
         self._channel_map = channel_map
 
     def set_channel_map(
-            self,
-            channel_map: dict[str, tuple[int, Callable[[np.ndarray], np.ndarray]]],
-            ) -> None:
+        self,
+        channel_map: dict[str, tuple[int, Callable[[np.ndarray], np.ndarray]]],
+    ) -> None:
         """
         Args:
             channel_map:
@@ -315,15 +318,17 @@ class FastScanGeneratorBase:
         self._channel_map = add_channel_map_units(channel_map)
 
     @property
-    def channel_map(self) -> dict[str, tuple[int, Callable[[np.ndarray], np.ndarray], str]]:
+    def channel_map(
+        self,
+    ) -> dict[str, tuple[int, Callable[[np.ndarray], np.ndarray], str]]:
         return self._channel_map
 
     def configure(
-            self,
-            acquisition_delay_ns: float = 500,
-            enabled_markers: list[str] = [],
-            line_margin: int = 0,
-            ):
+        self,
+        acquisition_delay_ns: float = 500,
+        enabled_markers: list[str] = [],
+        line_margin: int = 0,
+    ):
         """
         Args:
             acquisition_delay_ns (float):
@@ -339,38 +344,67 @@ class FastScanGeneratorBase:
         self.line_margin = int(line_margin)
 
     def get_config1D(
-            self,
-            gate: str, swing: float, n_pt: int, t_measure: float,
-            pulse_gates: dict[str, float] = {},
-            biasT_corr: bool = False,
-            ) -> ScanConfig1D:
+        self,
+        gate: str,
+        swing: float,
+        n_pt: int,
+        t_measure: float,
+        pulse_gates: dict[str, float] = {},
+        biasT_corr: bool = False,
+    ) -> ScanConfig1D:
         return ScanConfig1D(
-            t_measure, pulse_gates, self.channel_map, self.iq_mode, biasT_corr,
-            self.acquisition_delay_ns, self.line_margin, self.enabled_markers,
-            gate, swing, n_pt)
+            t_measure,
+            pulse_gates,
+            self.channel_map,
+            self.iq_mode,
+            biasT_corr,
+            self.acquisition_delay_ns,
+            self.line_margin,
+            self.enabled_markers,
+            gate,
+            swing,
+            n_pt,
+        )
 
     def get_config2D(
-            self,
-            gate1: str, swing1: float, n_pt1: int,
-            gate2: str, swing2: float, n_pt2: int,
-            t_measure: float,
-            pulse_gates: dict[str, float] = {},
-            biasT_corr: bool = False,
-            ) -> ScanConfig2D:
+        self,
+        gate1: str,
+        swing1: float,
+        n_pt1: int,
+        gate2: str,
+        swing2: float,
+        n_pt2: int,
+        t_measure: float,
+        pulse_gates: dict[str, float] = {},
+        biasT_corr: bool = False,
+    ) -> ScanConfig2D:
         return ScanConfig2D(
-            t_measure, pulse_gates, self.channel_map, self.iq_mode, biasT_corr,
-            self.acquisition_delay_ns, self.line_margin, self.enabled_markers,
-            gate1, swing1, n_pt1,
-            gate2, swing2, n_pt2,
-            )
+            t_measure,
+            pulse_gates,
+            self.channel_map,
+            self.iq_mode,
+            biasT_corr,
+            self.acquisition_delay_ns,
+            self.line_margin,
+            self.enabled_markers,
+            gate1,
+            swing1,
+            n_pt1,
+            gate2,
+            swing2,
+            n_pt2,
+        )
 
     @abstractmethod
     def create_1D_scan(
-            self,
-            gate: str, swing: float, n_pt: int, t_step: float,
-            pulse_gates: dict[str, float] = {},
-            biasT_corr: bool = False,
-            ) -> FastScanParameterBase:
+        self,
+        gate: str,
+        swing: float,
+        n_pt: int,
+        t_step: float,
+        pulse_gates: dict[str, float] = {},
+        biasT_corr: bool = False,
+    ) -> FastScanParameterBase:
         """Creates 1D fast scan parameter.
 
         Args:
@@ -390,13 +424,17 @@ class FastScanGeneratorBase:
 
     @abstractmethod
     def create_2D_scan(
-            self,
-            gate1: str, swing1: float, n_pt1: int,
-            gate2: str, swing2: float, n_pt2: int,
-            t_step: float,
-            pulse_gates: dict[str, float] = {},
-            biasT_corr: bool = True,
-            ) -> FastScanParameterBase:
+        self,
+        gate1: str,
+        swing1: float,
+        n_pt1: int,
+        gate2: str,
+        swing2: float,
+        n_pt2: int,
+        t_step: float,
+        pulse_gates: dict[str, float] = {},
+        biasT_corr: bool = True,
+    ) -> FastScanParameterBase:
         """Creates 2D fast scan parameter.
 
         Args:

@@ -42,86 +42,15 @@ class OPXFastScanParameter(FastScanParameterBase):
         pass
 
     def get_channel_data(self) -> dict[str, np.ndarray]:
-        frames = self._collect_frames()
-
-        flattened: dict[str, np.ndarray] = {}
-        for name, arr in frames.items():
-            if self.config.biasT_corr:
-                flattened[name] = self._encode_bias_t(arr)
-            else:
-                flattened[name] = arr.reshape(-1)
-
-        return flattened
-
-    def _collect_frames(self) -> dict[str, np.ndarray]:
-        raw_data = self.pulse_lib.opx.opx_run()
-        shape = self.config.shape
-        size = int(np.prod(shape))
-
-        frames: dict[str, np.ndarray] = {}
-        for name, data in zip(self.data_channels, raw_data):
-            arr = np.asarray(data)
-            if arr.size != size:
-                raise ValueError(
-                    "Received data size %s does not match expected scan size %s"
-                    % (arr.size, size)
-                )
-
-            arr = self._reshape_to_scan(arr, shape)
-            frames[name] = arr
-
-        return frames
-
-    def get_raw(self):
-        frames = self._collect_frames()
-
-        data_out = []
-        for ch, func, _ in self.config.channel_map.values():
-            ch_data = frames[ch]
-            data_out.append(func(ch_data))
-
-        return tuple(data_out)
-
-    @staticmethod
-    def _reshape_to_scan(arr: np.ndarray, target_shape: tuple[int, ...]) -> np.ndarray:
-        """Ensure array matches the scan shape and orientation."""
-
-        if arr.ndim == len(target_shape) and arr.shape == target_shape:
-            return np.array(arr, copy=True)
-
-        if arr.ndim == len(target_shape) and arr.shape[::-1] == target_shape:
-            axes = tuple(reversed(range(arr.ndim)))
-            return np.array(arr.transpose(axes), copy=True)
-
-        reshaped = np.array(arr, copy=True).reshape(target_shape)
-        return reshaped
-
-    @staticmethod
-    def _encode_bias_t(arr: np.ndarray) -> np.ndarray:
-        """Re-create the bias-T serpentine ordering expected by the base class."""
-
-        if arr.ndim == 1:
-            n_even = (arr.size + 1) // 2
-            encoded = np.empty_like(arr)
-            encoded[::2] = arr[:n_even]
-            if arr.size > 1:
-                encoded[1::2] = arr[n_even:][::-1]
-            return encoded
-
-        if arr.ndim == 2:
-            rows = arr.shape[0]
-            encoded = np.empty_like(arr)
-            n_even = (rows + 1) // 2
-            encoded[::2] = arr[:n_even]
-            if rows > 1:
-                encoded[1::2] = arr[n_even:][::-1]
-            return encoded.reshape(-1)
-
-        return arr.reshape(-1)
+        raw_data = self.pulse_lib.opx.run()
+        return {name: data for name, data in zip(self.data_channels, raw_data)}
 
     def close(self):  # pragma: no cover - hardware interaction
-        if hasattr(self.pulse_lib, "opx"):
-            self.pulse_lib.opx.opx_close()
+        self.pulse_lib.opx.close()
+
+    def stop(self):  # pragma: no cover - matches legacy behaviour
+        """Override base stop to avoid closing the OPX session on mode switches."""
+        return
 
 
 class FastScanGenerator(FastScanGeneratorBase):
@@ -139,15 +68,33 @@ class FastScanGenerator(FastScanGeneratorBase):
         # "transport": ["_Transport_DC_current"], # Disable for now
     }
 
-    def _setup_channels(self):
-        channels = self._iq_mode_channels.get(self.iq_mode, ["_I"])
-        self.pulse_lib.opx.channels = channels
+    def _resolve_iq_mode(self, iq_mode: str | None = None) -> list[str]:
+        """Return the OPX channel suffixes for the requested IQ mode."""
+
+        mode = iq_mode if iq_mode is not None else self.iq_mode
+        return self._iq_mode_channels.get(mode, ["_I"])
+
+    def _build_channel_map(self, channels: list[str]):
+        """Create a channel map without touching the hardware."""
+
         channel_map = {
             f"ch{i + 1}": (f"ch{i + 1}", lambda x: x, "mV")
             for i in range(len(channels))
         }
         self._channel_map = channel_map
-        return list(channel_map.keys())
+        return channel_map
+
+    def preview_channel_map(self, iq_mode: str | None):
+        """Generate a channel map for UI updates without accessing the OPX driver."""
+
+        channels = self._resolve_iq_mode(iq_mode)
+        return self._build_channel_map(channels)
+
+    def _setup_channels(self):
+        channels = self._resolve_iq_mode()
+        self.pulse_lib.opx.channels = channels
+        self._build_channel_map(channels)
+        return list(self._channel_map.keys())
 
     def create_1D_scan(
         self,
@@ -167,7 +114,7 @@ class FastScanGenerator(FastScanGeneratorBase):
         )
 
         m_param = OPXFastScanParameter(config, self.pulse_lib, data_channels)
-        self.pulse_lib.opx.opx_update_sweep(
+        self.pulse_lib.opx.sweep_gates(
             m_param,
             config.names,
             config.setpoints,
@@ -207,7 +154,7 @@ class FastScanGenerator(FastScanGeneratorBase):
         )
 
         m_param = OPXFastScanParameter(config, self.pulse_lib, data_channels)
-        self.pulse_lib.opx.opx_update_sweep(
+        self.pulse_lib.opx.sweep_gates(
             m_param,
             config.names,
             config.setpoints,

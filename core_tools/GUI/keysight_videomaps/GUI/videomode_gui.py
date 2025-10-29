@@ -16,16 +16,22 @@ class Ui_MainWindow(object):
         MainWindow.setObjectName("MainWindow")
         MainWindow.setEnabled(True)
         MainWindow.resize(1300, 800)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(MainWindow.sizePolicy().hasHeightForWidth())
         MainWindow.setSizePolicy(sizePolicy)
         self.centralwidget = QtWidgets.QWidget(MainWindow)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.centralwidget.sizePolicy().hasHeightForWidth())
+        sizePolicy.setHeightForWidth(
+            self.centralwidget.sizePolicy().hasHeightForWidth()
+        )
         self.centralwidget.setSizePolicy(sizePolicy)
         self.centralwidget.setMinimumSize(QtCore.QSize(0, 700))
         self.centralwidget.setObjectName("centralwidget")
@@ -41,7 +47,9 @@ class Ui_MainWindow(object):
         self.gridLayout.setContentsMargins(0, 0, 0, 0)
         self.gridLayout.setObjectName("gridLayout")
         self.frame_1D = QtWidgets.QFrame(self._1D)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Expanding)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Expanding
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.frame_1D.sizePolicy().hasHeightForWidth())
@@ -57,8 +65,12 @@ class Ui_MainWindow(object):
         self.verticalLayout.setSpacing(0)
         self.verticalLayout.setObjectName("verticalLayout")
         self.formLayout_1D = QtWidgets.QFormLayout()
-        self.formLayout_1D.setLabelAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignTop)
-        self.formLayout_1D.setFormAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignTop)
+        self.formLayout_1D.setLabelAlignment(
+            QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop
+        )
+        self.formLayout_1D.setFormAlignment(
+            QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop
+        )
         self.formLayout_1D.setContentsMargins(0, 0, 0, -1)
         self.formLayout_1D.setHorizontalSpacing(14)
         self.formLayout_1D.setVerticalSpacing(5)
@@ -66,7 +78,9 @@ class Ui_MainWindow(object):
         self.hboxlayout = QtWidgets.QHBoxLayout()
         self.hboxlayout.setObjectName("hboxlayout")
         self._1D_play = QtWidgets.QPushButton(self.frame_1D)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self._1D_play.sizePolicy().hasHeightForWidth())
@@ -75,7 +89,9 @@ class Ui_MainWindow(object):
         self._1D_play.setObjectName("_1D_play")
         self.hboxlayout.addWidget(self._1D_play)
         self._1D_pause = QtWidgets.QPushButton(self.frame_1D)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self._1D_pause.sizePolicy().hasHeightForWidth())
@@ -84,7 +100,9 @@ class Ui_MainWindow(object):
         self._1D_pause.setObjectName("_1D_pause")
         self.hboxlayout.addWidget(self._1D_pause)
         self._1D_reload = QtWidgets.QPushButton(self.frame_1D)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self._1D_reload.sizePolicy().hasHeightForWidth())
@@ -93,7 +111,9 @@ class Ui_MainWindow(object):
         self._1D_reload.setObjectName("_1D_reload")
         self.hboxlayout.addWidget(self._1D_reload)
         self._1D_step = QtWidgets.QPushButton(self.frame_1D)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self._1D_step.sizePolicy().hasHeightForWidth())
@@ -101,22 +121,40 @@ class Ui_MainWindow(object):
         self._1D_step.setMinimumSize(QtCore.QSize(0, 40))
         self._1D_step.setObjectName("_1D_step")
         self.hboxlayout.addWidget(self._1D_step)
-        self.formLayout_1D.setLayout(0, QtWidgets.QFormLayout.SpanningRole, self.hboxlayout)
-        spacerItem = QtWidgets.QSpacerItem(20, 1, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
-        self.formLayout_1D.setItem(1, QtWidgets.QFormLayout.LabelRole, spacerItem)
+        self.formLayout_1D.setLayout(
+            0, QtWidgets.QFormLayout.SpanningRole, self.hboxlayout
+        )
+        self._1D_measure_IQ_mode_label = QtWidgets.QLabel(self.frame_1D)
+        self._1D_measure_IQ_mode_label.setObjectName("_1D_measure_IQ_mode_label")
+        self.formLayout_1D.setWidget(
+            1, QtWidgets.QFormLayout.LabelRole, self._1D_measure_IQ_mode_label
+        )
+        self._1D_measure_IQ_mode = QtWidgets.QComboBox(self.frame_1D)
+        self._1D_measure_IQ_mode.setObjectName("_1D_measure_IQ_mode")
+        self.formLayout_1D.setWidget(
+            1, QtWidgets.QFormLayout.FieldRole, self._1D_measure_IQ_mode
+        )
         self._1D_gate_name_label = QtWidgets.QLabel(self.frame_1D)
         self._1D_gate_name_label.setObjectName("_1D_gate_name_label")
-        self.formLayout_1D.setWidget(2, QtWidgets.QFormLayout.LabelRole, self._1D_gate_name_label)
+        self.formLayout_1D.setWidget(
+            2, QtWidgets.QFormLayout.LabelRole, self._1D_gate_name_label
+        )
         self._1D_gate_name = QtWidgets.QComboBox(self.frame_1D)
         self._1D_gate_name.setEnabled(True)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self._1D_gate_name.sizePolicy().hasHeightForWidth())
+        sizePolicy.setHeightForWidth(
+            self._1D_gate_name.sizePolicy().hasHeightForWidth()
+        )
         self._1D_gate_name.setSizePolicy(sizePolicy)
         self._1D_gate_name.setMinimumSize(QtCore.QSize(107, 0))
         self._1D_gate_name.setObjectName("_1D_gate_name")
-        self.formLayout_1D.setWidget(2, QtWidgets.QFormLayout.FieldRole, self._1D_gate_name)
+        self.formLayout_1D.setWidget(
+            2, QtWidgets.QFormLayout.FieldRole, self._1D_gate_name
+        )
         self.label_5 = QtWidgets.QLabel(self.frame_1D)
         self.label_5.setObjectName("label_5")
         self.formLayout_1D.setWidget(3, QtWidgets.QFormLayout.LabelRole, self.label_5)
@@ -126,7 +164,9 @@ class Ui_MainWindow(object):
         self._1D_V_swing.setMinimum(-1000.0)
         self._1D_V_swing.setMaximum(1000.0)
         self._1D_V_swing.setObjectName("_1D_V_swing")
-        self.formLayout_1D.setWidget(3, QtWidgets.QFormLayout.FieldRole, self._1D_V_swing)
+        self.formLayout_1D.setWidget(
+            3, QtWidgets.QFormLayout.FieldRole, self._1D_V_swing
+        )
         self.label_2 = QtWidgets.QLabel(self.frame_1D)
         self.label_2.setObjectName("label_2")
         self.formLayout_1D.setWidget(4, QtWidgets.QFormLayout.LabelRole, self.label_2)
@@ -143,29 +183,43 @@ class Ui_MainWindow(object):
         self._1D_t_meas.setDecimals(1)
         self._1D_t_meas.setMaximum(100000.0)
         self._1D_t_meas.setObjectName("_1D_t_meas")
-        self.formLayout_1D.setWidget(5, QtWidgets.QFormLayout.FieldRole, self._1D_t_meas)
-        spacerItem1 = QtWidgets.QSpacerItem(24, 8, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum)
+        self.formLayout_1D.setWidget(
+            5, QtWidgets.QFormLayout.FieldRole, self._1D_t_meas
+        )
+        spacerItem1 = QtWidgets.QSpacerItem(
+            24, 8, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum
+        )
         self.formLayout_1D.setItem(8, QtWidgets.QFormLayout.LabelRole, spacerItem1)
         self.label_DC_offsets1D = QtWidgets.QLabel(self.frame_1D)
         self.label_DC_offsets1D.setAlignment(QtCore.Qt.AlignHCenter)
         self.label_DC_offsets1D.setObjectName("label_DC_offsets1D")
-        self.formLayout_1D.setWidget(9, QtWidgets.QFormLayout.SpanningRole, self.label_DC_offsets1D)
-        spacerItem2 = QtWidgets.QSpacerItem(24, 8, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum)
+        self.formLayout_1D.setWidget(
+            9, QtWidgets.QFormLayout.SpanningRole, self.label_DC_offsets1D
+        )
+        spacerItem2 = QtWidgets.QSpacerItem(
+            24, 8, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum
+        )
         self.formLayout_1D.setItem(30, QtWidgets.QFormLayout.LabelRole, spacerItem2)
-        spacerItem3 = QtWidgets.QSpacerItem(20, 8, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.MinimumExpanding)
+        spacerItem3 = QtWidgets.QSpacerItem(
+            20, 8, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.MinimumExpanding
+        )
         self.formLayout_1D.setItem(32, QtWidgets.QFormLayout.LabelRole, spacerItem3)
         self.hboxlayout1 = QtWidgets.QHBoxLayout()
         self.hboxlayout1.setObjectName("hboxlayout1")
         self.label_3 = QtWidgets.QLabel(self.frame_1D)
         self.label_3.setObjectName("label_3")
         self.hboxlayout1.addWidget(self.label_3)
-        spacerItem4 = QtWidgets.QSpacerItem(10, 20, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum)
+        spacerItem4 = QtWidgets.QSpacerItem(
+            10, 20, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum
+        )
         self.hboxlayout1.addItem(spacerItem4)
         self._1D_av_progress = QtWidgets.QProgressBar(self.frame_1D)
         self._1D_av_progress.setProperty("value", 0)
         self._1D_av_progress.setObjectName("_1D_av_progress")
         self.hboxlayout1.addWidget(self._1D_av_progress)
-        self.formLayout_1D.setLayout(33, QtWidgets.QFormLayout.LabelRole, self.hboxlayout1)
+        self.formLayout_1D.setLayout(
+            33, QtWidgets.QFormLayout.LabelRole, self.hboxlayout1
+        )
         self.hboxlayout2 = QtWidgets.QHBoxLayout()
         self.hboxlayout2.setObjectName("hboxlayout2")
         self._1D_average = QtWidgets.QSpinBox(self.frame_1D)
@@ -173,12 +227,16 @@ class Ui_MainWindow(object):
         self._1D_average.setMinimum(1)
         self._1D_average.setObjectName("_1D_average")
         self.hboxlayout2.addWidget(self._1D_average)
-        spacerItem5 = QtWidgets.QSpacerItem(6, 20, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum)
+        spacerItem5 = QtWidgets.QSpacerItem(
+            6, 20, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum
+        )
         self.hboxlayout2.addItem(spacerItem5)
         self._1D_reset_average = QtWidgets.QPushButton(self.frame_1D)
         self._1D_reset_average.setObjectName("_1D_reset_average")
         self.hboxlayout2.addWidget(self._1D_reset_average)
-        self.formLayout_1D.setLayout(33, QtWidgets.QFormLayout.FieldRole, self.hboxlayout2)
+        self.formLayout_1D.setLayout(
+            33, QtWidgets.QFormLayout.FieldRole, self.hboxlayout2
+        )
         self.label_7 = QtWidgets.QLabel(self.frame_1D)
         self.label_7.setObjectName("label_7")
         self.formLayout_1D.setWidget(34, QtWidgets.QFormLayout.LabelRole, self.label_7)
@@ -187,10 +245,14 @@ class Ui_MainWindow(object):
         self._1D_diff.setObjectName("_1D_diff")
         self.formLayout_1D.setWidget(34, QtWidgets.QFormLayout.FieldRole, self._1D_diff)
         self.verticalLayout.addLayout(self.formLayout_1D)
-        spacerItem6 = QtWidgets.QSpacerItem(20, 5, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        spacerItem6 = QtWidgets.QSpacerItem(
+            20, 5, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding
+        )
         self.verticalLayout.addItem(spacerItem6)
         self._1D_set_DC = QtWidgets.QPushButton(self.frame_1D)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self._1D_set_DC.sizePolicy().hasHeightForWidth())
@@ -201,10 +263,14 @@ class Ui_MainWindow(object):
         self._1D_set_DC.setCheckable(True)
         self._1D_set_DC.setObjectName("_1D_set_DC")
         self.verticalLayout.addWidget(self._1D_set_DC)
-        spacerItem7 = QtWidgets.QSpacerItem(20, 3, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        spacerItem7 = QtWidgets.QSpacerItem(
+            20, 3, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed
+        )
         self.verticalLayout.addItem(spacerItem7)
         self._1D_copy = QtWidgets.QPushButton(self.frame_1D)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self._1D_copy.sizePolicy().hasHeightForWidth())
@@ -214,10 +280,14 @@ class Ui_MainWindow(object):
         self._1D_copy.setFont(font)
         self._1D_copy.setObjectName("_1D_copy")
         self.verticalLayout.addWidget(self._1D_copy)
-        spacerItem8 = QtWidgets.QSpacerItem(20, 3, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        spacerItem8 = QtWidgets.QSpacerItem(
+            20, 3, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed
+        )
         self.verticalLayout.addItem(spacerItem8)
         self._1D_ppt_save = QtWidgets.QPushButton(self.frame_1D)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self._1D_ppt_save.sizePolicy().hasHeightForWidth())
@@ -227,13 +297,19 @@ class Ui_MainWindow(object):
         self._1D_ppt_save.setFont(font)
         self._1D_ppt_save.setObjectName("_1D_ppt_save")
         self.verticalLayout.addWidget(self._1D_ppt_save)
-        spacerItem9 = QtWidgets.QSpacerItem(20, 4, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        spacerItem9 = QtWidgets.QSpacerItem(
+            20, 4, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed
+        )
         self.verticalLayout.addItem(spacerItem9)
         self._1D_save_data = QtWidgets.QPushButton(self.frame_1D)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self._1D_save_data.sizePolicy().hasHeightForWidth())
+        sizePolicy.setHeightForWidth(
+            self._1D_save_data.sizePolicy().hasHeightForWidth()
+        )
         self._1D_save_data.setSizePolicy(sizePolicy)
         font = QtGui.QFont()
         font.setPointSize(14)
@@ -256,7 +332,9 @@ class Ui_MainWindow(object):
         self.gridLayout_9.setContentsMargins(0, 0, 0, 0)
         self.gridLayout_9.setObjectName("gridLayout_9")
         self.frame_2D = QtWidgets.QFrame(self._2D)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Expanding)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Expanding
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.frame_2D.sizePolicy().hasHeightForWidth())
@@ -274,7 +352,9 @@ class Ui_MainWindow(object):
         self.hboxlayout3 = QtWidgets.QHBoxLayout()
         self.hboxlayout3.setObjectName("hboxlayout3")
         self._2D_play = QtWidgets.QPushButton(self.frame_2D)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self._2D_play.sizePolicy().hasHeightForWidth())
@@ -283,7 +363,9 @@ class Ui_MainWindow(object):
         self._2D_play.setObjectName("_2D_play")
         self.hboxlayout3.addWidget(self._2D_play)
         self._2D_pause = QtWidgets.QPushButton(self.frame_2D)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self._2D_pause.sizePolicy().hasHeightForWidth())
@@ -292,7 +374,9 @@ class Ui_MainWindow(object):
         self._2D_pause.setObjectName("_2D_pause")
         self.hboxlayout3.addWidget(self._2D_pause)
         self._2D_reload = QtWidgets.QPushButton(self.frame_2D)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self._2D_reload.sizePolicy().hasHeightForWidth())
@@ -301,7 +385,9 @@ class Ui_MainWindow(object):
         self._2D_reload.setObjectName("_2D_reload")
         self.hboxlayout3.addWidget(self._2D_reload)
         self._2D_step = QtWidgets.QPushButton(self.frame_2D)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self._2D_step.sizePolicy().hasHeightForWidth())
@@ -311,27 +397,41 @@ class Ui_MainWindow(object):
         self.hboxlayout3.addWidget(self._2D_step)
         self.verticalLayout_3.addLayout(self.hboxlayout3)
         self.formLayout_2D = QtWidgets.QFormLayout()
-        self.formLayout_2D.setLabelAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignTop)
-        self.formLayout_2D.setFormAlignment(QtCore.Qt.AlignLeading|QtCore.Qt.AlignLeft|QtCore.Qt.AlignTop)
+        self.formLayout_2D.setLabelAlignment(
+            QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop
+        )
+        self.formLayout_2D.setFormAlignment(
+            QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop
+        )
         self.formLayout_2D.setContentsMargins(0, 0, 0, -1)
         self.formLayout_2D.setHorizontalSpacing(14)
         self.formLayout_2D.setVerticalSpacing(5)
         self.formLayout_2D.setObjectName("formLayout_2D")
-        spacerItem10 = QtWidgets.QSpacerItem(20, 6, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        spacerItem10 = QtWidgets.QSpacerItem(
+            20, 6, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed
+        )
         self.formLayout_2D.setItem(0, QtWidgets.QFormLayout.LabelRole, spacerItem10)
         self._1D_gate_name_label_3 = QtWidgets.QLabel(self.frame_2D)
         self._1D_gate_name_label_3.setObjectName("_1D_gate_name_label_3")
-        self.formLayout_2D.setWidget(1, QtWidgets.QFormLayout.LabelRole, self._1D_gate_name_label_3)
+        self.formLayout_2D.setWidget(
+            1, QtWidgets.QFormLayout.LabelRole, self._1D_gate_name_label_3
+        )
         self._2D_gate1_name = QtWidgets.QComboBox(self.frame_2D)
         self._2D_gate1_name.setEnabled(True)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self._2D_gate1_name.sizePolicy().hasHeightForWidth())
+        sizePolicy.setHeightForWidth(
+            self._2D_gate1_name.sizePolicy().hasHeightForWidth()
+        )
         self._2D_gate1_name.setSizePolicy(sizePolicy)
         self._2D_gate1_name.setMinimumSize(QtCore.QSize(107, 0))
         self._2D_gate1_name.setObjectName("_2D_gate1_name")
-        self.formLayout_2D.setWidget(1, QtWidgets.QFormLayout.FieldRole, self._2D_gate1_name)
+        self.formLayout_2D.setWidget(
+            1, QtWidgets.QFormLayout.FieldRole, self._2D_gate1_name
+        )
         self.label_17 = QtWidgets.QLabel(self.frame_2D)
         self.label_17.setObjectName("label_17")
         self.formLayout_2D.setWidget(2, QtWidgets.QFormLayout.LabelRole, self.label_17)
@@ -342,13 +442,17 @@ class Ui_MainWindow(object):
         self._2D_V1_swing.setMaximum(1000.0)
         self._2D_V1_swing.setProperty("value", 0.0)
         self._2D_V1_swing.setObjectName("_2D_V1_swing")
-        self.formLayout_2D.setWidget(2, QtWidgets.QFormLayout.FieldRole, self._2D_V1_swing)
+        self.formLayout_2D.setWidget(
+            2, QtWidgets.QFormLayout.FieldRole, self._2D_V1_swing
+        )
         self.label_24 = QtWidgets.QLabel(self.frame_2D)
         self.label_24.setObjectName("label_24")
         self.formLayout_2D.setWidget(3, QtWidgets.QFormLayout.LabelRole, self.label_24)
         self._2D_gate2_name = QtWidgets.QComboBox(self.frame_2D)
         self._2D_gate2_name.setObjectName("_2D_gate2_name")
-        self.formLayout_2D.setWidget(3, QtWidgets.QFormLayout.FieldRole, self._2D_gate2_name)
+        self.formLayout_2D.setWidget(
+            3, QtWidgets.QFormLayout.FieldRole, self._2D_gate2_name
+        )
         self.label_25 = QtWidgets.QLabel(self.frame_2D)
         self.label_25.setObjectName("label_25")
         self.formLayout_2D.setWidget(4, QtWidgets.QFormLayout.LabelRole, self.label_25)
@@ -356,7 +460,19 @@ class Ui_MainWindow(object):
         self._2D_V2_swing.setMinimum(-1000.0)
         self._2D_V2_swing.setMaximum(1000.0)
         self._2D_V2_swing.setObjectName("_2D_V2_swing")
-        self.formLayout_2D.setWidget(4, QtWidgets.QFormLayout.FieldRole, self._2D_V2_swing)
+        self.formLayout_2D.setWidget(
+            4, QtWidgets.QFormLayout.FieldRole, self._2D_V2_swing
+        )
+        self._2D_measure_IQ_mode_label = QtWidgets.QLabel(self.frame_2D)
+        self._2D_measure_IQ_mode_label.setObjectName("_2D_measure_IQ_mode_label")
+        self.formLayout_2D.setWidget(
+            5, QtWidgets.QFormLayout.LabelRole, self._2D_measure_IQ_mode_label
+        )
+        self._2D_measure_IQ_mode = QtWidgets.QComboBox(self.frame_2D)
+        self._2D_measure_IQ_mode.setObjectName("_2D_measure_IQ_mode")
+        self.formLayout_2D.setWidget(
+            5, QtWidgets.QFormLayout.FieldRole, self._2D_measure_IQ_mode
+        )
         self.label_18 = QtWidgets.QLabel(self.frame_2D)
         self.label_18.setObjectName("label_18")
         self.formLayout_2D.setWidget(6, QtWidgets.QFormLayout.LabelRole, self.label_18)
@@ -374,35 +490,51 @@ class Ui_MainWindow(object):
         self._2D_t_meas.setDecimals(1)
         self._2D_t_meas.setMaximum(100000.0)
         self._2D_t_meas.setObjectName("_2D_t_meas")
-        self.formLayout_2D.setWidget(7, QtWidgets.QFormLayout.FieldRole, self._2D_t_meas)
+        self.formLayout_2D.setWidget(
+            7, QtWidgets.QFormLayout.FieldRole, self._2D_t_meas
+        )
         self._flip_axes = QtWidgets.QPushButton(self.frame_2D)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self._flip_axes.sizePolicy().hasHeightForWidth())
         self._flip_axes.setSizePolicy(sizePolicy)
         self._flip_axes.setObjectName("_flip_axes")
-        self.formLayout_2D.setWidget(8, QtWidgets.QFormLayout.FieldRole, self._flip_axes)
-        spacerItem11 = QtWidgets.QSpacerItem(24, 8, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum)
+        self.formLayout_2D.setWidget(
+            8, QtWidgets.QFormLayout.FieldRole, self._flip_axes
+        )
+        spacerItem11 = QtWidgets.QSpacerItem(
+            24, 8, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum
+        )
         self.formLayout_2D.setItem(9, QtWidgets.QFormLayout.LabelRole, spacerItem11)
         self.label_DC_offsets2D = QtWidgets.QLabel(self.frame_2D)
         self.label_DC_offsets2D.setAlignment(QtCore.Qt.AlignHCenter)
         self.label_DC_offsets2D.setObjectName("label_DC_offsets2D")
-        self.formLayout_2D.setWidget(10, QtWidgets.QFormLayout.SpanningRole, self.label_DC_offsets2D)
-        spacerItem12 = QtWidgets.QSpacerItem(20, 8, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.MinimumExpanding)
+        self.formLayout_2D.setWidget(
+            10, QtWidgets.QFormLayout.SpanningRole, self.label_DC_offsets2D
+        )
+        spacerItem12 = QtWidgets.QSpacerItem(
+            20, 8, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.MinimumExpanding
+        )
         self.formLayout_2D.setItem(32, QtWidgets.QFormLayout.LabelRole, spacerItem12)
         self.hboxlayout4 = QtWidgets.QHBoxLayout()
         self.hboxlayout4.setObjectName("hboxlayout4")
         self.label_21 = QtWidgets.QLabel(self.frame_2D)
         self.label_21.setObjectName("label_21")
         self.hboxlayout4.addWidget(self.label_21)
-        spacerItem13 = QtWidgets.QSpacerItem(10, 20, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum)
+        spacerItem13 = QtWidgets.QSpacerItem(
+            10, 20, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum
+        )
         self.hboxlayout4.addItem(spacerItem13)
         self._2D_av_progress = QtWidgets.QProgressBar(self.frame_2D)
         self._2D_av_progress.setProperty("value", 0)
         self._2D_av_progress.setObjectName("_2D_av_progress")
         self.hboxlayout4.addWidget(self._2D_av_progress)
-        self.formLayout_2D.setLayout(33, QtWidgets.QFormLayout.LabelRole, self.hboxlayout4)
+        self.formLayout_2D.setLayout(
+            33, QtWidgets.QFormLayout.LabelRole, self.hboxlayout4
+        )
         self.horizontalLayout_4 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_4.setObjectName("horizontalLayout_4")
         self._2D_average = QtWidgets.QSpinBox(self.frame_2D)
@@ -410,15 +542,21 @@ class Ui_MainWindow(object):
         self._2D_average.setMinimum(1)
         self._2D_average.setObjectName("_2D_average")
         self.horizontalLayout_4.addWidget(self._2D_average)
-        spacerItem14 = QtWidgets.QSpacerItem(6, 20, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum)
+        spacerItem14 = QtWidgets.QSpacerItem(
+            6, 20, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum
+        )
         self.horizontalLayout_4.addItem(spacerItem14)
         self._2D_reset_average = QtWidgets.QPushButton(self.frame_2D)
         self._2D_reset_average.setObjectName("_2D_reset_average")
         self.horizontalLayout_4.addWidget(self._2D_reset_average)
-        self.formLayout_2D.setLayout(33, QtWidgets.QFormLayout.FieldRole, self.horizontalLayout_4)
+        self.formLayout_2D.setLayout(
+            33, QtWidgets.QFormLayout.FieldRole, self.horizontalLayout_4
+        )
         self.label_background_filter = QtWidgets.QLabel(self.frame_2D)
         self.label_background_filter.setObjectName("label_background_filter")
-        self.formLayout_2D.setWidget(34, QtWidgets.QFormLayout.LabelRole, self.label_background_filter)
+        self.formLayout_2D.setWidget(
+            34, QtWidgets.QFormLayout.LabelRole, self.label_background_filter
+        )
         self.horizontalLayout_background = QtWidgets.QHBoxLayout()
         self.horizontalLayout_background.setObjectName("horizontalLayout_background")
         self._2D_background_sigma = QtWidgets.QDoubleSpinBox(self.frame_2D)
@@ -430,16 +568,22 @@ class Ui_MainWindow(object):
         self._2D_background_sigma.setSingleStep(0.05)
         self._2D_background_sigma.setObjectName("_2D_background_sigma")
         self.horizontalLayout_background.addWidget(self._2D_background_sigma)
-        spacerItem15 = QtWidgets.QSpacerItem(6, 20, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum)
+        spacerItem15 = QtWidgets.QSpacerItem(
+            6, 20, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum
+        )
         self.horizontalLayout_background.addItem(spacerItem15)
         self._2D_filter_background = QtWidgets.QCheckBox(self.frame_2D)
         self._2D_filter_background.setText("")
         self._2D_filter_background.setObjectName("_2D_filter_background")
         self.horizontalLayout_background.addWidget(self._2D_filter_background)
-        self.formLayout_2D.setLayout(34, QtWidgets.QFormLayout.FieldRole, self.horizontalLayout_background)
+        self.formLayout_2D.setLayout(
+            34, QtWidgets.QFormLayout.FieldRole, self.horizontalLayout_background
+        )
         self.label_noise_filter = QtWidgets.QLabel(self.frame_2D)
         self.label_noise_filter.setObjectName("label_noise_filter")
-        self.formLayout_2D.setWidget(35, QtWidgets.QFormLayout.LabelRole, self.label_noise_filter)
+        self.formLayout_2D.setWidget(
+            35, QtWidgets.QFormLayout.LabelRole, self.label_noise_filter
+        )
         self.horizontalLayout_noise = QtWidgets.QHBoxLayout()
         self.horizontalLayout_noise.setObjectName("horizontalLayout_noise")
         self._2D_noise_sigma = QtWidgets.QDoubleSpinBox(self.frame_2D)
@@ -451,19 +595,25 @@ class Ui_MainWindow(object):
         self._2D_noise_sigma.setSingleStep(0.2)
         self._2D_noise_sigma.setObjectName("_2D_noise_sigma")
         self.horizontalLayout_noise.addWidget(self._2D_noise_sigma)
-        spacerItem16 = QtWidgets.QSpacerItem(6, 20, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum)
+        spacerItem16 = QtWidgets.QSpacerItem(
+            6, 20, QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Minimum
+        )
         self.horizontalLayout_noise.addItem(spacerItem16)
         self._2D_filter_noise = QtWidgets.QCheckBox(self.frame_2D)
         self._2D_filter_noise.setText("")
         self._2D_filter_noise.setObjectName("_2D_filter_noise")
         self.horizontalLayout_noise.addWidget(self._2D_filter_noise)
-        self.formLayout_2D.setLayout(35, QtWidgets.QFormLayout.FieldRole, self.horizontalLayout_noise)
+        self.formLayout_2D.setLayout(
+            35, QtWidgets.QFormLayout.FieldRole, self.horizontalLayout_noise
+        )
         self.label_23 = QtWidgets.QLabel(self.frame_2D)
         self.label_23.setObjectName("label_23")
         self.formLayout_2D.setWidget(36, QtWidgets.QFormLayout.LabelRole, self.label_23)
         self._2D_gradient = QtWidgets.QComboBox(self.frame_2D)
         self._2D_gradient.setEnabled(True)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self._2D_gradient.sizePolicy().hasHeightForWidth())
@@ -473,12 +623,18 @@ class Ui_MainWindow(object):
         self._2D_gradient.addItem("")
         self._2D_gradient.addItem("")
         self._2D_gradient.addItem("")
-        self.formLayout_2D.setWidget(36, QtWidgets.QFormLayout.FieldRole, self._2D_gradient)
+        self.formLayout_2D.setWidget(
+            36, QtWidgets.QFormLayout.FieldRole, self._2D_gradient
+        )
         self.verticalLayout_3.addLayout(self.formLayout_2D)
-        spacerItem17 = QtWidgets.QSpacerItem(20, 5, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.MinimumExpanding)
+        spacerItem17 = QtWidgets.QSpacerItem(
+            20, 5, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.MinimumExpanding
+        )
         self.verticalLayout_3.addItem(spacerItem17)
         self._2D_set_DC = QtWidgets.QPushButton(self.frame_2D)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self._2D_set_DC.sizePolicy().hasHeightForWidth())
@@ -489,10 +645,14 @@ class Ui_MainWindow(object):
         self._2D_set_DC.setCheckable(True)
         self._2D_set_DC.setObjectName("_2D_set_DC")
         self.verticalLayout_3.addWidget(self._2D_set_DC)
-        spacerItem18 = QtWidgets.QSpacerItem(20, 3, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        spacerItem18 = QtWidgets.QSpacerItem(
+            20, 3, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed
+        )
         self.verticalLayout_3.addItem(spacerItem18)
         self._2D_copy = QtWidgets.QPushButton(self.frame_2D)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self._2D_copy.sizePolicy().hasHeightForWidth())
@@ -502,10 +662,14 @@ class Ui_MainWindow(object):
         self._2D_copy.setFont(font)
         self._2D_copy.setObjectName("_2D_copy")
         self.verticalLayout_3.addWidget(self._2D_copy)
-        spacerItem19 = QtWidgets.QSpacerItem(20, 3, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        spacerItem19 = QtWidgets.QSpacerItem(
+            20, 3, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed
+        )
         self.verticalLayout_3.addItem(spacerItem19)
         self._2D_ppt_save = QtWidgets.QPushButton(self.frame_2D)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self._2D_ppt_save.sizePolicy().hasHeightForWidth())
@@ -515,13 +679,19 @@ class Ui_MainWindow(object):
         self._2D_ppt_save.setFont(font)
         self._2D_ppt_save.setObjectName("_2D_ppt_save")
         self.verticalLayout_3.addWidget(self._2D_ppt_save)
-        spacerItem20 = QtWidgets.QSpacerItem(20, 3, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        spacerItem20 = QtWidgets.QSpacerItem(
+            20, 3, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed
+        )
         self.verticalLayout_3.addItem(spacerItem20)
         self._2D_save_data = QtWidgets.QPushButton(self.frame_2D)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self._2D_save_data.sizePolicy().hasHeightForWidth())
+        sizePolicy.setHeightForWidth(
+            self._2D_save_data.sizePolicy().hasHeightForWidth()
+        )
         self._2D_save_data.setSizePolicy(sizePolicy)
         font = QtGui.QFont()
         font.setPointSize(14)
@@ -554,7 +724,12 @@ class Ui_MainWindow(object):
         self.formLayout_4 = QtWidgets.QGridLayout()
         self.formLayout_4.setHorizontalSpacing(8)
         self.formLayout_4.setObjectName("formLayout_4")
-        spacerItem21 = QtWidgets.QSpacerItem(20, 16, QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem21 = QtWidgets.QSpacerItem(
+            20,
+            16,
+            QtWidgets.QSizePolicy.MinimumExpanding,
+            QtWidgets.QSizePolicy.Minimum,
+        )
         self.formLayout_4.addItem(spacerItem21, 0, 20, 1, 1)
         self.label_43 = QtWidgets.QLabel(self.verticalLayoutWidget)
         self.label_43.setText("")
@@ -562,15 +737,23 @@ class Ui_MainWindow(object):
         self.formLayout_4.addWidget(self.label_43, 0, 0, 1, 1)
         self.horizontalLayout_channel_labels = QtWidgets.QHBoxLayout()
         self.horizontalLayout_channel_labels.setSpacing(8)
-        self.horizontalLayout_channel_labels.setObjectName("horizontalLayout_channel_labels")
+        self.horizontalLayout_channel_labels.setObjectName(
+            "horizontalLayout_channel_labels"
+        )
         self.formLayout_4.addLayout(self.horizontalLayout_channel_labels, 0, 1, 1, 1)
         self.label_9 = QtWidgets.QLabel(self.verticalLayoutWidget)
         self.label_9.setObjectName("label_9")
         self.formLayout_4.addWidget(self.label_9, 1, 0, 1, 1)
         self.horizontalLayout_channel_checkboxes = QtWidgets.QHBoxLayout()
-        self.horizontalLayout_channel_checkboxes.setObjectName("horizontalLayout_channel_checkboxes")
-        self.formLayout_4.addLayout(self.horizontalLayout_channel_checkboxes, 1, 1, 1, 1)
-        spacerItem22 = QtWidgets.QSpacerItem(20, 10, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        self.horizontalLayout_channel_checkboxes.setObjectName(
+            "horizontalLayout_channel_checkboxes"
+        )
+        self.formLayout_4.addLayout(
+            self.horizontalLayout_channel_checkboxes, 1, 1, 1, 1
+        )
+        spacerItem22 = QtWidgets.QSpacerItem(
+            20, 10, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed
+        )
         self.formLayout_4.addItem(spacerItem22, 3, 0, 1, 1)
         self.label_blank = QtWidgets.QLabel(self.verticalLayoutWidget)
         self.label_blank.setText("")
@@ -583,24 +766,37 @@ class Ui_MainWindow(object):
         self.label_markers.setObjectName("label_markers")
         self.formLayout_4.addWidget(self.label_markers, 5, 0, 1, 1)
         self.horizontalLayout_markers_checks = QtWidgets.QHBoxLayout()
-        self.horizontalLayout_markers_checks.setObjectName("horizontalLayout_markers_checks")
+        self.horizontalLayout_markers_checks.setObjectName(
+            "horizontalLayout_markers_checks"
+        )
         self.formLayout_4.addLayout(self.horizontalLayout_markers_checks, 5, 1, 1, 1)
-        spacerItem23 = QtWidgets.QSpacerItem(20, 10, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        spacerItem23 = QtWidgets.QSpacerItem(
+            20, 10, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed
+        )
         self.formLayout_4.addItem(spacerItem23, 10, 0, 1, 1)
         self.verticalLayout_4.addLayout(self.formLayout_4)
         self.gridlayout = QtWidgets.QGridLayout()
         self.gridlayout.setHorizontalSpacing(8)
         self.gridlayout.setObjectName("gridlayout")
-        spacerItem24 = QtWidgets.QSpacerItem(20, 16, QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem24 = QtWidgets.QSpacerItem(
+            20,
+            16,
+            QtWidgets.QSizePolicy.MinimumExpanding,
+            QtWidgets.QSizePolicy.Minimum,
+        )
         self.gridlayout.addItem(spacerItem24, 0, 4, 1, 1)
         self.label_30 = QtWidgets.QLabel(self.verticalLayoutWidget)
         self.label_30.setObjectName("label_30")
         self.gridlayout.addWidget(self.label_30, 1, 0, 1, 1)
         self._gen_n_columns = QtWidgets.QSpinBox(self.verticalLayoutWidget)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self._gen_n_columns.sizePolicy().hasHeightForWidth())
+        sizePolicy.setHeightForWidth(
+            self._gen_n_columns.sizePolicy().hasHeightForWidth()
+        )
         self._gen_n_columns.setSizePolicy(sizePolicy)
         self._gen_n_columns.setMaximumSize(QtCore.QSize(60, 24))
         self._gen_n_columns.setMinimum(1)
@@ -736,16 +932,22 @@ class Ui_MainWindow(object):
         self.hboxlayout6 = QtWidgets.QHBoxLayout()
         self.hboxlayout6.setObjectName("hboxlayout6")
         self._favorites_names = QtWidgets.QListWidget(self.tab_favorites)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Expanding)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Expanding
+        )
         sizePolicy.setHorizontalStretch(1)
         sizePolicy.setVerticalStretch(1)
-        sizePolicy.setHeightForWidth(self._favorites_names.sizePolicy().hasHeightForWidth())
+        sizePolicy.setHeightForWidth(
+            self._favorites_names.sizePolicy().hasHeightForWidth()
+        )
         self._favorites_names.setSizePolicy(sizePolicy)
         self._favorites_names.setMinimumSize(QtCore.QSize(100, 400))
         self._favorites_names.setObjectName("_favorites_names")
         self.hboxlayout6.addWidget(self._favorites_names)
         self.widget = QtWidgets.QWidget(self.tab_favorites)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Expanding)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Expanding
+        )
         sizePolicy.setHorizontalStretch(2)
         sizePolicy.setVerticalStretch(1)
         sizePolicy.setHeightForWidth(self.widget.sizePolicy().hasHeightForWidth())
@@ -793,7 +995,12 @@ class Ui_MainWindow(object):
         self.vboxlayout.addLayout(self.hboxlayout6)
         self.hboxlayout8 = QtWidgets.QHBoxLayout()
         self.hboxlayout8.setObjectName("hboxlayout8")
-        spacerItem25 = QtWidgets.QSpacerItem(20, 10, QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem25 = QtWidgets.QSpacerItem(
+            20,
+            10,
+            QtWidgets.QSizePolicy.MinimumExpanding,
+            QtWidgets.QSizePolicy.Minimum,
+        )
         self.hboxlayout8.addItem(spacerItem25)
         self._fav_apply = QtWidgets.QPushButton(self.tab_favorites)
         self._fav_apply.setMaximumSize(QtCore.QSize(80, 40))
@@ -840,6 +1047,9 @@ class Ui_MainWindow(object):
         self._1D_pause.setToolTip(_translate("MainWindow", "Puase / Stop (Esc)"))
         self._1D_reload.setToolTip(_translate("MainWindow", "Refresh (Ctrl+F5)"))
         self._1D_step.setToolTip(_translate("MainWindow", "Single scan (F9)"))
+        self._1D_measure_IQ_mode_label.setText(
+            _translate("MainWindow", "Measure IQ mode")
+        )
         self._1D_gate_name_label.setText(_translate("MainWindow", "Gate"))
         self.label_5.setText(_translate("MainWindow", "V Swing  (mV)"))
         self.label_2.setText(_translate("MainWindow", "N pt"))
@@ -850,12 +1060,20 @@ class Ui_MainWindow(object):
         self.label_7.setText(_translate("MainWindow", "Differentiate"))
         self._1D_set_DC.setText(_translate("MainWindow", "Set DC voltage"))
         self._1D_copy.setText(_translate("MainWindow", "Copy"))
-        self._1D_copy.setToolTip(_translate("MainWindow", "Copy image to clipboard (Ctrl+C)"))
+        self._1D_copy.setToolTip(
+            _translate("MainWindow", "Copy image to clipboard (Ctrl+C)")
+        )
         self._1D_ppt_save.setText(_translate("MainWindow", "Copy to PPT"))
-        self._1D_ppt_save.setToolTip(_translate("MainWindow", "Copy image + metadata to PowerPoint (Ctrl+P)"))
+        self._1D_ppt_save.setToolTip(
+            _translate("MainWindow", "Copy image + metadata to PowerPoint (Ctrl+P)")
+        )
         self._1D_save_data.setText(_translate("MainWindow", "Save Data"))
-        self._1D_save_data.setToolTip(_translate("MainWindow", "Save dataset  (Ctrl+S)"))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self._1D), _translate("MainWindow", "1D"))
+        self._1D_save_data.setToolTip(
+            _translate("MainWindow", "Save dataset  (Ctrl+S)")
+        )
+        self.tabWidget.setTabText(
+            self.tabWidget.indexOf(self._1D), _translate("MainWindow", "1D")
+        )
         self._2D_play.setToolTip(_translate("MainWindow", "Play (F5)"))
         self._2D_pause.setToolTip(_translate("MainWindow", "Pause / Stop (Esc)"))
         self._2D_reload.setToolTip(_translate("MainWindow", "Reload (Ctrl+F5)"))
@@ -864,57 +1082,117 @@ class Ui_MainWindow(object):
         self.label_17.setText(_translate("MainWindow", "V Swing x (mV)"))
         self.label_24.setText(_translate("MainWindow", "y-axis"))
         self.label_25.setText(_translate("MainWindow", "V Swing y (mV)"))
+        self._2D_measure_IQ_mode_label.setText(
+            _translate("MainWindow", "Measure IQ mode")
+        )
         self.label_18.setText(_translate("MainWindow", "N pt"))
         self.label_19.setText(_translate("MainWindow", "T meas (us)"))
         self._flip_axes.setText(_translate("MainWindow", "Flip X <-> Y"))
         self.label_DC_offsets2D.setText(_translate("MainWindow", "Pulsed offsets"))
         self.label_21.setText(_translate("MainWindow", "Average"))
         self._2D_reset_average.setText(_translate("MainWindow", "reset"))
-        self.label_background_filter.setText(_translate("MainWindow", "Filter background"))
-        self._2D_background_sigma.setToolTip(_translate("MainWindow", "sigma for Gaussian background filter relative to image size"))
-        self.label_noise_filter.setText(_translate("MainWindow", "Filter noise / low pass"))
-        self._2D_noise_sigma.setToolTip(_translate("MainWindow", "sigma for Gaussian noise filter in pixels"))
+        self.label_background_filter.setText(
+            _translate("MainWindow", "Filter background")
+        )
+        self._2D_background_sigma.setToolTip(
+            _translate(
+                "MainWindow",
+                "sigma for Gaussian background filter relative to image size",
+            )
+        )
+        self.label_noise_filter.setText(
+            _translate("MainWindow", "Filter noise / low pass")
+        )
+        self._2D_noise_sigma.setToolTip(
+            _translate("MainWindow", "sigma for Gaussian noise filter in pixels")
+        )
         self.label_23.setText(_translate("MainWindow", "Gradient"))
         self._2D_gradient.setItemText(0, _translate("MainWindow", "Off"))
         self._2D_gradient.setItemText(1, _translate("MainWindow", "Magnitude"))
         self._2D_gradient.setItemText(2, _translate("MainWindow", "Mag & angle"))
         self._2D_set_DC.setText(_translate("MainWindow", "Set DC voltage"))
         self._2D_copy.setText(_translate("MainWindow", " Copy"))
-        self._2D_copy.setToolTip(_translate("MainWindow", "Copy image to clipboard (Ctrl+C)"))
+        self._2D_copy.setToolTip(
+            _translate("MainWindow", "Copy image to clipboard (Ctrl+C)")
+        )
         self._2D_ppt_save.setText(_translate("MainWindow", " Copy to PPT"))
-        self._2D_ppt_save.setToolTip(_translate("MainWindow", "Copy image + metadata to PowerPoint (Ctrl+P)"))
+        self._2D_ppt_save.setToolTip(
+            _translate("MainWindow", "Copy image + metadata to PowerPoint (Ctrl+P)")
+        )
         self._2D_save_data.setText(_translate("MainWindow", " Save Data"))
-        self._2D_save_data.setToolTip(_translate("MainWindow", "Save dataset  (Ctrl+S)"))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self._2D), _translate("MainWindow", "2D"))
+        self._2D_save_data.setToolTip(
+            _translate("MainWindow", "Save dataset  (Ctrl+S)")
+        )
+        self.tabWidget.setTabText(
+            self.tabWidget.indexOf(self._2D), _translate("MainWindow", "2D")
+        )
         self.label_9.setText(_translate("MainWindow", "Enabled channels"))
         self.label_markers.setText(_translate("MainWindow", "Enabled markers"))
         self.label_30.setText(_translate("MainWindow", "# of columns"))
         self.label_acq_delay.setText(_translate("MainWindow", "Acquisition delay"))
         self.label_acq_delay_ns.setText(_translate("MainWindow", "ns"))
         self.label_line_margin.setText(_translate("MainWindow", "Line margin"))
-        self._gen_line_margin.setToolTip(_translate("MainWindow", "number extra points before scan line start and after line end"))
+        self._gen_line_margin.setToolTip(
+            _translate(
+                "MainWindow",
+                "number extra points before scan line start and after line end",
+            )
+        )
         self.label_line_margin_pts.setText(_translate("MainWindow", "points"))
-        self.label_line_margin_detail.setText(_translate("MainWindow", "Number extra points before scan line start and after line end"))
+        self.label_line_margin_detail.setText(
+            _translate(
+                "MainWindow",
+                "Number extra points before scan line start and after line end",
+            )
+        )
         self.label_bias_T.setText(_translate("MainWindow", "Bias-T RC time"))
-        self._gen_bias_T_RC.setToolTip(_translate("MainWindow", "used to check scan line duration"))
+        self._gen_bias_T_RC.setToolTip(
+            _translate("MainWindow", "used to check scan line duration")
+        )
         self.label_bias_T_ms.setText(_translate("MainWindow", "ms"))
-        self.label_line_margin_detail1.setText(_translate("MainWindow", "Time used to estimate scan voltage error assuming no bias-T correction in pulse-lib"))
+        self.label_line_margin_detail1.setText(
+            _translate(
+                "MainWindow",
+                "Time used to estimate scan voltage error assuming no bias-T correction in pulse-lib",
+            )
+        )
         self.label_max_V_swing.setText(_translate("MainWindow", "Max. V swing"))
-        self._gen_max_V_swing.setToolTip(_translate("MainWindow", "maximum voltage swing for 1D and 2D"))
+        self._gen_max_V_swing.setToolTip(
+            _translate("MainWindow", "maximum voltage swing for 1D and 2D")
+        )
         self.label_max_V_swing_mV.setText(_translate("MainWindow", "mV"))
-        self.label_max_V_swing_detail.setText(_translate("MainWindow", "Maximum voltage swing in 1D and 2D"))
+        self.label_max_V_swing_detail.setText(
+            _translate("MainWindow", "Maximum voltage swing in 1D and 2D")
+        )
         self.label_1D_biasT_corr.setText(_translate("MainWindow", "DC compensation 1D"))
-        self.label_1D_biasT_corr_detail.setText(_translate("MainWindow", "Compensate bias-T charging by alternating low and high values"))
+        self.label_1D_biasT_corr_detail.setText(
+            _translate(
+                "MainWindow",
+                "Compensate bias-T charging by alternating low and high values",
+            )
+        )
         self.label_2D_biasT_corr.setText(_translate("MainWindow", "DC compensation 2D"))
-        self.label_2D_biasT_corr_detail.setText(_translate("MainWindow", "Compensate bias-T charging by alternating top and bottom line scans"))
+        self.label_2D_biasT_corr_detail.setText(
+            _translate(
+                "MainWindow",
+                "Compensate bias-T charging by alternating top and bottom line scans",
+            )
+        )
         self.label_2D_cross.setText(_translate("MainWindow", "Cross in 2D"))
         self.label_2D_colorbar.setText(_translate("MainWindow", "Color bar in 2D"))
         self.label1.setText(_translate("MainWindow", "Virtual matrix auto recompile"))
-        self.label2.setText(_translate("MainWindow", "\n"
-"Automatically recompile sequence when virtual matrix changes during active play.\n"
-"If not checked the sequence will only be recompiled when \"Play\" or \"Refresh\" is pressed.\n"
-"               "))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_3), _translate("MainWindow", "Settings"))
+        self.label2.setText(
+            _translate(
+                "MainWindow",
+                "\n"
+                "Automatically recompile sequence when virtual matrix changes during active play.\n"
+                'If not checked the sequence will only be recompiled when "Play" or "Refresh" is pressed.\n'
+                "               ",
+            )
+        )
+        self.tabWidget.setTabText(
+            self.tabWidget.indexOf(self.tab_3), _translate("MainWindow", "Settings")
+        )
         self.label3.setText(_translate("MainWindow", "Name:"))
         self._fav_check_1D.setText(_translate("MainWindow", "1D"))
         self._fav_check_2D.setText(_translate("MainWindow", "2D"))
@@ -922,4 +1200,7 @@ class Ui_MainWindow(object):
         self._fav_apply.setText(_translate("MainWindow", "Apply"))
         self._fav_save.setText(_translate("MainWindow", "Save"))
         self._fav_save_default.setText(_translate("MainWindow", "Save Default"))
-        self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_favorites), _translate("MainWindow", "Favorites"))
+        self.tabWidget.setTabText(
+            self.tabWidget.indexOf(self.tab_favorites),
+            _translate("MainWindow", "Favorites"),
+        )

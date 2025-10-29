@@ -211,24 +211,18 @@
                 </layout>
                </item>
 
-               <item row="1" column="0">
-                <spacer name="verticalSpacer_12">
-                 <property name="orientation">
-                  <enum>Qt::Vertical</enum>
-                 </property>
-                 <property name="sizeType">
-                  <enum>QSizePolicy::Fixed</enum>
-                 </property>
-                 <property name="sizeHint" stdset="0">
-                  <size>
-                   <width>20</width>
-                   <height>1</height>
-                  </size>
-                 </property>
-                </spacer>
-               </item>
+              <item row="1" column="0">
+               <widget class="QLabel" name="_1D_measure_IQ_mode_label">
+                <property name="text">
+                 <string>Measure IQ mode</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QComboBox" name="_1D_measure_IQ_mode"/>
+              </item>
 
-               <item row="2" column="0">
+              <item row="2" column="0">
                 <widget class="QLabel" name="_1D_gate_name_label">
                  <property name="text">
                   <string>Gate</string>
@@ -880,7 +874,7 @@
                  </property>
                 </widget>
                </item>
-               <item row="4" column="1">
+              <item row="4" column="1">
                 <widget class="QDoubleSpinBox" name="_2D_V2_swing">
                  <property name="minimum">
                   <double>-1000.000000000000000</double>
@@ -889,9 +883,20 @@
                   <double>1000.000000000000000</double>
                  </property>
                 </widget>
-               </item>
+              </item>
 
-               <item row="6" column="0">
+              <item row="5" column="0">
+               <widget class="QLabel" name="_2D_measure_IQ_mode_label">
+                <property name="text">
+                 <string>Measure IQ mode</string>
+                </property>
+               </widget>
+              </item>
+              <item row="5" column="1">
+               <widget class="QComboBox" name="_2D_measure_IQ_mode"/>
+              </item>
+
+              <item row="6" column="0">
                 <widget class="QLabel" name="label_18">
                  <property name="text">
                   <string>N pt</string>

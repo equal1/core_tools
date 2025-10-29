@@ -168,6 +168,9 @@ class CheckboxList(GuiElement):
         if default:
             self._checked |= set(names)
         self._check_boxes = {}
+        self._labels = {}
+        self._layout_labels = layout_labels
+        self._layout_check_boxes = layout_check_boxes
         for name in names:
             label = QtWidgets.QLabel(name)
             layout_labels.addWidget(label, 0, QtCore.Qt.AlignHCenter)
@@ -177,6 +180,7 @@ class CheckboxList(GuiElement):
             check_box.stateChanged.connect(partial(self._changed, name=name))
             layout_check_boxes.addWidget(check_box, 0, QtCore.Qt.AlignHCenter)
             self._check_boxes[name] = check_box
+            self._labels[name] = label
 
     @qt_log_exception
     def _changed(self, state: int, name: str):
@@ -193,6 +197,40 @@ class CheckboxList(GuiElement):
 
     def get_value(self) -> list[str]:
         return sorted(self._checked)
+
+    def update_names(self, names: Sequence[str]):
+        names = list(names)
+        if not names:
+            new_checked: set[str] = set()
+        else:
+            new_checked = set(name for name in names if name in self._checked)
+            if not new_checked:
+                new_checked = set(names)
+
+        for label in self._labels.values():
+            self._layout_labels.removeWidget(label)
+            label.deleteLater()
+        for check_box in self._check_boxes.values():
+            self._layout_check_boxes.removeWidget(check_box)
+            check_box.deleteLater()
+
+        self._labels = {}
+        self._check_boxes = {}
+        self._checked = set(new_checked)
+
+        for name in names:
+            label = QtWidgets.QLabel(name)
+            self._layout_labels.addWidget(label, 0, QtCore.Qt.AlignHCenter)
+            check_box = QtWidgets.QCheckBox()
+            check_box.setText("")
+            checked = name in self._checked
+            check_box.setChecked(checked)
+            check_box.stateChanged.connect(partial(self._changed, name=name))
+            self._layout_check_boxes.addWidget(check_box, 0, QtCore.Qt.AlignHCenter)
+            self._labels[name] = label
+            self._check_boxes[name] = check_box
+
+        self._value_changed(sorted(self._checked))
 
 
 class OffsetsList(GuiElement):

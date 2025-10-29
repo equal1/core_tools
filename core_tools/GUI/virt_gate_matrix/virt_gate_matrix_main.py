@@ -152,7 +152,10 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
             self._add_matrix(virtual_gate_set)
 
         self.script_runner = ScriptRunner(parent=self.tabWidget, embedded=True)
-        self.tabWidget.addTab(self.script_runner, "Scripts")
+        script_tab_index = self.tabWidget.addTab(self.script_runner, "Scripts")
+        if script_tab_index != -1:
+            self.tabWidget.setCurrentIndex(script_tab_index)
+            self.script_runner.setFocus(QtCore.Qt.OtherFocusReason)
 
         self.show()
         if not instance_ready:
@@ -411,7 +414,8 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
 
         refresh()
 
-        tab_title = virtual_gate_set.name or "Virtual gates"
+        # tab_title = virtual_gate_set.name or "Virtual gates"
+        tab_title = "Virtual gates"
         self.tabWidget.addTab(matrix_widget, tab_title)
 
     # ------------------------------------------------------------------

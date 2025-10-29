@@ -180,6 +180,10 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         self._scan_generator.set_digitizer(digitizer)
         self._set_channel_map(channel_map, iq_mode)
         self._pulselib_settings = PulselibSettings(pulse_lib)
+        self._iq_mode_display_to_internal: dict[str, str] = {}
+        self._default_measure_iq_mode_display = "I"
+        self._current_measure_iq_mode_display: str | None = None
+        self._updating_measure_iq_mode = False
 
         self._plot1D = None
         self._plot2D = None
@@ -327,6 +331,7 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         self._gen_settings = Settings("gen", lambda: None)
         self._1D_settings = Settings("1D", self.update_plot_properties_1D)
         self._2D_settings = Settings("2D", self.update_plot_properties_2D)
+        self._init_measure_iq_mode_controls()
 
         sensor_checkboxes = CheckboxList(
             "enabled_channels",
@@ -366,6 +371,7 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
             gate_names,
         )
 
+        self._1D_settings.add("measure_IQ_mode", self._1D_measure_IQ_mode)
         self._1D_settings.add("gate_name", self._1D_gate_name)
         self._1D_settings.add("V_swing", self._1D_V_swing)
         self._1D_settings.add("npt", self._1D_npt)
@@ -384,6 +390,7 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
             gate_names,
         )
 
+        self._2D_settings.add("measure_IQ_mode", self._2D_measure_IQ_mode)
         self._2D_settings.add("gate1_name", self._2D_gate1_name)
         self._2D_settings.add("V1_swing", self._2D_V1_swing)
         self._2D_settings.add("V2_swing", self._2D_V2_swing)
@@ -404,6 +411,14 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         self._2D_settings.add("cross", self._gen_2D_cross)
         self._2D_settings.add("colorbar", self._gen_2D_colorbar)
         self._2D_settings.add("offsets", offset_gate_voltages_2D)
+
+        self._1D_measure_IQ_mode.currentTextChanged.connect(
+            lambda mode, src="1D": self._on_measure_iq_mode_changed(mode, src)
+        )
+        self._2D_measure_IQ_mode.currentTextChanged.connect(
+            lambda mode, src="2D": self._on_measure_iq_mode_changed(mode, src)
+        )
+        self._apply_iq_mode(self._1D_measure_IQ_mode.currentText())
 
         self._1D_play.clicked.connect(lambda: self._start_1D())
         self._2D_play.clicked.connect(lambda: self._start_2D())
@@ -575,6 +590,94 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         else:
             self.channel_map = get_channel_map_dig_4ch(iq_mode)
 
+    def _init_measure_iq_mode_controls(self):
+        if hasattr(self._scan_generator, "_iq_mode_channels"):
+            preferred = [
+                "Mag+Phase",
+                "MagdBm+Phase",
+                "Magnitude",
+                "MagdBm",
+                "Phase",
+                "I+Q",
+                "I",
+                "Q",
+            ]
+            available = list(
+                getattr(self._scan_generator, "_iq_mode_channels", {}).keys()
+            )
+            modes = [mode for mode in preferred if mode in available]
+            modes.extend(mode for mode in available if mode not in modes)
+            if not modes:
+                modes = ["I"]
+            mapping = {mode: mode for mode in modes}
+        else:
+            mapping_items = [
+                ("Mag+Phase", "amplitude+phase"),
+                ("Magnitude", "amplitude"),
+                ("Phase", "phase"),
+                ("Phase (deg)", "phase_deg"),
+                ("I+Q", "I+Q"),
+                ("I", "I"),
+                ("Q", "Q"),
+            ]
+            mapping = {display: internal for display, internal in mapping_items}
+        self._iq_mode_display_to_internal = mapping
+        modes = list(mapping.keys())
+        self._default_measure_iq_mode_display = modes[0]
+        for combo in (self._1D_measure_IQ_mode, self._2D_measure_IQ_mode):
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItems(modes)
+            combo.setCurrentText(self._default_measure_iq_mode_display)
+            combo.blockSignals(False)
+
+    def _resolve_iq_mode(self, display_mode: str) -> str:
+        return self._iq_mode_display_to_internal.get(display_mode, display_mode or "I")
+
+    def _on_measure_iq_mode_changed(self, display_mode: str, source: str):
+        if self._updating_measure_iq_mode:
+            return
+        self._updating_measure_iq_mode = True
+        try:
+            other = (
+                self._2D_measure_IQ_mode if source == "1D" else self._1D_measure_IQ_mode
+            )
+            if other.currentText() != display_mode:
+                other.blockSignals(True)
+                other.setCurrentText(display_mode)
+                other.blockSignals(False)
+            self._apply_iq_mode(display_mode)
+        finally:
+            self._updating_measure_iq_mode = False
+
+    def _apply_iq_mode(self, display_mode: str):
+        if not display_mode:
+            return
+        if display_mode == self._current_measure_iq_mode_display:
+            return
+        self._current_measure_iq_mode_display = display_mode
+        internal_mode = self._resolve_iq_mode(display_mode)
+        self.iq_mode = internal_mode
+        if hasattr(self._scan_generator, "_iq_mode_channels"):
+            preview = getattr(self._scan_generator, "preview_channel_map", None)
+            if callable(preview):
+                channel_map = preview(internal_mode)
+            else:
+                channel_map = self._scan_generator.channel_map
+        else:
+            self._set_channel_map(None, internal_mode)
+            channel_map = self.channel_map
+        self.channel_map = channel_map
+        self._update_channel_selection_widgets()
+
+    def _update_channel_selection_widgets(self):
+        try:
+            element = self._gen_settings.get_element("enabled_channels")
+        except KeyError:
+            return
+        checkbox_list = cast(CheckboxList, element)
+        checkbox_list.update_names(list(self.channel_map.keys()))
+
     def _init_defaults(self, cust_defaults, settings_name: str = None):
         if not self.gate_names:
             raise RuntimeError("No gate names available to initialize defaults.")
@@ -590,6 +693,7 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
             "average": 1,
             "diff": False,
             "biasT_corr": False,
+            "measure_IQ_mode": self._default_measure_iq_mode_display,
         }
 
         self.defaults_2D = {
@@ -608,6 +712,7 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
             "noise_sigma": 1.0,
             "cross": False,
             "colorbar": False,
+            "measure_IQ_mode": self._default_measure_iq_mode_display,
         }
 
         self.defaults_gen = {
@@ -819,6 +924,7 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
             self._2D_settings.update_scan = True
             gen_settings.update_scan = False
         settings = self._1D_settings
+        self._apply_iq_mode(settings["measure_IQ_mode"])
         self._stop_other()
 
         if self._requires_build(self._param1D, settings):
@@ -890,6 +996,7 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
             self._2D_settings.update_scan = True
             gen_settings.update_scan = False
         settings = self._2D_settings
+        self._apply_iq_mode(settings["measure_IQ_mode"])
         self._stop_other()
         if self._requires_build(self._param2D, settings):
             logger.debug("Creating 2D scan")
