@@ -38,7 +38,7 @@ license-files = [
 ]
 
 [tool.setuptools.package-data]
-"core_tools" = ["py.typed", "*.qml", "*.png"]
+"core_tools" = ["py.typed", "**/*.qml", "**/*.png"]
 
 [project.urls]
 # Homepage = "https://example.com"
