@@ -112,6 +112,7 @@ class Hvi2ScheduleLoader(HardwareSchedule):
             awg_conf = {}
             awg_conf['hvi_queue_control'] = getattr(awg, 'hvi_queue_control', False)
             awg_conf['sequencer'] = hvi_params.get(f'use_awg_sequencers_{awg_name}', hasattr(awg, 'get_sequencer'))
+            awg_conf['enabled_sequencers'] = hvi_params.get(f'enabled_sequencers_{awg_name}')
             # 'active_los' is List[Tuple[channel, LO]] # @@@ Tuple?
             awg_conf['active_los'] = getattr(awg, 'active_los', {})
             awg_conf['switch_los'] = hvi_params.get('switch_los', self._switch_los)

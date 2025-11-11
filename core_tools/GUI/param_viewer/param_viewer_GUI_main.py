@@ -346,6 +346,7 @@ class param_viewer(QtWidgets.QMainWindow):
             lambda: self._set_gate(parameter, voltage_input)
         )
         voltage_input.setKeyboardTracking(False)
+        voltage_input.setSingleStep(self._step_size)
         layout.addWidget(voltage_input, row, 1, 1, 1)
 
         gate_unit = QtWidgets.QLabel()

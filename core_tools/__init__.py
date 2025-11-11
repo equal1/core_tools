@@ -11,4 +11,4 @@ from core_tools.startup.launch_qt_databrowser import launch_qt_databrowser
 from core_tools.startup.launch_sqdl_sync import launch_sqdl_sync
 from core_tools.startup.sample_info import set_sample_info
 
-__version__ = "1.6.12"
+__version__ = "1.6.13"

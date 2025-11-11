@@ -29,6 +29,8 @@ class Hvi2VideoMode():
                         if None, then all los are switched on/off.
                     'hvi_queue_control' (bool): if True enables waveform queueing by hvi script.
                     'trigger_out' (bool): if True enables markers via Trigger Out channel.
+                    'sequencer' (bool): if True enables quantum sequencer features.
+                    'enabled_sequencers' (List[int]): enabled_sequencers.
         '''
         self._configuration = configuration.copy()
 
@@ -45,6 +47,15 @@ class Hvi2VideoMode():
 
     def _module_config(self, seq, key):
         return self._configuration[seq.engine.alias][key]
+
+    def _get_enabled_sequencers(self, seq):
+        if not self._module_config(seq, 'sequencer'):
+            return []
+        enabled_sequencers = self._module_config(seq, 'enabled_sequencers')
+        if enabled_sequencers is None:
+            # fall back
+            return list(range(1, 13))
+        return enabled_sequencers
 
     def _wait_state_clear(self, dig_seq, **kwargs):
         dig_seq.ds.set_state_mask(**kwargs)
@@ -128,10 +139,11 @@ class Hvi2VideoMode():
                             awg_seq.wait(10)
                         # Note: sequencers are used for RF generation to drive resonators
                         if self._module_config(awg_seq, 'sequencer'):
-                            awg_seq.qs.reset_phase()
-                            awg_seq.qs.start()
+                            enabled_sequencers = self._get_enabled_sequencers(awg_seq)
+                            awg_seq.qs.reset_phase(enabled_sequencers)
+                            awg_seq.qs.start(enabled_sequencers)
                             # total time since start loop: 50 ns (with QS)
-                            awg_seq.qs.trigger()
+                            awg_seq.qs.trigger(enabled_sequencers)
                             awg_seq.wait(70)
                         else:
                             awg_seq.wait(100)
@@ -147,7 +159,8 @@ class Hvi2VideoMode():
                         else:
                             awg_seq.wait(10)
                         if self._module_config(awg_seq, 'sequencer'):
-                            awg_seq.qs.stop()
+                            enabled_sequencers = self._get_enabled_sequencers(awg_seq)
+                            awg_seq.qs.stop(enabled_sequencers)
                         else:
                             awg_seq.wait(10)
 
