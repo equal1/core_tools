@@ -147,6 +147,25 @@ class param_viewer(QtWidgets.QMainWindow):
         if not instance_ready:
             self.app.exec()
 
+    def update_all_tabs(self) -> None:
+        """Refresh every tab while restoring the previously selected tab."""
+
+        tab_widget = self.tab_menu
+        if tab_widget is None:
+            return
+
+        original_index = tab_widget.currentIndex()
+        tab_count = tab_widget.count()
+
+        for index in range(tab_count):
+            if tab_widget.currentIndex() != index:
+                tab_widget.setCurrentIndex(index)
+            self._update_parameters()
+
+        if tab_count:
+            tab_widget.setCurrentIndex(original_index)
+            self._update_parameters()
+
     def get_tab_gate_names(self, tab_name: str) -> list[str]:
         """Return the parameter names registered under ``tab_name``."""
 

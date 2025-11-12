@@ -1,6 +1,3 @@
-import sqlite3
-
-import psycopg2
 from psycopg2 import sql
 from psycopg2.extras import RealDictCursor
 
@@ -11,98 +8,13 @@ from core_tools.data.SQL.SQL_utility import (
 )
 
 
-class sqlite_helper:
-    @staticmethod
-    def quote_ident(identifier):
-        for character in identifier:
-            if character == "\0" or character > "\x7f":
-                raise ValueError(
-                    "SQLite identifier cannot contain NUL or non-ASCII character."
-                )
-
-        return '"' + identifier.replace('"', '""') + '"'
-
-    @classmethod
-    def ident_as_string(cls, ident: sql.Identifier) -> str:
-        return ".".join(cls.quote_ident(s) for s in ident._wrapped)
-
-    @classmethod
-    def literal_as_string(cls, literal: sql.Literal) -> str:
-        val = literal._wrapped
-        if isinstance(val, int | float):
-            return str(val)
-        if isinstance(val, str):
-            return cls.quote_ident(val)
-
-        return literal.as_string(None)
-
-    @classmethod
-    def composed_as_string(cls, composed: sql.Composed) -> str:
-        rv = []
-        for item in composed._wrapped:
-            match item:
-                case sql.Composed():
-                    rv.append(cls.composed_as_string(item))
-                case sql.Identifier():
-                    rv.append(cls.ident_as_string(item))
-                case sql.Literal():
-                    rv.append(cls.literal_as_string(item))
-                case _:
-                    rv.append(item.as_string(None))
-        return "".join(rv)
-
-    @classmethod
-    def is_active(cls, cursor):
-        return isinstance(cursor, sqlite3.Cursor)
-
-    @classmethod
-    def convert_to_string(cls, statement):
-        if isinstance(statement, sql.Composed):
-            return cls.composed_as_string(statement)
-        return statement
-
-    @classmethod
-    def convert_placeholders(cls, placeholders):
-        return [cls.convert_one_placeholder(p) for p in placeholders]
-
-    @classmethod
-    def convert_one_placeholder(cls, placeholder):
-        if isinstance(placeholder, psycopg2.Binary):
-            return bytes(placeholder.adapted)
-        return placeholder
-
-    @classmethod
-    def split_multiple_statements(cls, statement, placeholders):
-        s = statement.replace("%s", "?")
-        ls: list[str] = [ss for ss in s.split(";") if ss.strip()]
-        if len(ls) == 0:
-            yield "", cls.convert_placeholders(placeholders)
-        elif len(ls) == 1:
-            yield ls[0], cls.convert_placeholders(placeholders)
-        else:
-            placeholders = placeholders[:]
-            for s in ls:
-                n = s.count("?")
-                yield s, cls.convert_placeholders(placeholders[:n])
-                placeholders = placeholders[n:]
-
-
-def execute_statement(conn, statement, placeholders=[], close_on_error=True):
+def execute_statement(conn, statement, placeholders=[]):
     try:
         cursor = conn.cursor()
-        if sqlite_helper.is_active(cursor):
-            statement = sqlite_helper.convert_to_string(statement)
-            for statement, placeholders in sqlite_helper.split_multiple_statements(
-                statement, placeholders
-            ):
-                cursor.execute(statement, placeholders)
-        else:
-            cursor.execute(statement, placeholders)
-            cursor.close()
+        cursor.execute(statement, placeholders)
+        cursor.close()
         return ((),)
     except Exception:
-        if not close_on_error:
-            return
         # After exception the connection cannot be used anymore.
         # A new connection will automatically be opened for the next command.
         conn.close()
@@ -111,41 +23,18 @@ def execute_statement(conn, statement, placeholders=[], close_on_error=True):
 
 def execute_query(conn, query, dict_cursor=False, placeholders=[]):
     try:
-        restore_orig_row_factory = False
-
         if dict_cursor is False:
             cursor = conn.cursor()
         else:
-            if not isinstance(conn, sqlite3.Connection):
-                cursor = conn.cursor(cursor_factory=RealDictCursor)
-            else:
-                if dict_cursor is not False:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
 
-                    def dict_factory(cursor, row):
-                        d = {}
-                        for idx, col in enumerate(cursor.description):
-                            d[col[0]] = row[idx]
-                        return d
-
-                    restore_orig_row_factory = True
-                    orig_row_factory = conn.row_factory
-                    conn.row_factory = dict_factory
-
-                cursor = conn.cursor()
-
-        if sqlite_helper.is_active(cursor):
-            query = sqlite_helper.convert_to_string(query)
-
-        try:
-            cursor.execute(query, placeholders)
-            return_values = cursor.fetchall()
-        finally:
-            if restore_orig_row_factory:
-                conn.row_factory = orig_row_factory
-
+        cursor.execute(query, placeholders)
+        return_values = cursor.fetchall()
         cursor.close()
         return return_values
     except Exception:
+        # After exception the connection cannot be used anymore.
+        # A new connection will automatically be opened for the next command.
         conn.close()
         raise
 
@@ -168,8 +57,7 @@ def select_elements_in_table(
     var_names_SQL = sql_name_formatter(var_names)
 
     query = sql.SQL("select {0} from {1} ").format(
-        sql.SQL(", ").join(var_names_SQL),
-        sql.SQL(table_name),
+        sql.SQL(", ").join(var_names_SQL), sql.SQL(table_name)
     )
     # SQL.Identifier does not work with underscore names for tables?
 
@@ -213,16 +101,6 @@ def insert_row_in_table(
         return execute_statement(
             conn, statement + sql.SQL(custom_statement), placeholders
         )
-    elif isinstance(conn, sqlite3.Connection):
-        cursor = conn.cursor()
-        try:
-            stmt = sqlite_helper.convert_to_string(
-                statement + sql.SQL(custom_statement)
-            )
-            cursor.execute(stmt, sqlite_helper.convert_placeholders(placeholders))
-            return cursor.lastrowid
-        finally:
-            cursor.close()
     else:
         statement += sql.SQL(" RETURNING {} ").format(
             sql.SQL(", ").join([sql.Identifier(i) for i in returning])

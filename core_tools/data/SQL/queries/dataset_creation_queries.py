@@ -1,6 +1,5 @@
 import getpass
 import json
-import sqlite3
 
 import psycopg2
 
@@ -58,10 +57,6 @@ class sample_info_queries:
             conn.commit()
 
 
-def _is_sqlite_conn(conn):
-    return isinstance(conn, sqlite3.Connection)
-
-
 class measurement_overview_queries:
     """
     large-ish table that holds all the inforamtion of what measurements are done.
@@ -71,12 +66,8 @@ class measurement_overview_queries:
 
     @staticmethod
     def generate_table(conn):
-        is_sqlite = _is_sqlite_conn(conn)
         statement = "CREATE TABLE if not EXISTS global_measurement_overview ("
-        if is_sqlite:
-            statement += "id INTEGER PRIMARY KEY AUTOINCREMENT,"
-        else:
-            statement += "id SERIAL,"
+        statement += "id SERIAL,"
         statement += "uuid BIGINT NOT NULL unique,"
 
         statement += "exp_name text NOT NULL,"
@@ -91,14 +82,9 @@ class measurement_overview_queries:
         statement += "stop_time TIMESTAMP, "
 
         statement += "exp_data_location text,"  # Database table name of parameter table. Older datasets. [SdS]
-        if is_sqlite:
-            statement += "snapshot BLOB, "
-            statement += "metadata BLOB,"
-            statement += "keywords TEXT, "
-        else:
-            statement += "snapshot BYTEA, "
-            statement += "metadata BYTEA,"
-            statement += "keywords JSONB, "
+        statement += "snapshot BYTEA, "
+        statement += "metadata BYTEA,"
+        statement += "keywords JSONB, "
         statement += "starred BOOL DEFAULT False, "
 
         statement += "completed BOOL DEFAULT False, "
@@ -115,38 +101,13 @@ class measurement_overview_queries:
         # Note [SdS]: Column is abused for migration to new measurement_parameters table
         statement += "sync_location text); "
 
-        _USING_BTREE_ = " USING BTREE " if not _is_sqlite_conn(conn) else " "
-        statement += (
-            "CREATE INDEX IF NOT EXISTS id_indexed ON global_measurement_overview"
-            + _USING_BTREE_
-            + "(id) ;"
-        )
-        statement += (
-            "CREATE INDEX IF NOT EXISTS uuid_indexed ON global_measurement_overview"
-            + _USING_BTREE_
-            + "(uuid) ;"
-        )
-        statement += (
-            "CREATE INDEX IF NOT EXISTS starred_indexed ON global_measurement_overview"
-            + _USING_BTREE_
-            + "(starred) ;"
-        )
-        statement += (
-            "CREATE INDEX IF NOT EXISTS date_day_index ON global_measurement_overview"
-            + _USING_BTREE_
-            + "(project, set_up, sample) ;"
-        )
+        statement += "CREATE INDEX IF NOT EXISTS id_indexed ON global_measurement_overview USING BTREE (id) ;"
+        statement += "CREATE INDEX IF NOT EXISTS uuid_indexed ON global_measurement_overview USING BTREE (uuid) ;"
+        statement += "CREATE INDEX IF NOT EXISTS starred_indexed ON global_measurement_overview USING BTREE (starred) ;"
+        statement += "CREATE INDEX IF NOT EXISTS date_day_index ON global_measurement_overview USING BTREE (project, set_up, sample) ;"
 
-        statement += (
-            "CREATE INDEX IF NOT EXISTS data_synced_index ON global_measurement_overview"
-            + _USING_BTREE_
-            + "(data_synchronized);"
-        )
-        statement += (
-            "CREATE INDEX IF NOT EXISTS table_synced_index ON global_measurement_overview"
-            + _USING_BTREE_
-            + "(table_synchronized);"
-        )
+        statement += "CREATE INDEX IF NOT EXISTS data_synced_index ON global_measurement_overview USING BTREE (data_synchronized);"
+        statement += "CREATE INDEX IF NOT EXISTS table_synced_index ON global_measurement_overview USING BTREE (table_synchronized);"
 
         execute_statement(conn, statement)
         conn.commit()
@@ -232,14 +193,13 @@ class measurement_overview_queries:
             )
 
         # NOTE: column sync_location is abused for migration to new format
-        returned_id = insert_row_in_table(
-            conn, "global_measurement_overview", var_names, var_values, ("id",)
+        returning = ("id", "uuid")
+        query_outcome = insert_row_in_table(
+            conn, "global_measurement_overview", var_names, var_values, returning
         )
-        if isinstance(returned_id, list):
-            returned_id = returned_id[0][0]
 
         # NOTE: SQL_datatable name is not used anymore for new measurements
-        return returned_id, uuid
+        return query_outcome[0][0], query_outcome[0][1]
 
     def update_measurement(
         conn,
@@ -320,12 +280,8 @@ class data_table_queries:
 
     @staticmethod
     def generate_table(conn, table_name):
-        is_sqlite = _is_sqlite_conn(conn)
         statement = f"CREATE TABLE if not EXISTS {table_name} ( "
-        if is_sqlite:
-            statement += "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-        else:
-            statement += "id SERIAL primary key, "
+        statement += "id SERIAL primary key, "
         statement += "param_id BIGINT, "
         statement += "nth_set INT, "
         statement += "nth_dim INT, "
@@ -336,9 +292,8 @@ class data_table_queries:
         statement += "name text NOT NULL,"
         statement += "label text NOT NULL,"
         statement += "unit text NOT NULL,"
-        json_type = "TEXT" if is_sqlite else "jsonb"
-        statement += f"depencies {json_type}, "
-        statement += f"shape {json_type}, "
+        statement += "depencies jsonb, "
+        statement += "shape jsonb, "
         statement += "write_cursor INT, "
         statement += "total_size INT, "
         statement += "oid INT, "
@@ -417,12 +372,8 @@ class measurement_parameters_queries:
 
     @staticmethod
     def generate_table(conn):
-        is_sqlite = _is_sqlite_conn(conn)
         statement = "CREATE TABLE if not EXISTS measurement_parameters ( "
-        if is_sqlite:
-            statement += "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-        else:
-            statement += "id SERIAL primary key, "
+        statement += "id SERIAL primary key, "
         statement += "exp_uuid BIGINT NOT NULL,"
         statement += "param_index INT NOT NULL,"
         statement += "param_id BIGINT, "
@@ -435,23 +386,13 @@ class measurement_parameters_queries:
         statement += "name text NOT NULL,"
         statement += "label text NOT NULL,"
         statement += "unit text NOT NULL,"
-        json_type = "TEXT" if is_sqlite else "jsonb"
-        statement += f"depencies {json_type}, "
-        statement += f"shape {json_type}, "
+        statement += "depencies jsonb, "
+        statement += "shape jsonb, "
         statement += "write_cursor INT, "
         statement += "total_size INT, "
         statement += "oid INT); "
-        _USING_BTREE_ = " USING BTREE " if not is_sqlite else " "
-        statement += (
-            "CREATE INDEX IF NOT EXISTS exp_uuid_index ON measurement_parameters "
-            + _USING_BTREE_
-            + "(exp_uuid) ;"
-        )
-        statement += (
-            "CREATE INDEX IF NOT EXISTS oid_index ON measurement_parameters "
-            + _USING_BTREE_
-            + "(oid) ;"
-        )
+        statement += "CREATE INDEX IF NOT EXISTS exp_uuid_index ON measurement_parameters USING BTREE (exp_uuid) ;"
+        statement += "CREATE INDEX IF NOT EXISTS oid_index ON measurement_parameters USING BTREE (oid) ;"
         execute_statement(conn, statement)
         conn.commit()
 

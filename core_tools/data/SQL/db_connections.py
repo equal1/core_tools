@@ -1,5 +1,4 @@
 import logging
-import sqlite3
 
 import psycopg2
 
@@ -12,13 +11,6 @@ def connect_local_db():
     if SQL_conn_info_local.dbname is None:
         raise Exception("No local database configured")
     try:
-        if getattr(SQL_conn_info_local, "is_sqlite", False):
-            conn = sqlite3.connect(
-                database=SQL_conn_info_local.dbname,
-                detect_types=sqlite3.PARSE_DECLTYPES,
-            )
-            conn.isolation_level = "DEFERRED"
-            return conn
         return psycopg2.connect(
             dbname=SQL_conn_info_local.dbname,
             user=SQL_conn_info_local.user,
@@ -36,13 +28,6 @@ def connect_remote_db():
     if SQL_conn_info_remote.dbname is None:
         raise Exception("No remote database configured")
     try:
-        if getattr(SQL_conn_info_remote, "is_sqlite", False):
-            conn = sqlite3.connect(
-                database=SQL_conn_info_remote.dbname,
-                detect_types=sqlite3.PARSE_DECLTYPES,
-            )
-            conn.isolation_level = "DEFERRED"
-            return conn
         return psycopg2.connect(
             dbname=SQL_conn_info_remote.dbname,
             user=SQL_conn_info_remote.user,

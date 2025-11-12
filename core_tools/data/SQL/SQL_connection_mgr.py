@@ -20,27 +20,14 @@ class SQL_database_manager:
     @property
     def connection(self):
         cls = SQL_database_manager
-        if cls._connection is None or getattr(cls._connection, "closed", False):
+        if cls._connection is None or cls._connection.closed:
             cls._connect()
         return cls._connection
-
-    # backward compatible property names
-    @property
-    def conn_local(self):
-        """Alias for :attr:`connection` for backward compatibility."""
-        return self.connection
-
-    @property
-    def conn_remote(self):
-        """Alias for :attr:`remote_connection` for backward compatibility."""
-        return self.remote_connection
 
     @property
     def remote_connection(self):
         cls = SQL_database_manager
-        if cls._remote_connection is None or getattr(
-            cls._remote_connection, "closed", False
-        ):
+        if cls._remote_connection is None or cls._remote_connection.closed:
             cls._connect_remote()
         return cls._remote_connection
 
@@ -72,9 +59,7 @@ class SQL_database_manager:
 
     @classmethod
     def _connect(cls):
-        if cls._connection is not None and not getattr(
-            cls._connection, "closed", False
-        ):
+        if cls._connection is not None and not cls._connection.closed:
             cls._connection.close()
 
         if SQL_conn_info_local.dbname is not None:
@@ -95,9 +80,7 @@ class SQL_database_manager:
 
     @classmethod
     def _connect_remote(cls):
-        if cls._remote_connection is not None and not getattr(
-            cls._remote_connection, "closed", False
-        ):
+        if cls._remote_connection is not None and not cls._remote_connection.closed:
             cls._remote_connection.close()
 
         if SQL_conn_info_remote.dbname is not None:

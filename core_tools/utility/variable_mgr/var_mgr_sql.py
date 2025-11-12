@@ -171,9 +171,7 @@ class var_sql_queries:
             tuple(all_vals.keys()),
             tuple(all_vals.values()),
             returning=("id",),
-        )
-        if isinstance(my_id, list):
-            my_id = my_id[0][0]
+        )[0]
         conn.commit()
 
         return all_vals, my_id
