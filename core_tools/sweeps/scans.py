@@ -251,7 +251,8 @@ def sweep(parameter, data, stop=None, n_points=None, delay=0.0,
         label (str): Label to use for resume after break.
     """
     return Sweep(parameter, data,
-                 stop=stop, n_points=n_points, delay=delay, resetable=resetable, endpoint=endpoint, label=label)
+                 stop=stop, n_points=n_points, delay=delay, resetable=resetable,
+                 value_after=value_after, endpoint=endpoint, label=label)
 
 
 class Section:
