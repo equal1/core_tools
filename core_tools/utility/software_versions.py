@@ -6,13 +6,18 @@ from importlib.metadata import version, PackageNotFoundError
 watched_packages = [
     "numpy",
     "qcodes",
+    "qcodes_contrib_drivers",
     "core_tools",
     "pulse_lib",
     "qconstruct",
     "qt_dataviewer",
+    "pyqtgraph",
+    "sqdl_client",
+    "sqdl_uploader",
     # Qblox
     "qblox_instruments",
     "q1pulse",
+    "q1simulator",
     # Keysight
     "hvi2_script",
     "keysight_fpga",
