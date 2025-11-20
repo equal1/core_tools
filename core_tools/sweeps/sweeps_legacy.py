@@ -9,7 +9,7 @@ from core_tools.sweeps.sweep_utility import (
 from core_tools.job_mgnt.job_meta import job_meta
 from core_tools.job_mgnt.job_mgmt import queue_mgr, ExperimentJob
 
-from qcodes.instrument.specialized_parameters import ElapsedTimeParameter
+from qcodes.parameters import ElapsedTimeParameter
 from pulse_lib.sequencer import sequencer
 
 

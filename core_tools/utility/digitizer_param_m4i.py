@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from qcodes.instrument.parameter import MultiParameter
+from qcodes import MultiParameter
 import numpy as np
 import numbers
 import pyspcm

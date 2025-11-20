@@ -3,7 +3,7 @@ from time import perf_counter, sleep
 from typing import Any
 
 import numpy as np
-from qcodes.instrument.parameter import Parameter, ManualParameter
+from qcodes import Parameter, ManualParameter
 
 from core_tools.sweeps.scans import ArraySetter
 
