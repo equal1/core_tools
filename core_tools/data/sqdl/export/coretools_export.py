@@ -39,7 +39,7 @@ class SqdlUpdate:
 
 
 class Exporter:
-    def __init__(self, export_path: str | Path, project: str, scope: str | None):
+    def __init__(self, export_path: Path, project: str, scope: str | None = None):
         self.export_path = export_path
         self.project = project
         self.scope = scope
