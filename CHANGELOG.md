@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[1.6.14\] - unreleased
+
+- Added option to change the Exporter base path through the config .yaml file.
+
 ## \[1.6.13\] - 2025-10-22
 
 - Fixed bug with step size of favorites in ParameterViewer.
