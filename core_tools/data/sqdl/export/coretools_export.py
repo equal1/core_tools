@@ -39,11 +39,10 @@ class SqdlUpdate:
 
 
 class Exporter:
-    def __init__(self, cfg: dict[str, Any]):
-        base_path = cfg.get('sqdl_sync.base_path', "~/.sqdl")
-        self.export_path = f"{base_path}/export"
-        self.project = cfg["project"]
-        self.scope = cfg.get("scope")
+    def __init__(self, export_path: str | Path, project: str, scope: str | None):
+        self.export_path = export_path
+        self.project = project
+        self.scope = scope
 
         self.no_action_count = 0
         self.loop_count = 0
