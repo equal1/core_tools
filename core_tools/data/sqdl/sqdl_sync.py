@@ -2,6 +2,7 @@ import os
 import time
 import logging
 import datetime
+from pathlib import Path
 
 from core_tools.data.SQL.SQL_connection_mgr import (
         SQL_database_manager as DatabaseManager
@@ -28,12 +29,18 @@ class SQDLSync():
 
         get_database_version(assert_requirement=True)
 
-        base_path = config.get("sqdl_sync.base_path", "~/.sqdl")
-        self.base_path = os.path.expanduser(base_path)
-        os.makedirs(self.base_path, exist_ok=True)
-        os.makedirs(f"{self.base_path}/export", exist_ok=True)
+        base_path = Path(config.get("sqdl_sync.base_path", "~/.sqdl")).expanduser()
+        export_path = Path(
+            config.get("sqdl_sync.export_path", f"{base_path}/export")
+        ).expanduser()
+        os.makedirs(base_path, exist_ok=True)
+        os.makedirs(export_path, exist_ok=True)
 
-        self.exporter = Exporter(config)
+        self.exporter = Exporter(
+            export_path=export_path,
+            project=config["project"],
+            scope=config.get("scope"),
+        )
         self.uploader = SqdlUploader(config)
 
         self.tick_rate = datetime.timedelta(

@@ -85,11 +85,14 @@ of your ```config.yaml``` file. This section accepts the following parameters
 scope: <required>
 
 sqdl_sync:
-    # (str) Local path where the exported data files will be saved before uploading
+    # (str) Local path where sync-related data will be stored (metadata, exports, etc)
     base_path: ~/.sqdl
 
-    # (str) Local file where the uploader will keep track of its tasks
-    database_file: ~/.sqdl/uploader.db
+    # (str) Overwrite where export data will be stored
+    export_path: <base_path>/export
+
+    # (str) Overwrite where the uploader will keep track of its tasks
+    database_file: <base_path>/uploader.db
 
     # (float) Minimum period of the event loop in seconds
     tick_rate: 0.1
