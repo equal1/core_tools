@@ -70,8 +70,9 @@ class GatesBase(qc.Instrument):
             unknown_gates = [name for name in virt_gate_set.virtual_gate_names if name not in virtual_gates]
             self._all_gate_names += virtual_gates
             self._virtual_gates += virtual_gates
-            for name in unknown_gates:
-                print(f"WARNING: unknown gate '{name}' defined in matrix '{virt_gate_set.name}'")
+            if unknown_gates:
+                raise Exception(f"Unknown gates {unknown_gates} defined in matrix '{virt_gate_set.name}'. "
+                                "Remove gates from matrix definition or add gates to hardware definition.")
             for v_gate_name in virtual_gates:
                 self.add_parameter(v_gate_name,
                                    set_cmd=partial(self._set_voltage_virt, v_gate_name, virt_gate_convertor),

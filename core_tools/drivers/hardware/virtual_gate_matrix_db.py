@@ -78,3 +78,9 @@ def save_virtual_gate(vg_matrix):
             conn, vg_matrix.name,
             vg_matrix.real_gate_names, vg_matrix.virtual_gate_names,
             vg_matrix.r2v_matrix_no_norm)
+
+
+def reset_virtual_matrix(name: str):
+    conn = SQL_database_manager().connection
+    virtual_gate_queries.delete_virtual_matrix(conn, name)
+    conn.commit()
