@@ -1,12 +1,8 @@
-from qcodes import Instrument
+from qcodes.instrument.base import Instrument
 
 import spirack
 
-
 class SPI_rack(Instrument):
-    """qcodes Instrument wrapper around spirack.SPI_rack.
-    """
-
     def __init__(self, name, address, baud_rate='115200', timeout=1):
         super().__init__(name)
         self.spi_rack = spirack.SPI_rack(address, baud=baud_rate, timeout=timeout)
