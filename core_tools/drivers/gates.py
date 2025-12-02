@@ -285,6 +285,25 @@ class GatesBase(qc.Instrument):
 
         return result
 
+    def get_offset_parameter(self, gate_name: str):
+        """Returns a parameter to add an offset to a (virtual) gate.
+
+        This parameter behaves like the AC / AWG video mode sweeps,
+        but then on the DC gate. It allows sweeps of real vs virtual gates.
+
+        Example:
+            offsetP1 = gates.get_offset_parameter("P1")
+            offsetVP1 = gates.get_offset_parameter("vP1")
+            Scan(
+                Sweep(offsetP1, -10, 10, 21),
+                Sweep(offsetVP1, -10, 10, 21),
+                m_param,
+                "test"
+                ).run()
+
+        """
+        return _OffsetParameter(gate_name, self)
+
     def snapshot_base(self, update=False, params_to_skip_update=None):
         # update real and virtual gates cached values by getting them.
         self.get_all_gate_voltages()
@@ -422,3 +441,39 @@ def confirm(prompt_text):
     while answer not in ["", "y", "n"]:
         answer = input(prompt_text + ' [y]/n').lower()
     return answer == "y" or answer == ''
+
+
+class _OffsetParameter(qc.Parameter):
+    def __init__(self, gate_name, gates: GatesBase):
+        self._gate_name = gate_name
+        self._gates = gates
+        self._offset = 0.0
+        if gate_name not in gates._all_gate_names:
+            raise Exception(f"Gate '{gate_name}' not defined in gates")
+
+        self._is_virtual = gate_name in gates.v_gates
+
+        name = gate_name + "_offset"
+        super().__init__(name, unit="mV", set_cmd=self._set_offset, initial_value=0.0)
+
+    def _set_offset(self, value):
+        delta = value - self._offset
+        if delta == 0.0:
+            return
+        gate_name = self._gate_name
+        old_voltages = self._gates.gv
+        if self._is_virtual:
+            projection = self._gates.get_virtual_gate_projection()[gate_name]
+            try:
+                for real_gate, ratio in projection.items():
+                    self._gates.parameters[real_gate].set(old_voltages[real_gate] + ratio * delta)
+            except Exception as ex:
+                logger.warning(f'Failed to set virtual gate offset; Reverting all voltages. '
+                               f'Exception: {ex}')
+                for real_gate, ratio in projection.items():
+                    self._gates.parameters[real_gate].set(old_voltages[real_gate])
+                raise
+        else:
+            self._gates.parameters[gate_name].set(old_voltages[gate_name] + delta)
+
+        self._offset = value
