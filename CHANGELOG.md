@@ -1,9 +1,14 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
-## \[1.6.14\] - unreleased
+## \[1.7.0\] - 2025-12-02
 
 - Added option to change the Exporter base path through the config .yaml file.
+- Added `get_offset_parameter` to `gates`
+- Added get_snapshot(xr.Dataset) and xr.Dataset.snapshot(). The latter only works after importing core_tools.data.ds.
+- More robust handling of singular virtual matrix and missing gates.
+- Removed outdated and deprecated code.
+- Fixed qcodes deprecation warnings.
 
 ## \[1.6.13\] - 2025-10-22
 
