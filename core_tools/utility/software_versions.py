@@ -36,10 +36,13 @@ def get_software_versions() -> dict[str, str]:
             meta_version = version(name)
             version_info = meta_version
             if name not in ["qcodes", "numpy"]:
-                package = importlib.import_module(name)
-                source_version = getattr(package, "__version__", "not set")
-                if source_version != meta_version:
-                    version_info = f"{source_version} (meta: {meta_version})"
+                try:
+                    package = importlib.import_module(name)
+                    source_version = getattr(package, "__version__", "not set")
+                    if source_version != meta_version:
+                        version_info = f"{source_version} (meta: {meta_version})"
+                except Exception:
+                    version_info = f"{source_version} (import failed!)"
             result[name] = version_info
         except PackageNotFoundError:
             # print(name, "Not installed")

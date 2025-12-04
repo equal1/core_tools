@@ -1,6 +1,10 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[1.7.1\] - 2025-12-04
+
+- Fixed problem in `get_software_versions`.
+
 ## \[1.7.0\] - 2025-12-02
 
 - Added option to change the Exporter base path through the config .yaml file.
