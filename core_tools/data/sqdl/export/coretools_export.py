@@ -94,6 +94,7 @@ class Exporter:
         self.timer.time('query actions')
 
         ds = None
+        action = None
         try:
             action, is_busy = self.get_action()
             if not action:
