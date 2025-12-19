@@ -1,6 +1,11 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
+## \[1.7.2\] - 2026-01-@@
+
+- Fixed missing close on buffer_reference.
+- Removed 'Critical' issue from review.
+
 ## \[1.7.1\] - 2025-12-04
 
 - Fixed problem in `get_software_versions`.
