@@ -32,6 +32,9 @@ class buffer_reference:
             return data.reshape(shape)
         return reshape
 
+    def close(self):
+        pass
+
 
 class buffer_writer(buffer_reference):
     def __init__(self, db_mgr, input_buffer):
