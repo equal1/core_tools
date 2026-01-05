@@ -1,9 +1,10 @@
 # Changelog
 All notable changes to core_tools will be documented in this file.
 
-## \[1.7.2\] - 2026-01-@@
+## \[1.7.2\] - 2026-01-05
 
 - Fixed missing close on buffer_reference.
+- Fixed D5a deprecation.
 - Removed 'Critical' issue from review.
 
 ## \[1.7.1\] - 2025-12-04
