@@ -14,7 +14,7 @@ class D5a(D5a_qcodes):
             "core_tools.drivers.D5a.D5a is deprecated. "
             "Use qcodes_contrib_drivers.drivers.QuTech.D5a.D5a."
         )
-        super().__init(
+        super().__init__(
             name, spi_rack, module,
             inter_delay=inter_delay,
             dac_step=dac_step,
