@@ -45,6 +45,15 @@ class OPXFastScanParameter(FastScanParameterBase):
         raw_data = self.pulse_lib.opx.run()
         return {name: data for name, data in zip(self.data_channels, raw_data)}
 
+    def get_raw(self):
+        """Override base get_raw to skip Python-side bias-T correction.
+
+        The OPX returns data already in the correct order, so we don't need
+        to apply the bias-T reordering that the base class does.
+        """
+        raw_data = self.pulse_lib.opx.run()
+        return tuple(raw_data)
+
     def close(self):  # pragma: no cover - hardware interaction
         self.pulse_lib.opx.close()
 
