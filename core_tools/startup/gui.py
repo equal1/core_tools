@@ -33,10 +33,10 @@ def start_virtual_matrix_gui(pulse):
     from core_tools.GUI.virt_gate_matrix.virt_gate_matrix_main import virt_gate_matrix_GUI
 
     global _vmg_qt
-    gates = _get_gates()
+    hardware = _get_hardware()
     cfg = get_configuration()
     qt_init(style=cfg.get('gui.style'))
-    _vmg_qt = virt_gate_matrix_GUI(gates, pulse,
+    _vmg_qt = virt_gate_matrix_GUI(hardware, pulse,
                                    coloring=cfg.get('virtual_matrix_gui.coloring', True))
     _set_window(_vmg_qt, cfg, 'virtual_matrix_gui')
     return _vmg_qt
@@ -66,6 +66,13 @@ def _get_gates():
         return _get_station().gates
     except AttributeError:
         raise AttributeError('gates not added to station')
+
+
+def _get_hardware():
+    try:
+        return _get_station().hardware
+    except AttributeError:
+        raise AttributeError('hardware not added to station')
 
 
 def _set_window(window, cfg, cfg_key):

@@ -36,12 +36,14 @@ class queue_mgr():
 
     def __init__(self):
         if self.__init is False:
-            print('Starting job queue_mgr')
+            print('WARNING! queue_mgr is deprecated in will be removed in the near future.')
             self.q = PriorityQueue()
             # Note: We have to use a dict, because the ExperimentJob only compares on priority
             self.job_refs = dict()
 
             def worker():
+                time.sleep(10.0)
+                print('WARNING! queue_mgr is deprecated in will be removed in the near future.')
                 while True:
                     n_jobs = self.q.qsize()
                     if n_jobs != 0:
@@ -62,7 +64,7 @@ class queue_mgr():
                         # 200ms sleep.
                         time.sleep(0.2)
 
-            self.worker_thread = threading.Thread(target=worker, daemon=True).start()
+            threading.Thread(target=worker, daemon=True).start()
             self.__init = True
 
     def put(self, job):

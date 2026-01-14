@@ -6,13 +6,18 @@ from importlib.metadata import version, PackageNotFoundError
 watched_packages = [
     "numpy",
     "qcodes",
+    "qcodes_contrib_drivers",
     "core_tools",
     "pulse_lib",
     "qconstruct",
     "qt_dataviewer",
+    "pyqtgraph",
+    "sqdl_client",
+    "sqdl_uploader",
     # Qblox
     "qblox_instruments",
     "q1pulse",
+    "q1simulator",
     # Keysight
     "hvi2_script",
     "keysight_fpga",
@@ -31,10 +36,13 @@ def get_software_versions() -> dict[str, str]:
             meta_version = version(name)
             version_info = meta_version
             if name not in ["qcodes", "numpy"]:
-                package = importlib.import_module(name)
-                source_version = getattr(package, "__version__", "not set")
-                if source_version != meta_version:
-                    version_info = f"{source_version} (meta: {meta_version})"
+                try:
+                    package = importlib.import_module(name)
+                    source_version = getattr(package, "__version__", "not set")
+                    if source_version != meta_version:
+                        version_info = f"{source_version} (meta: {meta_version})"
+                except Exception:
+                    version_info = f"{source_version} (import failed!)"
             result[name] = version_info
         except PackageNotFoundError:
             # print(name, "Not installed")

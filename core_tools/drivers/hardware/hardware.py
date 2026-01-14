@@ -6,7 +6,10 @@ import qcodes as qc
 from core_tools import __version__ as ct_version
 from core_tools.data.SQL.SQL_connection_mgr import SQL_database_manager
 from core_tools.drivers.hardware.hardware_SQL_backend import AWG_2_dac_ratio_queries
-from core_tools.drivers.hardware.virtual_gate_matrix_db import load_virtual_gate
+from core_tools.drivers.hardware.virtual_gate_matrix_db import (
+    load_virtual_gate,
+    reset_virtual_matrix,
+)
 
 
 class boundaries_mgr:
@@ -49,6 +52,9 @@ class virtual_gates_mgr:
         )
         setattr(self, name, virtual_gate_matrix)
         return virtual_gate_matrix
+
+    def reset(self, matrix_name: str):
+        reset_virtual_matrix(matrix_name)
 
     def __len__(self):
         return len(self.virtual_gate_names)

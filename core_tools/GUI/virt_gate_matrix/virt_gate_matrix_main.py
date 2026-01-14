@@ -260,10 +260,9 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
     # ------------------------------------------------------------------
     @qt_log_exception
     def update_awg_attenuation(self, gate_name, v_ratio):
+        # _awg_attenuation is an object that sync's to the database.
         self._awg_attenuation[gate_name] = v_ratio
-        hardware = self.gates_object.hardware
-        if self._old_harware_class:
-            hardware.sync_data()
+        # also update in pulse-lib
         self.pulse_lib.set_channel_attenuations(self._awg_attenuation)
 
     # ------------------------------------------------------------------

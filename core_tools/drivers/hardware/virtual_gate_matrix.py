@@ -55,7 +55,15 @@ class VirtualGateMatrix:
         self._normalization = normalization
         # store matrix and inverse to minimize conversions back and forth during editing.
         self._r2v_matrix = self._persistent_object.r2v_matrix_no_norm
-        self._v2r_matrix = np.linalg.inv(self._r2v_matrix)
+        try:
+            self._v2r_matrix = np.linalg.inv(self._r2v_matrix)
+        except np.linalg.LinAlgError:
+            name = persistent_object.name
+            raise Exception(
+                f"Stored matrix '{name}' is singular and cannot be loaded. "
+                f"Reet matrix with `hardware.virtual_gates.reset('{name}')`."
+                )
+
         # object shared with outside world reflecting the 'normalized' r2v matrix.
         self._norm_r2v_matrix = np.zeros(self._r2v_matrix.shape)
         self._calc_normalized()

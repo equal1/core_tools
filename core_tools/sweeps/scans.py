@@ -285,6 +285,7 @@ def sweep(
         n_points=n_points,
         delay=delay,
         resetable=resetable,
+        value_after=value_after,
         endpoint=endpoint,
         label=label,
     )
