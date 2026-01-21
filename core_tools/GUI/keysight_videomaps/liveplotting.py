@@ -488,9 +488,9 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
                 rg_names = list(virtual_gate_set.real_gate_names)
 
                 # Find indices for our gates using normalized matching
-                # x_gate is the swept gate (column = real gate), y_gate is the other axis (row = virtual gate)
-                col_idx = self._find_gate_in_list(x_gate, rg_names)
-                row_idx = self._find_gate_in_list(y_gate, vg_names)
+                # x_gate is the x-axis (row = virtual gate), y_gate is the y-axis (column = real gate)
+                row_idx = self._find_gate_in_list(x_gate, vg_names)
+                col_idx = self._find_gate_in_list(y_gate, rg_names)
 
                 if col_idx >= 0 and row_idx >= 0:
                     # Check if this would update a diagonal element
