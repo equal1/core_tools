@@ -87,10 +87,18 @@ class SlopeLinesManager:
 
     def _connect_mouse_events(self):
         """Connect mouse event handlers for line drawing."""
-        view = self.plot_widget.getViewBox()
-
         # Use scene events for drawing
         scene = self.plot_widget.scene()
+        if scene is None:
+            logger.warning("Cannot connect mouse events: scene not ready")
+            return
+
+        # Disconnect first to avoid duplicate connections
+        try:
+            scene.sigMouseClicked.disconnect(self._on_mouse_clicked)
+        except (TypeError, RuntimeError):
+            pass  # Not connected
+
         scene.sigMouseClicked.connect(self._on_mouse_clicked)
 
     def _disconnect_mouse_events(self):
@@ -132,7 +140,7 @@ class SlopeLinesManager:
         self._drawing = True
         self._start_pos = (x, y)
 
-        # Create line ROI with single white color
+        # Create line ROI with single black color
         pen = pg.mkPen(color=self.LINE_COLOR, width=2)
 
         # Create with both points at start position initially
@@ -221,19 +229,22 @@ class SlopeLinesManager:
         """Handle line being moved/adjusted by user."""
         line_roi = line_data.line_roi
 
-        # Get handle positions in scene coordinates
+        # Get handle positions and convert to view (data) coordinates
         handles = line_roi.getHandles()
         if len(handles) >= 2:
-            # Map handle positions to view coordinates
             p1_local = handles[0].pos()
             p2_local = handles[1].pos()
 
-            # LineSegmentROI handles are in local coordinates, need to map to view
-            p1_scene = line_roi.mapToParent(p1_local)
-            p2_scene = line_roi.mapToParent(p2_local)
+            # Map from handle local coords -> scene coords -> view (data) coords
+            p1_scene = line_roi.mapToScene(p1_local)
+            p2_scene = line_roi.mapToScene(p2_local)
 
-            line_data.p1 = (p1_scene.x(), p1_scene.y())
-            line_data.p2 = (p2_scene.x(), p2_scene.y())
+            vb = self.plot_widget.plotItem.vb
+            p1_view = vb.mapSceneToView(p1_scene)
+            p2_view = vb.mapSceneToView(p2_scene)
+
+            line_data.p1 = (p1_view.x(), p1_view.y())
+            line_data.p2 = (p2_view.x(), p2_view.y())
 
         self._update_line_label(line_data)
         self._notify_slopes_changed()
@@ -358,9 +369,22 @@ class SlopeLinesPanel(QtWidgets.QWidget):
     # Signal emitted when user wants to apply slope to virtual gates
     slope_to_vgates_requested = QtCore.pyqtSignal(float, str, str)
 
+    # Value representation options
+    VALUE_REPRESENTATIONS = [
+        ("slope", "slope", lambda s: s),
+        ("inverse", "1/slope", lambda s: 1 / s if abs(s) > 1e-9 else float("inf")),
+        ("negative", "-slope", lambda s: -s),
+        (
+            "neg_inverse",
+            "-1/slope",
+            lambda s: -1 / s if abs(s) > 1e-9 else float("-inf"),
+        ),
+    ]
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.managers: List[SlopeLinesManager] = []
+        self._raw_slopes: List[tuple] = []  # Store (label, raw_slope) pairs
         self._setup_ui()
 
     def _setup_ui(self):
@@ -372,6 +396,16 @@ class SlopeLinesPanel(QtWidgets.QWidget):
         self.enable_checkbox = QtWidgets.QCheckBox("Enable slope lines")
         self.enable_checkbox.stateChanged.connect(self._on_enable_changed)
         layout.addWidget(self.enable_checkbox)
+
+        # Value representation dropdown
+        repr_layout = QtWidgets.QHBoxLayout()
+        repr_layout.addWidget(QtWidgets.QLabel("Display:"))
+        self.repr_selector = QtWidgets.QComboBox()
+        for key, display_name, _ in self.VALUE_REPRESENTATIONS:
+            self.repr_selector.addItem(display_name, key)
+        self.repr_selector.currentIndexChanged.connect(self._on_repr_changed)
+        repr_layout.addWidget(self.repr_selector)
+        layout.addLayout(repr_layout)
 
         # Slopes display
         self.slopes_label = QtWidgets.QLabel("Slopes:")
@@ -385,18 +419,10 @@ class SlopeLinesPanel(QtWidgets.QWidget):
         )
         layout.addWidget(self.slopes_text)
 
-        # Buttons row
-        btn_layout = QtWidgets.QHBoxLayout()
-
+        # Clear button
         self.clear_btn = QtWidgets.QPushButton("Clear All")
         self.clear_btn.clicked.connect(self._on_clear_clicked)
-        btn_layout.addWidget(self.clear_btn)
-
-        self.copy_btn = QtWidgets.QPushButton("Copy Slopes")
-        self.copy_btn.clicked.connect(self._on_copy_clicked)
-        btn_layout.addWidget(self.copy_btn)
-
-        layout.addLayout(btn_layout)
+        layout.addWidget(self.clear_btn)
 
         # Virtual gate application section
         vgate_group = QtWidgets.QGroupBox("Apply to Virtual Gates")
@@ -412,6 +438,12 @@ class SlopeLinesPanel(QtWidgets.QWidget):
         )
         self.apply_vgate_btn.clicked.connect(self._on_apply_vgate_clicked)
         vgate_layout.addRow(self.apply_vgate_btn)
+
+        # Status message label (replaces popup dialog)
+        self.vgate_status_label = QtWidgets.QLabel("")
+        self.vgate_status_label.setWordWrap(True)
+        self.vgate_status_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        vgate_layout.addRow(self.vgate_status_label)
 
         layout.addWidget(vgate_group)
 
@@ -435,62 +467,102 @@ class SlopeLinesPanel(QtWidgets.QWidget):
         for manager in self.managers:
             manager.enabled = enabled
 
+    def _on_repr_changed(self, index: int):
+        """Handle value representation change."""
+        self._update_slopes_display()
+
+    def _get_transform_func(self):
+        """Get the current value transformation function."""
+        key = self.repr_selector.currentData()
+        for k, _, func in self.VALUE_REPRESENTATIONS:
+            if k == key:
+                return func
+        return lambda s: s  # Default: identity
+
+    def _format_value(self, raw_slope: float) -> str:
+        """Format a slope value using current representation."""
+        if abs(raw_slope) == float("inf"):
+            return "∞"
+        try:
+            transformed = self._get_transform_func()(raw_slope)
+            if abs(transformed) == float("inf"):
+                return "∞"
+            return f"{transformed:.4f}"
+        except (ZeroDivisionError, ValueError):
+            return "∞"
+
     def _on_slopes_changed(self, slopes: List[float]):
         """Handle slopes changed in any manager."""
-        # Collect all slopes from all managers
-        all_slopes = []
+        # Collect all raw slopes from all managers
+        self._raw_slopes = []
         for manager in self.managers:
             for i, line in enumerate(manager.lines):
                 label = f"Plot {self.managers.index(manager) + 1}, Line {i + 1}"
-                all_slopes.append((label, line.slope))
+                self._raw_slopes.append((label, line.slope))
 
+        self._update_slopes_display()
+
+    def _update_slopes_display(self):
+        """Update the slopes display with current representation."""
         # Update display
-        if all_slopes:
+        if self._raw_slopes:
             text_lines = []
-            for label, slope in all_slopes:
-                if abs(slope) != float("inf"):
-                    text_lines.append(f"{label}: {slope:.4f}")
-                else:
-                    text_lines.append(f"{label}: ∞")
+            for label, raw_slope in self._raw_slopes:
+                value_str = self._format_value(raw_slope)
+                text_lines.append(f"{label}: {value_str}")
             self.slopes_text.setText("\n".join(text_lines))
         else:
             self.slopes_text.clear()
 
-        # Update selector
+        # Update selector (always show raw slope in selector for applying to VGM)
         self.slope_selector.clear()
-        for label, slope in all_slopes:
-            if abs(slope) != float("inf"):
-                self.slope_selector.addItem(f"{label}: {slope:.4f}", slope)
-            else:
-                self.slope_selector.addItem(f"{label}: ∞", slope)
+        for label, raw_slope in self._raw_slopes:
+            value_str = self._format_value(raw_slope)
+            # Store raw slope as data, but display transformed value
+            self.slope_selector.addItem(f"{label}: {value_str}", raw_slope)
 
     def _on_clear_clicked(self):
         """Clear all slope lines."""
         for manager in self.managers:
             manager.clear_all_lines()
-
-    def _on_copy_clicked(self):
-        """Copy slopes to clipboard."""
-        slopes = []
-        for manager in self.managers:
-            slopes.extend(manager.get_slopes())
-
-        if slopes:
-            text = "\n".join(f"{s:.6f}" for s in slopes if abs(s) != float("inf"))
-            clipboard = QtWidgets.QApplication.clipboard()
-            clipboard.setText(text)
-            logger.info(f"Copied {len(slopes)} slopes to clipboard")
+        self.vgate_status_label.setText("")
 
     def _on_apply_vgate_clicked(self):
         """Apply selected slope to virtual gates."""
         idx = self.slope_selector.currentIndex()
         if idx < 0:
+            self.vgate_status_label.setText(
+                "<span style='color: orange;'>Select a slope line first.</span>"
+            )
             return
 
-        slope = self.slope_selector.currentData()
-        if slope is None or abs(slope) == float("inf"):
-            QtWidgets.QMessageBox.warning(
-                self, "Invalid Slope", "Cannot apply infinite slope to virtual gates."
+        raw_slope = self.slope_selector.currentData()
+        if raw_slope is None or abs(raw_slope) == float("inf"):
+            self.vgate_status_label.setText(
+                "<span style='color: red;'>Cannot apply infinite slope to virtual gates.</span>"
+            )
+            return
+
+        # Get the transformed slope value based on current representation
+        try:
+            slope = self._get_transform_func()(raw_slope)
+            if abs(slope) == float("inf"):
+                self.vgate_status_label.setText(
+                    "<span style='color: red;'>Cannot apply infinite value to virtual gates.</span>"
+                )
+                return
+        except (ZeroDivisionError, ValueError):
+            self.vgate_status_label.setText(
+                "<span style='color: red;'>Cannot compute value for this slope.</span>"
+            )
+            return
+
+        # Check if slope magnitude is valid for virtual gate matrix
+        # Off-diagonal elements should be <= 1 (diagonal is always 1)
+        if abs(slope) > 1.0:
+            self.vgate_status_label.setText(
+                "<span style='color: red;'>Value |{:.4f}| > 1. Off-diagonal elements must be ≤ 1. "
+                "Try using 1/slope representation.</span>".format(slope)
             )
             return
 
@@ -502,3 +574,10 @@ class SlopeLinesPanel(QtWidgets.QWidget):
                     slope, manager.x_label, manager.y_label
                 )
                 break
+
+    def set_vgate_status(self, message: str, success: bool = True):
+        """Set the status message for virtual gate application."""
+        color = "green" if success else "orange"
+        self.vgate_status_label.setText(
+            f"<span style='color: {color};'>{message}</span>"
+        )

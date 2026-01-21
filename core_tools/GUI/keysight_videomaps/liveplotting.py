@@ -72,90 +72,6 @@ class param_getter:
     _2D: object()
 
 
-class SlopeToVGateDialog(QtWidgets.QDialog):
-    """Dialog for applying slope values to virtual gate matrix."""
-
-    def __init__(
-        self, parent, slope: float, x_gate: str, y_gate: str, vgm_updated: bool
-    ):
-        super().__init__(parent)
-        self.slope = slope
-        self.x_gate = x_gate
-        self.y_gate = y_gate
-        self.vgm_updated = vgm_updated
-        self._setup_ui()
-
-    def _setup_ui(self):
-        self.setWindowTitle("Slope Measurement Result")
-        self.setMinimumWidth(400)
-
-        layout = QtWidgets.QVBoxLayout(self)
-
-        # Slope value display
-        value_group = QtWidgets.QGroupBox("Measured Slope")
-        value_layout = QtWidgets.QFormLayout(value_group)
-
-        slope_label = QtWidgets.QLabel(f"<b>{self.slope:.6f}</b>")
-        slope_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
-        value_layout.addRow("Slope:", slope_label)
-
-        gates_label = QtWidgets.QLabel(f"d({self.y_gate}) / d({self.x_gate})")
-        value_layout.addRow("Meaning:", gates_label)
-
-        layout.addWidget(value_group)
-
-        # Status message
-        if self.vgm_updated:
-            status_label = QtWidgets.QLabel(
-                "✓ Virtual gate matrix has been updated automatically."
-            )
-            status_label.setStyleSheet("color: green; font-weight: bold;")
-        else:
-            status_label = QtWidgets.QLabel(
-                "Virtual gate matrix GUI not found or gates not in matrix.\n"
-                "Use the buttons below to copy the value."
-            )
-            status_label.setStyleSheet("color: orange;")
-        layout.addWidget(status_label)
-
-        # Buttons
-        btn_layout = QtWidgets.QHBoxLayout()
-
-        copy_btn = QtWidgets.QPushButton("Copy Slope Value")
-        copy_btn.clicked.connect(self._copy_slope)
-        btn_layout.addWidget(copy_btn)
-
-        copy_neg_btn = QtWidgets.QPushButton("Copy Negative")
-        copy_neg_btn.clicked.connect(self._copy_negative)
-        copy_neg_btn.setToolTip("Copy -slope (for inverse relationship)")
-        btn_layout.addWidget(copy_neg_btn)
-
-        copy_inv_btn = QtWidgets.QPushButton("Copy Inverse")
-        copy_inv_btn.clicked.connect(self._copy_inverse)
-        copy_inv_btn.setToolTip("Copy 1/slope")
-        btn_layout.addWidget(copy_inv_btn)
-
-        layout.addLayout(btn_layout)
-
-        # Close button
-        close_btn = QtWidgets.QPushButton("Close")
-        close_btn.clicked.connect(self.accept)
-        layout.addWidget(close_btn)
-
-    def _copy_slope(self):
-        clipboard = QtWidgets.QApplication.clipboard()
-        clipboard.setText(f"{self.slope:.6f}")
-
-    def _copy_negative(self):
-        clipboard = QtWidgets.QApplication.clipboard()
-        clipboard.setText(f"{-self.slope:.6f}")
-
-    def _copy_inverse(self):
-        if abs(self.slope) > 1e-9:
-            clipboard = QtWidgets.QApplication.clipboard()
-            clipboard.setText(f"{1 / self.slope:.6f}")
-
-
 class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
     # class variable to keep the last instance alive and retrievable by other components.
     last_instance = None
@@ -485,20 +401,27 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
             f"Applying slope {slope:.4f} from {x_gate}/{y_gate} to virtual gates"
         )
 
-        # Try to find and update the virtual gate matrix GUI
-        vgm_updated = self._try_update_virtual_gate_matrix(slope, x_gate, y_gate)
+        # Early check: if x_gate and y_gate are the same, it's a diagonal
+        if self._normalize_gate_name(x_gate) == self._normalize_gate_name(y_gate):
+            self.slope_lines_panel.set_vgate_status(
+                f"Cannot update diagonal element. Sweep gates '{x_gate}' and '{y_gate}' are the same.",
+                success=False,
+            )
+            return
 
-        # Show dialog with options
-        dialog = SlopeToVGateDialog(self, slope, x_gate, y_gate, vgm_updated)
-        dialog.exec_()
+        # Try to find and update the virtual gate matrix GUI
+        success, message = self._try_update_virtual_gate_matrix(slope, x_gate, y_gate)
+
+        # Update status in the panel (instead of showing a dialog)
+        self.slope_lines_panel.set_vgate_status(message, success)
 
     def _try_update_virtual_gate_matrix(
         self, slope: float, x_gate: str, y_gate: str
-    ) -> bool:
+    ) -> tuple:
         """
         Try to find and update the virtual gate matrix GUI with the slope value.
 
-        Returns True if successfully updated, False otherwise.
+        Returns tuple of (success: bool, message: str)
         """
         try:
             # Look for open virtual gate matrix windows
@@ -506,36 +429,87 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
                 if widget.__class__.__name__ == "virt_gate_matrix_GUI":
                     # Found the virtual gate matrix GUI
                     # Try to find the matrix element for these gates
-                    return self._set_vgm_element(widget, slope, x_gate, y_gate)
+                    success, msg = self._set_vgm_element(widget, slope, x_gate, y_gate)
+                    if success:
+                        return (True, msg)
+            return (False, "Virtual gate matrix GUI not found. Open it first.")
         except Exception as e:
             logger.warning(f"Failed to update virtual gate matrix: {e}")
-        return False
+            return (False, f"Error: {e}")
 
-    def _set_vgm_element(self, vgm_gui, slope: float, x_gate: str, y_gate: str) -> bool:
+    def _normalize_gate_name(self, name: str) -> str:
+        """
+        Normalize a gate name for matching.
+        Removes common prefixes/suffixes and normalizes separators.
+        E.g., 'vQP_0' -> 'QP0', 'QP_1' -> 'QP1', 'QP1P' -> 'QP1'
+        """
+        import re
+
+        # Remove 'v' prefix if present (for virtual gates)
+        normalized = re.sub(r"^v", "", name, flags=re.IGNORECASE)
+        # Remove underscores and other separators
+        normalized = re.sub(r"[_\-\s]", "", normalized)
+        # Remove trailing 'P' (pulse gate suffix)
+        normalized = re.sub(r"P$", "", normalized)
+        return normalized
+
+    def _find_gate_in_list(self, gate_name: str, gate_list: list) -> int:
+        """
+        Find a gate in a list, using normalized matching.
+        Returns the index if found, -1 otherwise.
+        """
+        normalized_target = self._normalize_gate_name(gate_name)
+        for idx, name in enumerate(gate_list):
+            if self._normalize_gate_name(name) == normalized_target:
+                return idx
+        return -1
+
+    def _set_vgm_element(
+        self, vgm_gui, slope: float, x_gate: str, y_gate: str
+    ) -> tuple:
         """
         Try to set the virtual gate matrix element for the given gates.
 
         The slope from a 2D scan where x-axis is gate1 and y-axis is gate2
         indicates how gate2 changes relative to gate1 along the feature.
         This corresponds to the cross-capacitance: d(gate2)/d(gate1) = slope
+
+        The diagonal elements (where virtual gate corresponds to same real gate)
+        should always remain 1.0 and are never updated.
+
+        Returns tuple of (success: bool, message: str)
         """
         try:
             gates_object = vgm_gui.gates_object
             hardware = gates_object.hardware
 
             for virtual_gate_set in hardware.virtual_gates:
-                vg_names = virtual_gate_set.virtual_gate_names
-                rg_names = virtual_gate_set.real_gate_names
+                vg_names = list(virtual_gate_set.virtual_gate_names)
+                rg_names = list(virtual_gate_set.real_gate_names)
 
-                # Find indices for our gates
-                # x_gate is the swept gate (column), y_gate is the other axis (row)
-                if x_gate in rg_names and y_gate in vg_names:
-                    col_idx = rg_names.index(x_gate)
-                    row_idx = vg_names.index(y_gate)
+                # Find indices for our gates using normalized matching
+                # x_gate is the swept gate (column = real gate), y_gate is the other axis (row = virtual gate)
+                col_idx = self._find_gate_in_list(x_gate, rg_names)
+                row_idx = self._find_gate_in_list(y_gate, vg_names)
 
-                    # Set the matrix element
+                if col_idx >= 0 and row_idx >= 0:
+                    # Check if this would update a diagonal element
+                    # Diagonal is where virtual gate corresponds to same real gate
+                    virt_gate_normalized = self._normalize_gate_name(vg_names[row_idx])
+                    real_gate_normalized = self._normalize_gate_name(rg_names[col_idx])
+
+                    if virt_gate_normalized == real_gate_normalized:
+                        return (
+                            False,
+                            f"Cannot update diagonal element ({vg_names[row_idx]}/{rg_names[col_idx]}). Diagonal must remain 1.",
+                        )
+
+                    real_gate = rg_names[col_idx]
+                    virt_gate = vg_names[row_idx]
+
                     logger.info(
-                        f"Setting virtual gate matrix [{row_idx},{col_idx}] = {slope}"
+                        f"Setting virtual gate matrix [{row_idx},{col_idx}] "
+                        f"({virt_gate}/{real_gate}) = {slope}"
                     )
 
                     # Get current matrix and update
@@ -550,11 +524,14 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
                     ):
                         vgm_gui._on_matrix_changed()
 
-                    return True
+                    return (True, f"✓ Updated {virt_gate}/{real_gate} = {slope:.4f}")
+
+            # Gates not found in any virtual gate set
+            return (False, f"Gates '{x_gate}'/'{y_gate}' not found in matrix.")
 
         except Exception as e:
             logger.warning(f"Failed to set VGM element: {e}")
-        return False
+            return (False, f"Error setting VGM element: {e}")
 
     def _on_slopes_changed_2D(self, slopes: List[float]):
         """Handle slope changes from 2D plot."""
