@@ -1,7 +1,7 @@
 import logging
 import re
 from dataclasses import dataclass
-from typing import Optional, Dict, Any, Tuple, Union, Callable
+from typing import Optional, Dict, Any, Tuple, Union, Callable, List
 
 import numpy as np
 import pyqtgraph as pg
@@ -15,6 +15,7 @@ from core_tools.GUI.keysight_videomaps.data_saver.native import CoreToolsDataSav
 from core_tools.GUI.keysight_videomaps.data_getter.iq_modes import get_channel_map, get_channel_map_dig_4ch
 from core_tools.GUI.keysight_videomaps.data_getter import scan_generator_Virtual
 from core_tools.GUI.keysight_videomaps.plotter.plotting_functions import _1D_live_plot, _2D_live_plot
+from core_tools.GUI.keysight_videomaps.plotter.slope_lines import SlopeLinesPanel
 from core_tools.GUI.qt_util import qt_log_exception
 from core_tools.utility.powerpoint import addPPTslide
 
@@ -61,6 +62,88 @@ class plot_content:
 class param_getter:
     _1D: object()
     _2D: object()
+
+
+class SlopeToVGateDialog(QtWidgets.QDialog):
+    """Dialog for applying slope values to virtual gate matrix."""
+    
+    def __init__(self, parent, slope: float, x_gate: str, y_gate: str, vgm_updated: bool):
+        super().__init__(parent)
+        self.slope = slope
+        self.x_gate = x_gate
+        self.y_gate = y_gate
+        self.vgm_updated = vgm_updated
+        self._setup_ui()
+        
+    def _setup_ui(self):
+        self.setWindowTitle("Slope Measurement Result")
+        self.setMinimumWidth(400)
+        
+        layout = QtWidgets.QVBoxLayout(self)
+        
+        # Slope value display
+        value_group = QtWidgets.QGroupBox("Measured Slope")
+        value_layout = QtWidgets.QFormLayout(value_group)
+        
+        slope_label = QtWidgets.QLabel(f"<b>{self.slope:.6f}</b>")
+        slope_label.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        value_layout.addRow("Slope:", slope_label)
+        
+        gates_label = QtWidgets.QLabel(f"d({self.y_gate}) / d({self.x_gate})")
+        value_layout.addRow("Meaning:", gates_label)
+        
+        layout.addWidget(value_group)
+        
+        # Status message
+        if self.vgm_updated:
+            status_label = QtWidgets.QLabel(
+                "✓ Virtual gate matrix has been updated automatically."
+            )
+            status_label.setStyleSheet("color: green; font-weight: bold;")
+        else:
+            status_label = QtWidgets.QLabel(
+                "Virtual gate matrix GUI not found or gates not in matrix.\n"
+                "Use the buttons below to copy the value."
+            )
+            status_label.setStyleSheet("color: orange;")
+        layout.addWidget(status_label)
+        
+        # Buttons
+        btn_layout = QtWidgets.QHBoxLayout()
+        
+        copy_btn = QtWidgets.QPushButton("Copy Slope Value")
+        copy_btn.clicked.connect(self._copy_slope)
+        btn_layout.addWidget(copy_btn)
+        
+        copy_neg_btn = QtWidgets.QPushButton("Copy Negative")
+        copy_neg_btn.clicked.connect(self._copy_negative)
+        copy_neg_btn.setToolTip("Copy -slope (for inverse relationship)")
+        btn_layout.addWidget(copy_neg_btn)
+        
+        copy_inv_btn = QtWidgets.QPushButton("Copy Inverse")
+        copy_inv_btn.clicked.connect(self._copy_inverse)
+        copy_inv_btn.setToolTip("Copy 1/slope")
+        btn_layout.addWidget(copy_inv_btn)
+        
+        layout.addLayout(btn_layout)
+        
+        # Close button
+        close_btn = QtWidgets.QPushButton("Close")
+        close_btn.clicked.connect(self.accept)
+        layout.addWidget(close_btn)
+        
+    def _copy_slope(self):
+        clipboard = QtWidgets.QApplication.clipboard()
+        clipboard.setText(f"{self.slope:.6f}")
+        
+    def _copy_negative(self):
+        clipboard = QtWidgets.QApplication.clipboard()
+        clipboard.setText(f"{-self.slope:.6f}")
+        
+    def _copy_inverse(self):
+        if abs(self.slope) > 1e-9:
+            clipboard = QtWidgets.QApplication.clipboard()
+            clipboard.setText(f"{1/self.slope:.6f}")
 
 
 class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
@@ -249,6 +332,166 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         self.cursor_value_label.setMargin(2)
         self.cursor_value_label.setMinimumWidth(300)
         self.statusbar.addWidget(self.cursor_value_label)
+        
+        # Add slope info label to status bar
+        self.slope_info_label = QtWidgets.QLabel("")
+        self.slope_info_label.setMargin(2)
+        self.slope_info_label.setMinimumWidth(200)
+        self.statusbar.addWidget(self.slope_info_label)
+        
+        # Setup slope lines panel (will be shown on 2D tab)
+        self._setup_slope_lines_panel()
+
+    def _setup_slope_lines_panel(self):
+        """Setup the slope lines control panel for 2D plots."""
+        # Add slope lines checkbox to the general settings tab (Settings tab)
+        # Find the gridlayout in the settings tab to add our checkbox
+        self._add_slope_lines_checkbox_to_settings()
+        
+        # Create a collapsible dock widget for slope lines
+        self.slope_lines_dock = QtWidgets.QDockWidget("Slope Lines", self)
+        self.slope_lines_dock.setFeatures(
+            QtWidgets.QDockWidget.DockWidgetMovable | 
+            QtWidgets.QDockWidget.DockWidgetFloatable |
+            QtWidgets.QDockWidget.DockWidgetClosable
+        )
+        
+        # Create the panel
+        self.slope_lines_panel = SlopeLinesPanel()
+        self.slope_lines_panel.slope_to_vgates_requested.connect(self._on_slope_to_vgates)
+        
+        self.slope_lines_dock.setWidget(self.slope_lines_panel)
+        self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.slope_lines_dock)
+        
+        # Initially hide the dock
+        self.slope_lines_dock.hide()
+        
+    def _add_slope_lines_checkbox_to_settings(self):
+        """Add slope lines enable checkbox to the general settings tab."""
+        # Add label
+        self.label_slope_lines = QtWidgets.QLabel(self.verticalLayoutWidget)
+        self.label_slope_lines.setObjectName("label_slope_lines")
+        self.label_slope_lines.setText("Slope lines")
+        
+        # Add checkbox
+        self._gen_slope_lines = QtWidgets.QCheckBox(self.verticalLayoutWidget)
+        self._gen_slope_lines.setText("")
+        self._gen_slope_lines.setChecked(False)
+        self._gen_slope_lines.setObjectName("_gen_slope_lines")
+        self._gen_slope_lines.setToolTip(
+            "Enable drawing slope measurement lines on 2D plots.\n"
+            "Click to start a line, click again to finish.\n"
+            "Lines can be dragged and adjusted after creation."
+        )
+        self._gen_slope_lines.stateChanged.connect(self._on_slope_lines_checkbox_changed)
+        
+        # Add to the grid layout in the settings tab (after colorbar, row 22)
+        self.gridlayout.addWidget(self.label_slope_lines, 22, 0, 1, 1)
+        self.gridlayout.addWidget(self._gen_slope_lines, 22, 1, 1, 1)
+        
+        # Add a detail label
+        self.label_slope_lines_detail = QtWidgets.QLabel(self.verticalLayoutWidget)
+        self.label_slope_lines_detail.setText("(2D only)")
+        self.label_slope_lines_detail.setObjectName("label_slope_lines_detail")
+        self.gridlayout.addWidget(self.label_slope_lines_detail, 22, 3, 1, 1)
+        
+    @qt_log_exception
+    def _on_slope_lines_checkbox_changed(self, state):
+        """Handle slope lines checkbox state change."""
+        enabled = state == QtCore.Qt.Checked
+        
+        # Show/hide the dock widget
+        if enabled:
+            self.slope_lines_dock.show()
+        else:
+            self.slope_lines_dock.hide()
+            
+        # Update the panel's enable state
+        self.slope_lines_panel.enable_checkbox.setChecked(enabled)
+        
+        # If we have a 2D plot running, update it
+        if self.current_plot._2D is not None:
+            self.current_plot._2D.set_slope_lines_enabled(enabled)
+        
+    @qt_log_exception
+    def _on_slope_to_vgates(self, slope: float, x_gate: str, y_gate: str):
+        """Handle request to apply slope to virtual gates."""
+        logger.info(f"Applying slope {slope:.4f} from {x_gate}/{y_gate} to virtual gates")
+        
+        # Try to find and update the virtual gate matrix GUI
+        vgm_updated = self._try_update_virtual_gate_matrix(slope, x_gate, y_gate)
+        
+        # Show dialog with options
+        dialog = SlopeToVGateDialog(self, slope, x_gate, y_gate, vgm_updated)
+        dialog.exec_()
+
+    def _try_update_virtual_gate_matrix(self, slope: float, x_gate: str, y_gate: str) -> bool:
+        """
+        Try to find and update the virtual gate matrix GUI with the slope value.
+        
+        Returns True if successfully updated, False otherwise.
+        """
+        try:
+            # Look for open virtual gate matrix windows
+            for widget in QtWidgets.QApplication.topLevelWidgets():
+                if widget.__class__.__name__ == 'virt_gate_matrix_GUI':
+                    # Found the virtual gate matrix GUI
+                    # Try to find the matrix element for these gates
+                    return self._set_vgm_element(widget, slope, x_gate, y_gate)
+        except Exception as e:
+            logger.warning(f"Failed to update virtual gate matrix: {e}")
+        return False
+    
+    def _set_vgm_element(self, vgm_gui, slope: float, x_gate: str, y_gate: str) -> bool:
+        """
+        Try to set the virtual gate matrix element for the given gates.
+        
+        The slope from a 2D scan where x-axis is gate1 and y-axis is gate2
+        indicates how gate2 changes relative to gate1 along the feature.
+        This corresponds to the cross-capacitance: d(gate2)/d(gate1) = slope
+        """
+        try:
+            gates_object = vgm_gui.gates_object
+            hardware = gates_object.hardware
+            
+            for virtual_gate_set in hardware.virtual_gates:
+                vg_names = virtual_gate_set.virtual_gate_names
+                rg_names = virtual_gate_set.real_gate_names
+                
+                # Find indices for our gates
+                # x_gate is the swept gate (column), y_gate is the other axis (row)
+                if x_gate in rg_names and y_gate in vg_names:
+                    col_idx = rg_names.index(x_gate)
+                    row_idx = vg_names.index(y_gate)
+                    
+                    # Set the matrix element
+                    logger.info(f"Setting virtual gate matrix [{row_idx},{col_idx}] = {slope}")
+                    
+                    # Get current matrix and update
+                    current_matrix = np.array(virtual_gate_set.matrix, dtype=float)
+                    current_matrix[row_idx, col_idx] = slope
+                    virtual_gate_set.update_matrix(current_matrix, persist=False)
+                    
+                    # Trigger refresh of the GUI
+                    if hasattr(vgm_gui, '_on_matrix_changed') and vgm_gui._on_matrix_changed:
+                        vgm_gui._on_matrix_changed()
+                    
+                    return True
+                    
+        except Exception as e:
+            logger.warning(f"Failed to set VGM element: {e}")
+        return False
+
+    def _on_slopes_changed_2D(self, slopes: List[float]):
+        """Handle slope changes from 2D plot."""
+        if slopes:
+            # Update status bar with first slope
+            slope_text = f"Slopes: {', '.join(f'{s:.3f}' for s in slopes[:3])}"
+            if len(slopes) > 3:
+                slope_text += f" (+{len(slopes)-3} more)"
+            self.slope_info_label.setText(slope_text)
+        else:
+            self.slope_info_label.setText("")
 
     @property
     def tab_id(self):
@@ -690,6 +933,19 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
                         self._2D_filter_background.isChecked(),
                         self._gen_background_sigma.value()
                         )
+                
+                # Connect slope lines functionality
+                self.current_plot._2D.set_on_slopes_changed(self._on_slopes_changed_2D)
+                # Register slope managers with the panel
+                for manager in self.current_plot._2D.get_slope_managers():
+                    self.slope_lines_panel.register_manager(manager)
+                    
+                # Sync slope lines enabled state with checkbox
+                slope_lines_enabled = self._gen_slope_lines.isChecked()
+                self.current_plot._2D.set_slope_lines_enabled(slope_lines_enabled)
+                if slope_lines_enabled:
+                    self.slope_lines_dock.show()
+                
                 self.set_metadata()
                 logger.info('Finished init currentplot and current_param')
             else:
@@ -745,6 +1001,9 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         '''
         try:
             if self.current_plot._2D is not None:
+                # Unregister slope managers before removing plot
+                for manager in self.current_plot._2D.get_slope_managers():
+                    self.slope_lines_panel.unregister_manager(manager)
                 self.current_plot._2D.stop()
                 self.current_plot._2D.remove()
                 self.current_plot._2D = None

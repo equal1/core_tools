@@ -13,6 +13,7 @@ from PyQt5.QtCore import QThread
 from scipy import ndimage
 
 from .colors import compress_range, polar_to_rgb
+from .slope_lines import SlopeLinesManager
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,7 @@ class plot_widget_data:
     plot_widget: pg.PlotWidget  # widget.
     plot_items: list  # line in the plot.
     color_bar: any = None
+    slope_manager: any = None  # SlopeLinesManager for 2D plots
 
 
 class plot_param:
@@ -385,6 +387,8 @@ class _2D_live_plot(live_plot):
     _enhanced_contrast = False
     _filter_background = False
     _background_rel_sigma = 0.1
+    _slope_lines_enabled = False
+    _on_slopes_changed = None  # Callback for slope changes
 
     def init_plot(self):
         n_col = self.n_col
@@ -431,6 +435,18 @@ class _2D_live_plot(live_plot):
                 img.scene().sigMouseClicked,
                 slot=partial(self.mouse_clicked, plot_2D, i),
             )
+            
+            # Create slope lines manager for this plot
+            x_label = param.setpoint_names[1] if len(param.setpoint_names) > 1 else "x"
+            y_label = param.setpoint_names[0] if len(param.setpoint_names) > 0 else "y"
+            slope_manager = SlopeLinesManager(
+                plot_2D,
+                on_slope_changed=self._handle_slopes_changed,
+                x_label=x_label,
+                y_label=y_label
+            )
+            plot_data.slope_manager = slope_manager
+            
             self.plot_widgets.append(plot_data)
 
     def set_background_filter(self, enabled, rel_sigma):
@@ -454,6 +470,41 @@ class _2D_live_plot(live_plot):
                 # cb = pg.ColorBarItem(colorMap=colormap, interactive=False, width=14)
                 cb.setImageItem(pwd.plot_items[0], insert_in=pwd.plot_widget.plotItem)
                 pwd.color_bar = cb
+
+    def set_slope_lines_enabled(self, enabled: bool):
+        """Enable or disable slope line drawing mode."""
+        self._slope_lines_enabled = enabled
+        for pwd in self.plot_widgets:
+            if pwd.slope_manager:
+                pwd.slope_manager.enabled = enabled
+        logger.info(f"Slope lines {'enabled' if enabled else 'disabled'}")
+
+    def set_on_slopes_changed(self, callback):
+        """Set callback to be called when slopes change."""
+        self._on_slopes_changed = callback
+        
+    def _handle_slopes_changed(self, slopes):
+        """Internal handler for slope changes, forwards to external callback."""
+        if self._on_slopes_changed:
+            self._on_slopes_changed(slopes)
+
+    def get_slope_managers(self):
+        """Get list of all slope managers."""
+        return [pwd.slope_manager for pwd in self.plot_widgets if pwd.slope_manager]
+
+    def clear_all_slope_lines(self):
+        """Clear all slope lines from all plots."""
+        for pwd in self.plot_widgets:
+            if pwd.slope_manager:
+                pwd.slope_manager.clear_all_lines()
+
+    def get_all_slopes(self):
+        """Get all slopes from all plots."""
+        slopes = []
+        for pwd in self.plot_widgets:
+            if pwd.slope_manager:
+                slopes.extend(pwd.slope_manager.get_slopes())
+        return slopes
 
     def _get_plot_coords(self, plot, index, coordinates):
         if plot.sceneBoundingRect().contains(coordinates):
