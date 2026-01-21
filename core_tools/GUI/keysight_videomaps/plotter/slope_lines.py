@@ -419,10 +419,17 @@ class SlopeLinesPanel(QtWidgets.QWidget):
         )
         layout.addWidget(self.slopes_text)
 
-        # Clear button
+        # Clear and Copy buttons
+        btn_layout = QtWidgets.QHBoxLayout()
         self.clear_btn = QtWidgets.QPushButton("Clear All")
         self.clear_btn.clicked.connect(self._on_clear_clicked)
-        layout.addWidget(self.clear_btn)
+        btn_layout.addWidget(self.clear_btn)
+
+        self.copy_btn = QtWidgets.QPushButton("Copy Slopes")
+        self.copy_btn.setToolTip("Copy all slopes to clipboard")
+        self.copy_btn.clicked.connect(self._on_copy_clicked)
+        btn_layout.addWidget(self.copy_btn)
+        layout.addLayout(btn_layout)
 
         # Virtual gate application section
         vgate_group = QtWidgets.QGroupBox("Apply to Virtual Gates")
@@ -526,6 +533,19 @@ class SlopeLinesPanel(QtWidgets.QWidget):
         for manager in self.managers:
             manager.clear_all_lines()
         self.vgate_status_label.setText("")
+
+    def _on_copy_clicked(self):
+        """Copy all slopes to clipboard."""
+        if not self._raw_slopes:
+            return
+
+        values = []
+        for label, raw_slope in self._raw_slopes:
+            value_str = self._format_value(raw_slope)
+            values.append(value_str)
+
+        clipboard = QtWidgets.QApplication.clipboard()
+        clipboard.setText("\n".join(values))
 
     def _on_apply_vgate_clicked(self):
         """Apply selected slope to virtual gates."""
