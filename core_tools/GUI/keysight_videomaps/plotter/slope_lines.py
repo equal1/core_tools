@@ -10,12 +10,11 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, List, Optional
 
-import numpy as np
 import pyqtgraph as pg
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore, QtWidgets
 
 if TYPE_CHECKING:
-    from core_tools.GUI.virt_gate_matrix.virt_gate_matrix_main import virt_gate_matrix_GUI
+    pass
 
 logger = logging.getLogger(__name__)
 

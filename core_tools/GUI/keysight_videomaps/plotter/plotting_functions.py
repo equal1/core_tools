@@ -435,7 +435,7 @@ class _2D_live_plot(live_plot):
                 img.scene().sigMouseClicked,
                 slot=partial(self.mouse_clicked, plot_2D, i),
             )
-            
+
             # Create slope lines manager for this plot
             x_label = param.setpoint_names[1] if len(param.setpoint_names) > 1 else "x"
             y_label = param.setpoint_names[0] if len(param.setpoint_names) > 0 else "y"
@@ -443,10 +443,10 @@ class _2D_live_plot(live_plot):
                 plot_2D,
                 on_slope_changed=self._handle_slopes_changed,
                 x_label=x_label,
-                y_label=y_label
+                y_label=y_label,
             )
             plot_data.slope_manager = slope_manager
-            
+
             self.plot_widgets.append(plot_data)
 
     def set_background_filter(self, enabled, rel_sigma):
@@ -482,7 +482,7 @@ class _2D_live_plot(live_plot):
     def set_on_slopes_changed(self, callback):
         """Set callback to be called when slopes change."""
         self._on_slopes_changed = callback
-        
+
     def _handle_slopes_changed(self, slopes):
         """Internal handler for slope changes, forwards to external callback."""
         if self._on_slopes_changed:
