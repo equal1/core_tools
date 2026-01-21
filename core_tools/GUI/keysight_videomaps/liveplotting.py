@@ -373,6 +373,16 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         self.slope_info_label.setMinimumWidth(200)
         self.statusbar.addWidget(self.slope_info_label)
 
+        # Add slope lines toggle button to status bar
+        self._slopes_status_btn = QtWidgets.QToolButton()
+        self._slopes_status_btn.setText("Slopes")
+        self._slopes_status_btn.setToolTip(
+            "Toggle slope lines panel.\n"
+            "Enable drawing slope measurement lines on 2D plots."
+        )
+        self._slopes_status_btn.setStyleSheet("font-weight: bold; color: black;")
+        self.statusbar.addPermanentWidget(self._slopes_status_btn)
+
         # Setup slope lines panel (will be shown on 2D tab)
         self._setup_slope_lines_panel()
 
@@ -386,7 +396,6 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         self.slope_lines_dock = QtWidgets.QDockWidget("Slope Lines", self)
         self.slope_lines_dock.setFeatures(
             QtWidgets.QDockWidget.DockWidgetMovable
-            | QtWidgets.QDockWidget.DockWidgetFloatable
             | QtWidgets.QDockWidget.DockWidgetClosable
         )
 
@@ -398,6 +407,16 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
 
         self.slope_lines_dock.setWidget(self.slope_lines_panel)
         self.addDockWidget(QtCore.Qt.RightDockWidgetArea, self.slope_lines_dock)
+
+        # Link the status bar button to the dock's toggle action
+        toggle_action = self.slope_lines_dock.toggleViewAction()
+        toggle_action.setText("Slopes")
+        self._slopes_status_btn.setDefaultAction(toggle_action)
+
+        # Auto-enable slope lines when dock becomes visible
+        self.slope_lines_dock.visibilityChanged.connect(
+            self._on_slope_dock_visibility_changed
+        )
 
         # Initially hide the dock
         self.slope_lines_dock.hide()
@@ -450,6 +469,14 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         # If we have a 2D plot running, update it
         if self.current_plot._2D is not None:
             self.current_plot._2D.set_slope_lines_enabled(enabled)
+
+    @qt_log_exception
+    def _on_slope_dock_visibility_changed(self, visible: bool):
+        """Handle dock visibility change - auto-enable slope lines when dock opens."""
+        if visible:
+            # Auto-enable slope lines when dock becomes visible
+            self._gen_slope_lines.setChecked(True)
+            self.slope_lines_panel.enable_checkbox.setChecked(True)
 
     @qt_log_exception
     def _on_slope_to_vgates(self, slope: float, x_gate: str, y_gate: str):

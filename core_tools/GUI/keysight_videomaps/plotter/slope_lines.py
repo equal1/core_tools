@@ -39,15 +39,8 @@ class SlopeLinesManager:
     Slopes are displayed as labels on the lines and in a summary panel.
     """
 
-    # Line colors for multiple lines (cycling through)
-    LINE_COLORS = [
-        (255, 255, 0),  # Yellow
-        (0, 255, 255),  # Cyan
-        (255, 0, 255),  # Magenta
-        (0, 255, 0),  # Green
-        (255, 165, 0),  # Orange
-        (255, 255, 255),  # White
-    ]
+    # Single black color for all lines
+    LINE_COLOR = (0, 0, 0)  # Black
 
     def __init__(
         self,
@@ -139,10 +132,8 @@ class SlopeLinesManager:
         self._drawing = True
         self._start_pos = (x, y)
 
-        # Create line ROI
-        color_idx = len(self.lines) % len(self.LINE_COLORS)
-        color = self.LINE_COLORS[color_idx]
-        pen = pg.mkPen(color=color, width=2)
+        # Create line ROI with single white color
+        pen = pg.mkPen(color=self.LINE_COLOR, width=2)
 
         # Create with both points at start position initially
         line_roi = pg.LineSegmentROI(
@@ -152,12 +143,12 @@ class SlopeLinesManager:
 
         # Style the handles
         for handle in line_roi.getHandles():
-            handle.pen = pg.mkPen(color=color, width=2)
+            handle.pen = pg.mkPen(color=self.LINE_COLOR, width=2)
 
         self.plot_widget.addItem(line_roi)
 
         # Create label for slope display
-        label = pg.TextItem(text="slope: ...", color=color, anchor=(0.5, 1))
+        label = pg.TextItem(text="slope: ...", color=self.LINE_COLOR, anchor=(0.5, 1))
         label.setZValue(1001)
         self.plot_widget.addItem(label)
 
@@ -333,9 +324,7 @@ class SlopeLinesManager:
         Returns:
             The created SlopeLineData
         """
-        color_idx = len(self.lines) % len(self.LINE_COLORS)
-        color = self.LINE_COLORS[color_idx]
-        pen = pg.mkPen(color=color, width=2)
+        pen = pg.mkPen(color=self.LINE_COLOR, width=2)
 
         line_roi = pg.LineSegmentROI(
             positions=[(x1, y1), (x2, y2)], pen=pen, movable=True, removable=True
@@ -343,7 +332,7 @@ class SlopeLinesManager:
         line_roi.setZValue(1000)
         self.plot_widget.addItem(line_roi)
 
-        label = pg.TextItem(text="slope: ...", color=color, anchor=(0.5, 1))
+        label = pg.TextItem(text="slope: ...", color=self.LINE_COLOR, anchor=(0.5, 1))
         label.setZValue(1001)
         self.plot_widget.addItem(label)
 
