@@ -208,17 +208,17 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         table.verticalHeader().setDefaultSectionSize(26)
         grid_layout.addWidget(table, 0, 0, 1, 1)
 
-        state = {"v2r": False}
+        state = {"v2r": True}
         update_list: list[tuple[int, int, AutoFitDoubleSpinBox]] = []
 
         for col_pos, col_idx in enumerate(indices):
             header_item = QtWidgets.QTableWidgetItem()
-            header_item.setText(virtual_gate_set.real_gate_names[col_idx])
+            header_item.setText(virtual_gate_set.virtual_gate_names[col_idx])
             table.setHorizontalHeaderItem(col_pos, header_item)
 
         for row_pos, row_idx in enumerate(indices):
             header_item = QtWidgets.QTableWidgetItem()
-            header_item.setText(virtual_gate_set.virtual_gate_names[row_idx])
+            header_item.setText(virtual_gate_set.real_gate_names[row_idx])
             table.setVerticalHeaderItem(row_pos, header_item)
 
             for col_pos, col_idx in enumerate(indices):
@@ -230,7 +230,7 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
                 spin_box.setFrame(False)
                 spin_box.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
                 spin_box.setAlignment(QtCore.Qt.AlignCenter)
-                value = virtual_gate_set.get_element(row_idx, col_idx, v2r=False)
+                value = virtual_gate_set.get_element(row_idx, col_idx, v2r=True)
                 spin_box.setValue(value)
 
                 # Make diagonal elements read-only
