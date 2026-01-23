@@ -208,17 +208,19 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         table.verticalHeader().setDefaultSectionSize(26)
         grid_layout.addWidget(table, 0, 0, 1, 1)
 
+        # v2r=True shows compensation factors (what YAML describes)
+        # This shows how much each real gate changes when a virtual gate changes
         state = {"v2r": True}
         update_list: list[tuple[int, int, AutoFitDoubleSpinBox]] = []
 
         for col_pos, col_idx in enumerate(indices):
             header_item = QtWidgets.QTableWidgetItem()
-            header_item.setText(virtual_gate_set.virtual_gate_names[col_idx])
+            header_item.setText(virtual_gate_set.real_gate_names[col_idx])
             table.setHorizontalHeaderItem(col_pos, header_item)
 
         for row_pos, row_idx in enumerate(indices):
             header_item = QtWidgets.QTableWidgetItem()
-            header_item.setText(virtual_gate_set.real_gate_names[row_idx])
+            header_item.setText(virtual_gate_set.virtual_gate_names[row_idx])
             table.setVerticalHeaderItem(row_pos, header_item)
 
             for col_pos, col_idx in enumerate(indices):
@@ -329,8 +331,10 @@ class virt_gate_matrix_GUI(QtWidgets.QMainWindow, Ui_MainWindow):
         r2v_matrix = np.array(virtual_gate_set.matrix, dtype=float)
         try:
             if state["v2r"]:
+                # GUI has i=virtual, j=real but v2r has rows=real, cols=virtual
+                # So GUI position [i, j] maps to v2r[j, i]
                 v2r_matrix = np.linalg.inv(r2v_matrix)
-                v2r_matrix[i, j] = value
+                v2r_matrix[j, i] = value  # Note: transposed indices
                 r2v_new = np.linalg.inv(v2r_matrix)
             else:
                 r2v_new = r2v_matrix

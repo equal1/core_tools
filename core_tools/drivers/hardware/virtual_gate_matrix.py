@@ -127,14 +127,39 @@ class VirtualGateMatrix:
         return self.virtual_gate_names
 
     def get_element(self, i, j, v2r=True):
+        """Get matrix element.
+
+        Args:
+            i: row index (virtual gate index in GUI layout)
+            j: col index (real gate index in GUI layout)
+            v2r: If True, return v2r matrix element (compensation factors).
+                 For GUI display with rows=virtual, cols=real, this returns
+                 v2r[j, i] (transposed) so the YAML values appear correctly.
+                 If False, return r2v[i, j] directly.
+        """
         if v2r:
-            return self._v2r_matrix[i, j]
+            # GUI has rows=virtual (i), cols=real (j)
+            # v2r has rows=real, cols=virtual
+            # So v2r[real_idx, virtual_idx] = v2r[j, i]
+            return self._v2r_matrix[j, i]
         else:
             return self._r2v_matrix[i, j]
 
     def set_element(self, i, j, value, v2r=True):
+        """Set matrix element.
+
+        Args:
+            i: row index (virtual gate index in GUI layout)
+            j: col index (real gate index in GUI layout)
+            value: new value
+            v2r: If True, set v2r matrix element (compensation factors).
+                 For GUI with rows=virtual, cols=real, this sets
+                 v2r[j, i] (transposed).
+                 If False, set r2v[i, j] directly.
+        """
         if v2r:
-            self._v2r_matrix[i, j] = value
+            # Set v2r[j, i] since GUI i=virtual, j=real but v2r has rows=real, cols=virtual
+            self._v2r_matrix[j, i] = value
             self._r2v_matrix[:] = np.linalg.inv(self._v2r_matrix)
         else:
             self._r2v_matrix[i, j] = value
