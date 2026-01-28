@@ -1,7 +1,7 @@
 import logging
 import re
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import pyqtgraph as pg
@@ -91,6 +91,8 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
             str, Tuple[Union[int, str], Callable[[np.ndarray], np.ndarray]]
         ] = None,
         gates=None,
+        gate_filter_names: Optional[Sequence[str]] = None,
+        virtual_gate_filter_names: Optional[Sequence[str]] = None,
     ):
         """
         Args:
@@ -242,6 +244,17 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         self._2D_reset_average.clicked.connect(lambda: self._reset_2D_average())
 
         self.init_defaults(pulse_lib.channels, cust_defaults)
+        if gate_filter_names is None:
+            filtered_gate_names = list(pulse_lib.channels)
+        else:
+            filtered_gate_names = list(gate_filter_names)
+            if not filtered_gate_names:
+                filtered_gate_names = list(pulse_lib.channels)
+
+        self.set_available_gates(
+            filtered_gate_names,
+            virtual_gate_names=virtual_gate_filter_names,
+        )
 
         self._1D_save_data.clicked.connect(lambda: self.save_data())
         self._2D_save_data.clicked.connect(lambda: self.save_data())
@@ -746,6 +759,91 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         )
 
         self._channels = self.get_activated_channels()
+
+    def set_available_gates(
+        self,
+        real_gate_names: Sequence[str],
+        *,
+        virtual_gate_names: Optional[Sequence[str]] = None,
+    ) -> None:
+        """Limit gate selectors to ``real_gate_names`` and matching virtual gates."""
+
+        real_gate_names = list(dict.fromkeys(real_gate_names))
+        merged = list(real_gate_names)
+
+        if virtual_gate_names is None and self.gates is not None:
+            if hasattr(self.gates, "v_gates"):
+                try:
+                    virtual_gate_names = list(getattr(self.gates, "v_gates"))
+                except Exception:
+                    virtual_gate_names = None
+
+        if virtual_gate_names:
+            for candidate in list(dict.fromkeys(virtual_gate_names)):
+                base = candidate[1:] if candidate.startswith("v") else candidate
+                if base in real_gate_names and candidate not in merged:
+                    merged.append(candidate)
+
+        def _select_fallback(requested: Optional[str]) -> Optional[str]:
+            if not merged:
+                return None
+            if requested and requested in merged:
+                return requested
+            if requested:
+                base = requested[1:] if requested.startswith("v") else requested
+                virtual = f"v{base}"
+                if virtual in merged:
+                    return virtual
+                if base in merged:
+                    return base
+            for candidate in real_gate_names:
+                if candidate in merged:
+                    return candidate
+            return merged[0]
+
+        current_1d = self._1D_gate_name.currentText()
+        current_2d1 = self._2D_gate1_name.currentText()
+        current_2d2 = self._2D_gate2_name.currentText()
+
+        for combo in (self._1D_gate_name, self._2D_gate1_name, self._2D_gate2_name):
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItems(merged)
+            combo.blockSignals(False)
+
+        for requested, combo in (
+            (current_1d, self._1D_gate_name),
+            (current_2d1, self._2D_gate1_name),
+            (current_2d2, self._2D_gate2_name),
+        ):
+            fallback = _select_fallback(requested)
+            if fallback is not None:
+                combo.setCurrentText(fallback)
+
+        offset_combo_names = [
+            "_1D_offset1_name",
+            "_1D_offset2_name",
+            "_1D_offset3_name",
+            "_2D_offset1_name",
+            "_2D_offset2_name",
+            "_2D_offset3_name",
+        ]
+        for name in offset_combo_names:
+            combo = getattr(self, name, None)
+            if combo is None:
+                continue
+            current = combo.currentText()
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItem("<None>")
+            combo.addItems(merged)
+            if current in merged:
+                combo.setCurrentText(current)
+            else:
+                combo.setCurrentText("<None>")
+            combo.blockSignals(False)
+
+        self.gate_names = list(real_gate_names)
 
     def set_1D_settings(
         self,

@@ -1,17 +1,21 @@
 # -*- coding: utf-8 -*-
-import __main__ as main_package
-from typing import Optional
-from core_tools.GUI.param_viewer.param_viewer_GUI_window import Ui_MainWindow
-from PyQt5 import QtCore, QtWidgets
-import qcodes as qc
-from dataclasses import dataclass
-from ..qt_util import qt_log_exception
-import numpy as np
+import json
+import logging
 import os
 import sys
-import json
+from dataclasses import dataclass
 from pathlib import Path
-import logging
+from typing import Callable, Collection, Optional
+
+import numpy as np
+import qcodes as qc
+from PyQt5 import QtCore, QtWidgets
+
+import __main__ as main_package
+from core_tools.GUI.param_viewer.param_viewer_GUI_window import Ui_MainWindow
+
+from ..qt_util import qt_log_exception
+
 
 # For some reason we depend on the eq1x package for some utility functions
 def find_opx_element(opx_instr, search_name):
@@ -46,7 +50,10 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
     def __init__(self, gates_object: Optional[object] = None,
                  max_diff: float = 1000,
                  keysight_rf: Optional[object] = None,
-                 locked=False):
+                 locked=False,
+                 visible_real_gates: Optional[Collection[str]] = None,
+                 visible_virtual_gates: Optional[Collection[str]] = None,
+                 virtual_gate_normaliser: Optional[Callable[[str], str]] = None):
         self.real_gates = list()
         self.virtual_gates = list()
         self.rf_settings = list()
@@ -54,6 +61,7 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
         self.max_diff = max_diff
         self.keysight_rf = keysight_rf
         self.locked = locked
+        self._row_widget_heights = {}
         self.real_gates_qt_voltage_input = dict()
         self.SETTINGS_DICT = dict()
         self.command_line_settings_file = None
@@ -132,7 +140,12 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
                     qt_voltage_input = self.real_gates_qt_voltage_input[gate_name]
                     qt_voltage_input.setValue( val )
 
+        if visible_real_gates is not None:
+            self.hide_gates_not_in("Real", visible_real_gates)
 
+        if visible_virtual_gates is not None:
+            normalise = virtual_gate_normaliser or (lambda name: name)
+            self.hide_gates_not_in("Virtual", visible_virtual_gates, normalise=normalise)
 
         self.step_size.clear()
         items = [100, 50, 20, 10, 5, 2, 1, 0.5, 0.2, 0.1]
@@ -151,6 +164,72 @@ class param_viewer(QtWidgets.QMainWindow, Ui_MainWindow):
         self.show()
         if not instance_ready:
             self.app.exec()
+
+    def update_all_tabs(self) -> None:
+        """Refresh every tab while restoring the previously selected tab."""
+        tab_widget = getattr(self, "tab_menu", None)
+        if tab_widget is None:
+            return
+
+        original_index = tab_widget.currentIndex()
+        tab_count = tab_widget.count()
+
+        for index in range(tab_count):
+            if tab_widget.currentIndex() != index:
+                tab_widget.setCurrentIndex(index)
+            self._update_parameters()
+
+        if tab_count:
+            tab_widget.setCurrentIndex(original_index)
+            self._update_parameters()
+
+    def hide_gates_not_in(
+        self,
+        tab_name: str,
+        allowed_names: Collection[str],
+        *,
+        normalise: Optional[Callable[[str], str]] = None,
+    ) -> None:
+        """Hide gate rows whose (optionally normalised) name is not allowed."""
+        allowed = set(allowed_names)
+        if not allowed:
+            normalise = normalise or (lambda name: name)
+        normalise = normalise or (lambda name: name)
+
+        tab_key = (tab_name or "").lower()
+        if "real" in tab_key:
+            params = self.real_gates
+        elif "virtual" in tab_key:
+            params = self.virtual_gates
+        elif "rf" in tab_key:
+            params = self.rf_settings
+        else:
+            return
+
+        for param_data in params:
+            gate_name = normalise(param_data.param_parameter.name)
+            self._set_param_row_visible(param_data, gate_name in allowed)
+
+    def _set_param_row_visible(self, param_data: param_data_obj, visible: bool) -> None:
+        widgets = [
+            self.findChild(QtWidgets.QWidget, param_data.param_parameter.name),
+            self.findChild(QtWidgets.QWidget, param_data.param_parameter.name + "_input"),
+            self.findChild(QtWidgets.QWidget, param_data.param_parameter.name + "_unit"),
+        ]
+        for widget in widgets:
+            if widget is None:
+                continue
+            if not visible:
+                if widget not in self._row_widget_heights:
+                    self._row_widget_heights[widget] = widget.sizeHint().height()
+                widget.hide()
+                widget.setFixedHeight(0)
+            else:
+                previous_height = self._row_widget_heights.get(widget)
+                widget.show()
+                if previous_height is None:
+                    previous_height = widget.sizeHint().height()
+                widget.setFixedHeight(previous_height)
 
     @qt_log_exception
     def closeEvent(self, event):
