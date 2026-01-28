@@ -530,8 +530,15 @@ class SlopeLinesPanel(QtWidgets.QWidget):
 
     def _on_clear_clicked(self):
         """Clear all slope lines."""
+        self.clear_all_lines()
+
+    def clear_all_lines(self):
+        """Clear all slope lines and reset the panel display."""
         for manager in self.managers:
             manager.clear_all_lines()
+        # Ensure UI is cleared even if no managers are registered.
+        self._raw_slopes = []
+        self._update_slopes_display()
         self.vgate_status_label.setText("")
 
     def _on_copy_clicked(self):

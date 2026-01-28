@@ -337,6 +337,13 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         # Initially hide the dock
         self.slope_lines_dock.hide()
 
+    def _clear_slope_lines(self):
+        """Clear slope lines and related UI state."""
+        if hasattr(self, "slope_lines_panel"):
+            self.slope_lines_panel.clear_all_lines()
+        if hasattr(self, "slope_info_label"):
+            self.slope_info_label.setText("")
+
     def _add_slope_lines_checkbox_to_settings(self):
         """Add slope lines enable checkbox to the general settings tab."""
         # Add label
@@ -1126,6 +1133,7 @@ class liveplotting(QtWidgets.QMainWindow, Ui_MainWindow):
         update settings of the plot -- e.g. switch gate, things that require a re-upload of the data. ~
         """
         try:
+            self._clear_slope_lines()
             if self.current_plot._2D is not None:
                 # Unregister slope managers before removing plot
                 for manager in self.current_plot._2D.get_slope_managers():
