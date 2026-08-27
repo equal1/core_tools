@@ -92,6 +92,21 @@ class SQL_database_manager:
     @classmethod
     def _configure_local_db(cls):
         conn = cls._connection
+        if SQL_conn_info_local.is_sqlite:
+            # The measurement-dataset schema and its migrations are PostgreSQL
+            # only: SERIAL columns, USING BTREE indexes, ADD COLUMN IF NOT
+            # EXISTS, multi-statement execute() and psycopg2 error codes. None
+            # of it ports to sqlite as written, and none of it is needed by the
+            # hardware settings tables (virtual gate matrices, AWG attenuations),
+            # which create their own tables on demand.
+            #
+            # So on sqlite the connection is a hardware settings store only.
+            # Measurement data must go somewhere else -- e.g. QCodesDataSaver.
+            logger.info(
+                "sqlite database: hardware settings only, "
+                "dataset schema is not created"
+            )
+            return
         local_database_update_routine(conn)
         sample_info_queries.add_sample(conn)
         conn.commit()

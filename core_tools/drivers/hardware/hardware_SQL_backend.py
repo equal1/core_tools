@@ -3,7 +3,17 @@ from core_tools.data.SQL.SQL_common_commands import select_elements_in_table, in
 from core_tools.data.SQL.connect import sample_info
 
 import psycopg2, json
+import sqlite3
 import numpy as np
+
+
+def _blob_to_bytes(value):
+    """Read a bytea/BLOB column back, whichever driver produced it.
+
+    psycopg2 returns a memoryview, sqlite3 returns plain bytes.
+    """
+    return value.tobytes() if hasattr(value, 'tobytes') else value
+
 
 class virtual_gate_queries:
     @staticmethod
@@ -24,7 +34,9 @@ class virtual_gate_queries:
         if len(res) == 0: #if empty
             return list(), list(), np.asarray([[],])
 
-        return json.loads(res[0]['real_gates'].tobytes()), json.loads(res[0]['virtual_gates'].tobytes()), np.asarray(json.loads(res[0]['vg_matrix'].tobytes()))
+        return (json.loads(_blob_to_bytes(res[0]['real_gates'])),
+                json.loads(_blob_to_bytes(res[0]['virtual_gates'])),
+                np.asarray(json.loads(_blob_to_bytes(res[0]['vg_matrix']))))
 
     @staticmethod
     def set_virtual_gate_matrix(conn, name, real_gates, virtual_gates, vg_matrix):
@@ -51,7 +63,13 @@ class virtual_gate_queries:
 
     @staticmethod
     def check_table_exist(conn):
-        return_data = execute_query(conn, "SELECT to_regclass('{}');".format(virtual_gate_queries.table_name()))
+        table = virtual_gate_queries.table_name()
+        if isinstance(conn, sqlite3.Connection):
+            # sqlite has no to_regclass; the catalogue is sqlite_master
+            return_data = execute_query(
+                conn, "SELECT name FROM sqlite_master WHERE type='table' AND name='{}';".format(table))
+        else:
+            return_data = execute_query(conn, "SELECT to_regclass('{}');".format(table))
 
         if len(return_data) == 0 or return_data[0][0] is None:
             return False
@@ -81,7 +99,8 @@ class AWG_2_dac_ratio_queries:
         gate_ratio_pairs = dict()
 
         if len(res) != 0:
-            gates, ratios = json.loads(res[0]['real_gates'].tobytes()), json.loads(res[0]['ratios'].tobytes())
+            gates, ratios = (json.loads(_blob_to_bytes(res[0]['real_gates'])),
+                             json.loads(_blob_to_bytes(res[0]['ratios'])))
             for i in range(len(gates)):
                 gate_ratio_pairs[gates[i]] = ratios[i]
 
